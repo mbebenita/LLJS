@@ -135,3 +135,61 @@ function bitCount(i) {
   i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
   return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
 }
+
+var IndentingWriter = (function () {
+  function indentingWriter(suppressOutput) {
+    this.tab = "  ";
+    this.padding = "";
+    this.suppressOutput = suppressOutput;
+  }
+
+  indentingWriter.prototype.writeLn = function writeLn(str) {
+    if (!this.suppressOutput) {
+      console.info(this.padding + str);
+    }
+  };
+
+  indentingWriter.prototype.enter = function enter(str) {
+    if (!this.suppressOutput) {
+      console.info(this.padding + str);
+    }
+    this.indent();
+  };
+
+  indentingWriter.prototype.leave = function leave(str) {
+    this.outdent();
+    if (!this.suppressOutput) {
+      console.info(this.padding + str);
+    }
+  };
+
+  indentingWriter.prototype.indent = function indent() {
+    this.padding += this.tab;
+  };
+
+  indentingWriter.prototype.outdent = function outdent() {
+    if (this.padding.length > 0) {
+      this.padding = this.padding.substring(0, this.padding.length - this.tab.length);
+    }
+  };
+
+  indentingWriter.prototype.writeArray = function writeArray(arr, detailed) {
+    detailed = detailed || false;
+    for (var i = 0, j = arr.length; i < j; i++) {
+      var prefix = "";
+      if (detailed) {
+        if (arr[i] === null) {
+          prefix = "null";
+        } else if (arr[i] === undefined) {
+          prefix = "undefined";
+        } else {
+          prefix = arr[i].constructor.name;
+        }
+        prefix += " ";
+      } 
+      this.writeLn(("" + i).padRight(' ', 3) + prefix + arr[i]);
+    }
+  };
+
+  return indentingWriter;
+})();

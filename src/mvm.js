@@ -8,12 +8,19 @@ var BitMap = (function () {
   const ADDRESS_BITS_PER_WORD = 5;
   const BITS_PER_WORD = 1 << ADDRESS_BITS_PER_WORD;
   const BIT_INDEX_MASK = BITS_PER_WORD - 1;
-  function bitMap(size) {
-    this.size = ((size + (BITS_PER_WORD - 1)) >> ADDRESS_BITS_PER_WORD) << ADDRESS_BITS_PER_WORD; 
+  function bitMap(length) {
+    this.length = length;
+    this.size = ((length + (BITS_PER_WORD - 1)) >> ADDRESS_BITS_PER_WORD) << ADDRESS_BITS_PER_WORD; 
     this.bits = new Uint32Array(this.size >> ADDRESS_BITS_PER_WORD);
   }
   bitMap.prototype.set = function set(i) {
     this.bits[i >> ADDRESS_BITS_PER_WORD] |= 1 << (i & BIT_INDEX_MASK);
+  };
+  bitMap.prototype.setAll = function setAll() {
+    var bits = this.bits;
+    for (var i = 0, j = bits.length; i < j; i++) {
+      bits[i] = 0xFFFFFFFF;
+    }
   };
   bitMap.prototype.clear = function clear(i) {
     this.bits[i >> ADDRESS_BITS_PER_WORD] &= ~(1 << (i & BIT_INDEX_MASK));
@@ -31,6 +38,31 @@ var BitMap = (function () {
   return bitMap;
 })();
 
+var NodeSet = (function () {
+  function nodeSet(nodes) {
+    this.nodes = nodes;
+    this.map = new BitMap(nodes.length);
+  }
+  nodeSet.prototype.set = function set(node) {
+    this.map.set(node.id);
+  };
+  nodeSet.prototype.get = function get(node) {
+    return this.map.get(node.id);
+  };
+  nodeSet.prototype.toString = function toString() {
+    var list = [];
+    this.forEach(list.push.bind(list));
+    return "{" + list.join(", ") + "}";
+  };
+  nodeSet.prototype.forEach = function forEach(fn) {
+    for (var i = 0; i < this.map.length; i++) {
+      if (this.map.get(i)) {
+        fn(this.nodes[i]);
+      }
+    }
+  }
+  return nodeSet;
+})();
 
 var Node = (function () {
   function node() {
@@ -42,6 +74,7 @@ var Node = (function () {
 var Block = (function () {
   function block() {
     Node.call(this);
+    this.predecessors = [];
     this.last = null;
   }
   Object.defineProperty(block.prototype, "successors", {
@@ -54,7 +87,8 @@ var Block = (function () {
   });
   block.prototype.toString = function toString() {
     var s = this.successors.map(function (block) { return block.id; }).join(",");
-    return "B" + this.id + "[" + s + "]";
+    // return "B" + this.id + "[" + s + "]";
+    return "B" + this.id;
   }
   return block;
 })();
@@ -103,10 +137,12 @@ var Graph = (function () {
         var str = "Block: " + block.id;
         str += (block.dominator ? ", idom: " + block.dominator.id : "");
         str += (block.isLoopHeader ? " [loop header]" : "");
+        str += (block.interval ? ", interval: " + block.interval.header.id : "");
         str += ('loops' in block ? " [loops " + block.loops + "]" : "");
         return str;
       }, {
-        color: function (block) { return (1 + bitPos(block.loops)) % 10 ; }
+        color: function (block) { 
+          return 1 + (block.interval ? block.interval.header.id % 10 : 0) ; }
       } 
     );
   };
@@ -226,7 +262,114 @@ var Graph = (function () {
     
     var loop = visit(this.root);
     assert(loop === 0);
-  } 
+  }
+  graph.prototype.computeReversePostOrder = function computeReversePostOrder() {
+    var order = [];
+    this.depthFirstSearch(null, order.push.bind(order));
+    order.reverse();
+    return order;
+  };
+  graph.prototype.computePredecessors = function computePredecessors() {
+    this.nodes.forEach(function (node) {
+      node.successors.forEach(function (succ) {
+        succ.predecessors.push(node);
+      });
+    });
+  };
+  /**
+   * Computes the Allen-Cocke interval partitioning. Optionally, the interval information can be applied to blocks 
+   * directly, so that blocks point to their containing interval.
+   */
+  graph.prototype.computeIntervals = function computeIntervals(apply) {
+    var order = this.computeReversePostOrder();
+    
+    var headers = [this.root];
+    var processedHeaders = new NodeSet(this.nodes);
+
+    // console.info("Reverse Post Order: " + order);
+    
+    var intervals = [];
+    while (headers.length > 0) {
+      var header = headers.pop();
+      processedHeaders.set(header);
+      
+      var interval = new NodeSet(this.nodes);
+      interval.set(header);
+      
+      console.info("Interval: " + interval);
+      
+      /**
+       * Expand interval by adding all nodes whose predecessors are within the interval.
+       */
+      var expandedInterval = true;
+      while (expandedInterval) {
+        expandedInterval = false;
+        for (var i = 0; i < order.length; i++) {
+          var node = order[i];
+          console.info("Node: " + node + ", predecessors: " + node.predecessors);
+          if (node === this.root) {
+            continue;
+          }
+          if (interval.get(node)) {
+            continue;
+          }
+          
+          var allPredecessorsInInterval = node.predecessors.length > 0;
+          for (var j = 0; j < node.predecessors.length; j++) {
+            var predecessor = node.predecessors[j];  
+            if (!interval.get(predecessor)) {
+              allPredecessorsInInterval = false;
+              break;
+            }
+          }
+          if (allPredecessorsInInterval) {
+            console.info("Node: " + node + " has all preds " + node.predecessors + " in interval " + interval);
+            interval.set(node);
+            expandedInterval = true;
+            console.info("Expanded Interval: " + interval);
+          }
+        }
+      }
+      
+      intervals.push({header: header, body: interval});
+      
+      /**
+       * Add header nodes which have not been processed and have at least one predecessor in the interval.
+       */
+      for (var i = 0; i < order.length; i++) {
+        var node = order[i];
+        console.info("Node: " + node + ", processedHeaders: " + processedHeaders);
+        if (processedHeaders.get(node)) {
+          continue;
+        }
+        console.info("Int: " + interval);
+        if (interval.get(node)) {
+          continue;
+        }
+        console.info("Node Preds: " + node.predecessors);
+        for (var j = 0; j < node.predecessors.length; j++) {
+          var predecessor = node.predecessors[j];
+          console.info("Pred: " + predecessor);
+          if (interval.get(predecessor)) {
+            headers.push(node);
+            break;
+          }
+        }
+      }
+    }
+
+    if (apply) {
+      intervals.forEach(function (interval) {
+        interval.body.forEach(function (node) {
+          node.interval = interval;
+        });
+      });  
+    }
+    
+    intervals.forEach(function (interval) {
+      console.info("Interval: header: " + interval.header + ", nodes: " + interval.body);
+    });
+  };
   return graph;
 })();
 
