@@ -572,24 +572,29 @@ function BitSetFunctor(length) {
 };
 
 
+var consoleWriter = {
+  writeLn: function (x) {
+    console.info(x);
+  }
+};
 
 var IndentingWriter = (function () {
   function indentingWriter(suppressOutput, out) {
     this.tab = "  ";
     this.padding = "";
     this.suppressOutput = suppressOutput;
-    this.out = out || console;
+    this.out = out || consoleWriter;
   }
 
   indentingWriter.prototype.writeLn = function writeLn(str) {
     if (!this.suppressOutput) {
-      this.out.info(this.padding + str);
+      this.out.writeLn(this.padding + str);
     }
   };
 
   indentingWriter.prototype.enter = function enter(str) {
     if (!this.suppressOutput) {
-      this.out.info(this.padding + str);
+      this.out.writeLn(this.padding + str);
     }
     this.indent();
   };
@@ -597,7 +602,7 @@ var IndentingWriter = (function () {
   indentingWriter.prototype.leave = function leave(str) {
     this.outdent();
     if (!this.suppressOutput) {
-      this.out.info(this.padding + str);
+      this.out.writeLn(this.padding + str);
     }
   };
 
