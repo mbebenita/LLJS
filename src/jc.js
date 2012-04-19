@@ -341,7 +341,7 @@ print (JSON.stringify(program, null, 2));
 
   var global = new Scope();
 
-  function readMemory(address, type, offset) {
+  function accessMemory(address, type, offset) {
     if (type === types.int || type instanceof PointerType) {
       return "M[" + address + " + " + offset + "]";
     }
@@ -415,7 +415,7 @@ print (JSON.stringify(program, null, 2));
       var base = walkExpression(this.base, match, o);
       if (this.name.dereference) {
         var field = this.base.type.type.getField(this.name.name);
-        return readMemory(base, field.type, field.offset);
+        return accessMemory(base, field.type, field.offset);
       }
       return notImplemented();
     },

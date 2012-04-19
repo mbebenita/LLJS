@@ -1,13 +1,23 @@
-struct Node {
-  int value,
-  Node * next
-}
+struct Node { int value, Node * next }
 
 Node * head, tail = null;
 
-function Node * add(int value) {
+function Node * addNode(int value) {
   Node * node = new Node;
   node->value = value;
   head->next = node;
   head = node;
+}
+
+function int count (Node * node) {
+  int sum = 0;
+  while (node) {
+    sum = node->value;
+    node = node->next;
+  }
+  return sum;
+}
+
+for (int i = 0; i < 1000; i++) {
+  addNode(i);
 }
