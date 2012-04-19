@@ -1,24 +1,13 @@
 struct Node {
-  dynamic value,
+  int value,
   Node * next
 }
 
+Node * head, tail = null;
 
-Node * head;
-
-
-function add(dynamic value) {
+function Node * add(int value) {
   Node * node = new Node;
   node->value = value;
   head->next = node;
   head = node;
 }
-
-/*
-var List = (function () {
-  var Node * head;
-  function list() {
-    head = new Node;
-  }
-})();
-*/

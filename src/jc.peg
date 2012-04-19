@@ -523,7 +523,7 @@ MemberExpression
     accessors:(
         __ "[" __ name:Expression __ "]" { return name; }
       / __ "." __ name:IdentifierName    { return name; }
-      / __ "->" __ name:IdentifierName   { return {tag: "ptr", name: name}; }
+      / __ "->" __ name:IdentifierName   { return {dereference:true, name: name}; }
     )* {
       var result = base;
       for (var i = 0; i < accessors.length; i++) {
@@ -572,6 +572,13 @@ CallExpression
       / __ "." __ name:IdentifierName {
           return {
             tag:  "PropertyAccessProperty",
+            name: name
+          };
+        }
+      / __ "->" __ name:IdentifierName {
+          return {
+            tag:  "PropertyAccessProperty",
+            derefrence: true,
             name: name
           };
         }
@@ -1137,7 +1144,8 @@ VariableDeclaration
       return {
         tag:   "VariableDeclaration",
         name:  name,
-        value: value !== "" ? value : null
+        value: value !== "" ? value : null,
+        position: computeErrorPosition()
       };
     }
 
@@ -1160,7 +1168,7 @@ EmptyStatement
   = ";" { return { tag:  "EmptyStatement" }; }
 
 ExpressionStatement
-  = !("{" / FunctionToken) expression:Expression EOS { return expression; }
+  = !("{" / FunctionToken) expression:Expression EOS { return { tag: "ExpressionStatement", expression:expression }; }
 
 IfStatement
   = IfToken __
@@ -1414,13 +1422,14 @@ DebuggerStatement
 /* ===== A.5 Functions and Programs ===== */
 
 FunctionDeclaration
-  = FunctionToken __ name:Identifier __
+  = FunctionToken __ type:Type __ name:Identifier __
     "(" __ params:FormalParameterList? __ ")" __
     "{" __ elements:FunctionBody __ "}" {
       return {
         tag:      "Function",
         name:     name,
         params:   params !== "" ? params : [],
+        type:     type,
         elements: elements
       };
     }
