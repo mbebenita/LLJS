@@ -299,6 +299,23 @@ var Scope = (function () {
     },
     ExpressionStatement: function ExpressionStatement(o) {
       return walkExpression(this.expression, match, o);
+    },
+    WhileStatement: function WhileStatement(o) {
+      walk(this.statement, match, o);
+    },
+    ForStatement: function ForStatement(o) {
+      o = {scope: new Scope(o.scope)};
+      walk(this.initializer, match, o);
+      walk(this.test, match, o);
+      walk(this.counter, match, o);
+      walk(this.statement, match, o);
+    },
+    Block: function Block(o) {
+      o = {scope: new Scope(o.scope)};
+      walk(this.statements, match, o);
+    },
+    FunctionCall: function FunctionCall(o) {
+      walk(this.arguments, match, o);
     }
   };
   walk(program, match);
@@ -339,11 +356,15 @@ print (JSON.stringify(program, null, 2));
     VariableStatement: function VariableStatement(o) {
       assert (o.scope);
       var type = this.type;
-      writer.writeLn("var " +
+      var str = "var " +
       this.declarations.map(function (x) {
         o.scope.add(x.name, new Variable(x.name, type, 0));
         return x.name + " = " + walkExpression(x.value, match, o);
-      }).join(", ") + ";");
+      }).join(", ");
+      if (this.inForInitializer) {
+        return str;
+      }
+      writer.writeLn(str + ";");
     },
     VariableDeclaration: function VariableDeclaration(o) {
       return walkExpression(this.value, match, o);
@@ -402,6 +423,37 @@ print (JSON.stringify(program, null, 2));
       var v = o.scope.get(this.name);
       assert (v);
       return v.name;
+    },
+    WhileStatement: function WhileStatement(o) {
+      writer.enter("while (" + walkExpression(this.condition, match, o) + ") {");
+      walk(this.statement, match, o);
+      writer.leave("}");
+    },
+    Block: function Block(o) {
+      o = {scope: new Scope(o.scope)};
+      walk(this.statements, match, o);
+    },
+    ReturnStatement: function ReturnStatement(o) {
+      writer.writeLn("return " + walkExpression(this.value, match, o) + ";");
+    },
+    ForStatement: function ForStatement(o) {
+      o = {scope: new Scope(o.scope), isExpression: true};
+      writer.enter("for (" +
+        walkExpression(this.initializer, match, o) + "; " +
+        walkExpression(this.test, match, o) + "; " +
+        walkExpression(this.counter, match, o) + ") {"
+      );
+      walk(this.statement, match, o);
+      writer.leave("}");
+    },
+    PostfixExpression: function PostfixExpression(o) {
+      return walkExpression(this.expression, match, o) + this.operator;
+    },
+    FunctionCall: function FunctionCall(o) {
+      return this.name.name + "(" +
+        this.arguments.map(function (x) {
+        return walkExpression(x, match, o);
+      }).join(", ") + ")";
     }
   };
   walk(program, match);

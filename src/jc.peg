@@ -1213,10 +1213,12 @@ ForStatement
   = ForToken __
     "(" __
     initializer:(
-        VarToken __ declarations:VariableDeclarationListNoIn {
+        type:Type __ declarations:VariableDeclarationListNoIn {
           return {
             tag:          "VariableStatement",
-            declarations: declarations
+            type: type,
+            declarations: declarations,
+            inForInitializer: true
           };
         }
       / ExpressionNoIn?
