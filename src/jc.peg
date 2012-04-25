@@ -1440,12 +1440,12 @@ DebuggerStatement
 
 FunctionDeclaration
   = FunctionToken __ type:TypeName __ name:Identifier __
-    "(" __ params:FormalParameterList? __ ")" __
+    "(" __ parameters:FormalParameterList? __ ")" __
     "{" __ elements:FunctionBody __ "}" {
       return {
         tag:      "Function",
         name:     name,
-        params:   params !== "" ? params : [],
+        parameters:   parameters !== "" ? parameters : [],
         type:     type,
         elements: elements
       };
@@ -1453,12 +1453,12 @@ FunctionDeclaration
 
 FunctionExpression
   = FunctionToken __ name:Identifier? __
-    "(" __ params:FormalParameterList? __ ")" __
+    "(" __ parameters:FormalParameterList? __ ")" __
     "{" __ elements:FunctionBody __ "}" {
       return {
         tag:      "Function",
         name:     name !== "" ? name : null,
-        params:   params !== "" ? params : [],
+        parameters:   parameters !== "" ? parameters : [],
         elements: elements
       };
     }
@@ -1599,11 +1599,11 @@ ParameterList
   }
 
 ParameterDeclaration
-  = typeSpecifier:TypeSpecifier __ ad:AbstractDeclarator? {
+  = typeSpecifier:TypeSpecifier __ d:(Declarator / AbstractDeclarator)? {
     return {
       tag: "ParameterDeclaration",
       typeSpecifier: typeSpecifier,
-      abstractDeclarator: ad !== "" ? ad : null
+      declarator: d !== "" ? d : null
     };
   }
 
@@ -1626,6 +1626,7 @@ TypeSpecifier
 	/ "i32"
 	/ "int"
 	/ "uint"
+  / "dyn"
 	/ Identifier
 
 AbstractDeclarator

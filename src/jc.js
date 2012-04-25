@@ -30,7 +30,7 @@ options.parse(arguments.slice(0, arguments.length - 1));
 if (generateParser.value) {
   var parser = P.buildParser(snarf("jc.peg", "text"), { trackLineAndColumn: true});
   print("var parser = " + parser.toSource() + ";");
-  quit();
+  // quit();
 } else {
   load("parser.js");
 }

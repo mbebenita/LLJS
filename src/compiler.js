@@ -81,7 +81,7 @@ function compile(source) {
       return this.name || (this.name = this.base + stars(this.pointers + 1));
     };
     pointerType.prototype.toJSON = function () {
-      return this.base + stars(this.pointers + 1);
+      return this.toString();
     };
     pointerType.prototype.getSize = function () {
       return 4;
@@ -102,6 +102,9 @@ function compile(source) {
     }
     functionType.prototype.toString = function () {
       return this.name || (this.name = this.returnType + "(" + this.parameterTypes.join(", ") + ")");
+    };
+    functionType.prototype.toJSON = function () {
+      return this.toString();
     };
     functionType.prototype.assignableFrom = function (other) {
       if (other === types.void) {
@@ -148,7 +151,8 @@ function compile(source) {
     u32: new Type("u32", 4, 0),
     i32: new Type("i32", 4, 0),
 
-    void: new Type("void", undefined, 0)
+    void: new Type("void", undefined, 0),
+    dyn: new Type("dyn", undefined, 0)
   };
 
   function createType(node) {
@@ -244,6 +248,7 @@ function compile(source) {
 
   (function computeTypes(program) {
     var global = new Scope();
+
     var match = {
       Program: function Program() {
         walk(this.elements, match, {scope: global});
@@ -288,13 +293,18 @@ function compile(source) {
       },
       ParameterDeclaration: function ParameterDeclaration(o) {
         var type = getType(this.typeSpecifier);
-        if (this.abstractDeclarator) {
-          type = walkExpression(this.abstractDeclarator, match, { type: type });
+        if (this.declarator) {
+          o = Object.create(o, {type: {value: type}});
+          type = walkExpression(this.declarator, match, o);
         }
         return type;
       },
       ArrayDeclarator: function ArrayDeclarator(o) {
         notImplemented();
+      },
+      TypeName: function TypeName(o) {
+        o = Object.create(o, {type: {value: getType(this.typeSpecifier)}});
+        return walkExpression(this.declarator, match, o);
       },
       Void: function Void() {
         return types.void;
@@ -313,8 +323,15 @@ function compile(source) {
       },
       Function: function Function(o) {
         o = {scope: new Scope(o.scope)};
-        walk(this.params, match, o);
+        var parameterTypes = [];
+        this.parameters = this.parameters.map(function (x) {
+          var type = walkExpression(x, match, o);
+          parameterTypes.push(type);
+          return {name: x.declarator.directDeclarator.name, type: type};
+        });
         walk(this.elements, match, o);
+        var returnType = walkExpression(this.type, match, o);
+        this.type = new FunctionType(returnType, parameterTypes);
       },
       Parameter: function Parameter(o) {
         this.type = createType(this.type);
@@ -448,9 +465,9 @@ function compile(source) {
       },
       Function: function Function(o) {
         o = {scope: new Scope(o.scope)};
-        walk(this.params, match, o);
+        walk(this.parameters, match, o);
         writer.enter("function " + this.name + "(" +
-          this.params.map(function (x) {
+          this.parameters.map(function (x) {
             o.scope.add(x.name, new Variable(x.name, x.type, 0));
             return x.name;
           }).join(", ") + ") {");
@@ -512,8 +529,7 @@ function compile(source) {
       }
     };
     walk(program, match);
-  });
-  //(program);
+  })(program);
 
   // str = new Function (str).toString();
 
