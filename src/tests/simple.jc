@@ -1,23 +1,22 @@
-struct Node { int value, Node * next }
+// int **a[][][];
 
-Node * head, tail = null;
+int *a(int, int *());
 
-function Node * addNode(int value) {
-  Node * node = new Node;
-  node->value = value;
-  head->next = node;
-  head = node;
+
+/*
+int a;
+int * b;
+int * c[3];
+int i, *pi, *const cpi;
+int f(), *fpi(), (*pfi)();
+int strcpy(int *dest, int *source);
+int f(), *fpi(), (*pfi)();
+
+function int f(int *a, int b) {
+
 }
+*/
 
-function int count (Node * node) {
-  int sum = 0;
-  while (node) {
-    sum = node->value;
-    node = node->next;
-  }
-  return sum;
-}
-
-for (int i = 0; i < 1000; i++) {
-  addNode(i);
-}
+//int (*)[] d;
+// int *() e;
+//int (*[])(void) f;

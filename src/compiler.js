@@ -8,12 +8,15 @@ function compile(source) {
       this.size = size;
       this.defaultValue = defaultValue;
     };
+
     type.prototype.toString = function () {
       return this.name;
     };
+
     type.prototype.toJSON = function () {
       return this.name;
     };
+
     type.prototype.getSize = function () {
       if (this.size) {
         return this.size;
@@ -26,6 +29,7 @@ function compile(source) {
       this.size = size;
       return size;
     };
+
     type.prototype.assignableFrom = function (other) {
       if (other === types.void) {
         return true;
@@ -51,6 +55,7 @@ function compile(source) {
       }
       return null;
     };
+
     return type;
   })();
 
@@ -73,7 +78,7 @@ function compile(source) {
       return str;
     }
     pointerType.prototype.toString = function () {
-      return this.base + stars(this.pointers + 1);
+      return this.name || (this.name = this.base + stars(this.pointers + 1));
     };
     pointerType.prototype.toJSON = function () {
       return this.base + stars(this.pointers + 1);
@@ -90,6 +95,22 @@ function compile(source) {
     return pointerType;
   })();
 
+  var FunctionType = (function () {
+    function functionType(returnType, parameterTypes) {
+      this.returnType = returnType;
+      this.parameterTypes = parameterTypes;
+    }
+    functionType.prototype.toString = function () {
+      return this.name || (this.name = this.returnType + "(" + this.parameterTypes.join(", ") + ")");
+    };
+    functionType.prototype.assignableFrom = function (other) {
+      if (other === types.void) {
+        return true;
+      }
+      return other instanceof FunctionType;
+    };
+    return functionType;
+  })();
 
   function walk(node, match, options) {
     assert (node);
@@ -118,6 +139,15 @@ function compile(source) {
 
   var types = {
     int: new Type("int", 4, 0),
+    uint: new Type("uint", 4, 0),
+
+    u8: new Type("u8", 1, 0),
+    i8: new Type("i8", 1, 0),
+    u16: new Type("u16", 2, 0),
+    i16: new Type("i16", 2, 0),
+    u32: new Type("u32", 4, 0),
+    i32: new Type("i32", 4, 0),
+
     void: new Type("void", undefined, 0)
   };
 
@@ -157,27 +187,30 @@ function compile(source) {
     });
   })(program);
 
-  function printError(position, message) {
+  function reportError(position, message) {
     var str = "";
     if (position) {
+      /*
       str = source.split("\n")[position.line - 1] + "\n";
       for (var i = 0; i < position.column - 1; i++) {
         str += " ";
       }
       str += "^ ";
+      */
+      str = position.line + ":" + position.column+ " ";
     }
-    print(str + message);
+    throw new Error(str + message);
   }
 
   function checkTypeAssignment(node, a, b) {
     if (!a.assignableFrom(b)) {
-      printError(node.position, "Unassignable types " + a + " <= " + b);
+      reportError(node.position, "Unassignable types " + a + " <= " + b);
     }
   }
 
   function check(node, condition, message) {
     if (!condition) {
-      printError(node.position, message);
+      reportError(node.position, message);
     }
   }
 
@@ -199,10 +232,14 @@ function compile(source) {
 
     scope.prototype.add = function add(name, symbol) {
       assert (name);
+      print("Adding name: " + name + ", symbol: " + symbol + " to scope.");
       this.symbols[name] = symbol;
     };
     return scope;
   })();
+
+
+  print (JSON.stringify(program, null, 2));
 
 
   (function computeTypes(program) {
@@ -214,13 +251,50 @@ function compile(source) {
       Struct: function () {},
       VariableStatement: function VariableStatement(o) {
         assert (o.scope);
-        this.type = createType(this.type);
-        walk(this.declarations, match, Object.create(o, {type: {value: this.type}}));
+        o = Object.create(o, {type: {value: getType(this.typeSpecifier)}});
+        walk(this.declarations, match, o);
       },
       VariableDeclaration: function VariableDeclaration(o) {
-        var type = walkExpression(this.value, match, o);
-        checkTypeAssignment(this, o.type, type);
-        o.scope.add(this.name, o.type);
+        var type = walkExpression(this.declarator, match, o);
+        var valueType = walkExpression(this.value, match, o);
+        checkTypeAssignment(this, type, valueType);
+      },
+      Declarator: function Declarator(o) {
+        var type = o.type;
+        if (this.pointer) {
+          for (var i = 0; i < this.pointer.count; i++) {
+            type = new PointerType(type);
+          }
+        }
+        o = Object.create(o, {type: {value: type}});
+        return walkExpression(this.directDeclarator, match, o);
+      },
+      DirectDeclarator: function DirectDeclarator(o) {
+        assert (o.type);
+        var type = o.type;
+        for (var i = this.declaratorSuffix.length - 1; i >= 0; i--) {
+          type = walkExpression(this.declaratorSuffix[i], match, { returnType: type });
+        }
+        if (this.name) {
+          o.scope.add(this.name, type);
+        }
+        return type;
+      },
+      FunctionDeclarator: function FunctionDeclarator(o) {
+        var parameterTypes = this.parameterList ? this.parameterList.map(function (x) {
+          return walkExpression(x, match, o);
+        }) : [];
+        return new FunctionType(o.returnType, parameterTypes);
+      },
+      ParameterDeclaration: function ParameterDeclaration(o) {
+        var type = getType(this.typeSpecifier);
+        if (this.abstractDeclarator) {
+          type = walkExpression(this.abstractDeclarator, match, { type: type });
+        }
+        return type;
+      },
+      ArrayDeclarator: function ArrayDeclarator(o) {
+        notImplemented();
       },
       Void: function Void() {
         return types.void;
@@ -294,7 +368,7 @@ function compile(source) {
     walk(program, match);
   })(program);
 
-  // print (JSON.stringify(program, null, 2));
+  print (JSON.stringify(program, null, 2));
 
   var str = "";
   var writer = new IndentingWriter(false, {writeLn: function (x) {
@@ -316,9 +390,15 @@ function compile(source) {
 
     var global = new Scope();
 
+    function log2(x) {
+      return Math.log(x) / Math.LN2;
+    }
+
     function accessMemory(address, type, offset) {
-      if (type === types.int || type instanceof PointerType) {
-        return "M[" + address + " + " + offset + "]";
+      if (type === types.int) {
+        return "I32[" + address + " + " + offset + " >> " + log2(type.getSize()) + "]";
+      } else if (type === types.uint || type instanceof PointerType) {
+        return "U32[" + address + " + " + offset + " >> " + log2(type.getSize()) + "]";
       }
       return notImplemented(type);
     };
@@ -381,7 +461,7 @@ function compile(source) {
         o.scope.add(this.name, new Variable(this.name, this.type, 0));
       },
       NewOperator: function () {
-        return "allocate(" + this.type.type.getSize() + ")";
+        return "malloc(" + this.type.type.getSize() + ")";
       },
       NullLiteral: function NullLiteral() {
         return types.void.defaultValue;
@@ -432,7 +512,10 @@ function compile(source) {
       }
     };
     walk(program, match);
-  })(program);
+  });
+  //(program);
+
+  // str = new Function (str).toString();
 
   return str;
 }

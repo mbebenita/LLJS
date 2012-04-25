@@ -123,6 +123,7 @@ UnicodeConnectorPunctuation
 ReservedWord
   = Keyword
   / FutureReservedWord
+  / TypeReservedWord
   / NullLiteral
   / BooleanLiteral
 
@@ -166,6 +167,20 @@ FutureReservedWord
       / "extends"
       / "import"
       / "super"
+    )
+    !IdentifierPart
+
+TypeReservedWord
+  = (
+        "void"
+	    / "u8"
+	    / "i8"
+	    / "u16"
+	    / "i16"
+	    / "u32"
+	    / "i32"
+	    / "int"
+	    / "uint"
     )
     !IdentifierPart
 
@@ -1113,11 +1128,11 @@ Type
     }
 
 VariableStatement
-  = type:Type __ declarations:VariableDeclarationList EOS {
+  = typeSpecifier:TypeSpecifier __ declarations:VariableDeclarationList EOS {
       return {
-        tag:          "VariableStatement",
+        tag: "VariableStatement",
         declarations: declarations,
-        type: type
+        typeSpecifier: typeSpecifier
       };
     }
 
@@ -1140,20 +1155,20 @@ VariableDeclarationListNoIn
     }
 
 VariableDeclaration
-  = name:Identifier __ value:Initialiser? {
+  = declarator:Declarator __ value:Initialiser? {
       return {
         tag:   "VariableDeclaration",
-        name:  name,
+        declarator:  declarator,
         value: value !== "" ? value : null,
         position: computeErrorPosition()
       };
     }
 
 VariableDeclarationNoIn
-  = name:Identifier __ value:InitialiserNoIn? {
+  = declarator:Declarator __ value:InitialiserNoIn? {
       return {
         tag:   "VariableDeclaration",
-        name:  name,
+        declarator:  declarator,
         value: value !== "" ? value : null
       };
     }
@@ -1424,7 +1439,7 @@ DebuggerStatement
 /* ===== A.5 Functions and Programs ===== */
 
 FunctionDeclaration
-  = FunctionToken __ type:Type __ name:Identifier __
+  = FunctionToken __ type:TypeName __ name:Identifier __
     "(" __ params:FormalParameterList? __ ")" __
     "{" __ elements:FunctionBody __ "}" {
       return {
@@ -1477,13 +1492,16 @@ StructDeclarationList
     }
 
 FormalParameter
-  = type:Type __ name:Identifier {
+  = ParameterDeclaration
+/*
+  type:Type __ name:Identifier {
     return {
       tag: "Parameter",
       name: name,
       type: type
     }
   }
+*/
 
 FormalParameterList
   = head:FormalParameter tail:(__ "," __ FormalParameter)* {
@@ -1536,3 +1554,113 @@ SourceElement
 /* ===== A.8 JSON ===== */
 
 /* Irrelevant. */
+
+/* ===== C Grammar ===== */
+
+Declarator
+  = p:Pointer? __ dd:DirectDeclarator {
+    return {
+      tag: "Declarator",
+      pointer: p !== "" ? p : null,
+      directDeclarator: dd
+    };
+  }
+
+DirectDeclarator
+  = name:Identifier __ ds:DeclaratorSuffix* {
+    return {
+      tag: "DirectDeclarator",
+      name: name,
+      declaratorSuffix: ds
+    }
+  }
+  / "(" declarator:Declarator ")" __ ds:DeclaratorSuffix* {
+    return {
+      tag: "DirectDeclarator",
+      declarator: declarator,
+      declaratorSuffix: ds
+    };
+  }
+
+DeclaratorSuffix
+  = "[" __ nl:NumericLiteral __ "]" { return { tag: "ArrayDeclarator", Value: nl}; }
+  / "[" __ "]" { return { tag: "ArrayDeclarator" }; }
+  / "(" pl:ParameterList ")" { return { tag: "FunctionDeclarator", parameterList:pl }; }
+  / "(" ")" { return { tag: "FunctionDeclarator" }; }
+
+
+ParameterList
+  = head:ParameterDeclaration tail:(__ "," __ ParameterDeclaration)* {
+    var result = [head];
+    for (var i = 0; i < tail.length; i++) {
+      result.push(tail[i][3]);
+    }
+    return result;
+  }
+
+ParameterDeclaration
+  = typeSpecifier:TypeSpecifier __ ad:AbstractDeclarator? {
+    return {
+      tag: "ParameterDeclaration",
+      typeSpecifier: typeSpecifier,
+      abstractDeclarator: ad !== "" ? ad : null
+    };
+  }
+
+TypeName
+	= ts:TypeSpecifier __ ad:AbstractDeclarator? {
+    return {
+      tag: "TypeName",
+      typeSpecifier: ts,
+      declarator: ad
+    };
+  }
+
+TypeSpecifier
+	= "void"
+	/ "u8"
+	/ "i8"
+	/ "u16"
+	/ "i16"
+	/ "u32"
+	/ "i32"
+	/ "int"
+	/ "uint"
+	/ Identifier
+
+AbstractDeclarator
+  = p:Pointer? __  dad:DirectAbstractDeclarator? {
+    return {
+      tag: "Declarator",
+      pointer: p !== "" ? p : null,
+      directDeclarator: dad
+    };
+  }
+
+DirectAbstractDeclarator
+  = ds:AbstractDeclaratorSuffix* {
+    return {
+      tag: "DirectDeclarator",
+      declaratorSuffix: ds
+    }
+  }
+  / "(" declarator:AbstractDeclarator ")" __ ds:AbstractDeclaratorSuffix* {
+    return {
+      tag: "DirectDeclarator",
+      declarator: declarator,
+      declaratorSuffix: ds
+    };
+  }
+
+AbstractDeclaratorSuffix
+  = "[" __ nl:NumericLiteral __ "]" { return { tag: "ArrayDeclarator", Value: nl}; }
+  / "[" __ "]" { return { tag: "ArrayDeclarator" }; }
+  / "(" pl:ParameterList ")" { return { tag: "FunctionDeclarator", parameterList:pl }; }
+  / "(" ")" { return { tag: "FunctionDeclarator" }; }
+
+Pointer
+  = "*" __ p:Pointer? {
+    return {
+      tag: "Pointer", count: p !== "" ? p.count + 1 : 1
+    };
+  }
