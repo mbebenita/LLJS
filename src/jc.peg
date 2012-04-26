@@ -1128,7 +1128,7 @@ Type
     }
 
 VariableStatement
-  = typeSpecifier:TypeSpecifier __ declarations:VariableDeclarationList EOS {
+  = VarToken __ typeSpecifier:TypeSpecifier __ declarations:VariableDeclarationList EOS {
       return {
         tag: "VariableStatement",
         declarations: declarations,
@@ -1228,10 +1228,10 @@ ForStatement
   = ForToken __
     "(" __
     initializer:(
-        type:Type __ declarations:VariableDeclarationListNoIn {
+        VarToken __ typeSpecifier:TypeSpecifier __ declarations:VariableDeclarationListNoIn {
           return {
             tag:          "VariableStatement",
-            type: type,
+            typeSpecifier: typeSpecifier,
             declarations: declarations,
             inForInitializer: true
           };
@@ -1465,25 +1465,25 @@ FunctionExpression
 
 StructDeclaration "struct"
   = StructToken __ name:Identifier __
-    "{" __ elements:StructDeclarationList? __ "}" {
+    "{" __ declarations:FieldDeclarationList? __ "}" {
       return {
-        tag:      "Struct",
+        tag:      "StructDeclaration",
         name:     name,
-        elements: elements
+        declarations: declarations
       };
     }
 
-StructDeclarator
-  = type:Type __ name:Identifier {
+FieldDeclaration
+  = typeSpecifier:TypeSpecifier __ declarator:Declarator {
     return {
-      tag: "StructDeclarator",
-      name: name,
-      type: type
+      tag: "FieldDeclaration",
+      typeSpecifier: typeSpecifier,
+      declarator:declarator
     }
   }
 
-StructDeclarationList
-  = head:StructDeclarator tail:(__ "," __ StructDeclarator)* {
+FieldDeclarationList
+  = head:FieldDeclaration tail:(__ "," __ FieldDeclaration)* {
       var result = [head];
       for (var i = 0; i < tail.length; i++) {
         result.push(tail[i][3]);
@@ -1585,21 +1585,11 @@ DirectDeclarator
 DeclaratorSuffix
   = "[" __ nl:NumericLiteral __ "]" { return { tag: "ArrayDeclarator", Value: nl}; }
   / "[" __ "]" { return { tag: "ArrayDeclarator" }; }
-  / "(" pl:ParameterList ")" { return { tag: "FunctionDeclarator", parameterList:pl }; }
+  / "(" pl:AbstractParameterList ")" { return { tag: "FunctionDeclarator", parameterList:pl }; }
   / "(" ")" { return { tag: "FunctionDeclarator" }; }
 
-
-ParameterList
-  = head:ParameterDeclaration tail:(__ "," __ ParameterDeclaration)* {
-    var result = [head];
-    for (var i = 0; i < tail.length; i++) {
-      result.push(tail[i][3]);
-    }
-    return result;
-  }
-
 ParameterDeclaration
-  = typeSpecifier:TypeSpecifier __ d:(Declarator / AbstractDeclarator)? {
+  = typeSpecifier:TypeSpecifier __ d:Declarator? {
     return {
       tag: "ParameterDeclaration",
       typeSpecifier: typeSpecifier,
@@ -1612,7 +1602,7 @@ TypeName
     return {
       tag: "TypeName",
       typeSpecifier: ts,
-      declarator: ad
+      declarator: ad !== "" ? ad : null
     };
   }
 
@@ -1630,34 +1620,59 @@ TypeSpecifier
 	/ Identifier
 
 AbstractDeclarator
-  = p:Pointer? __  dad:DirectAbstractDeclarator? {
+  = p:Pointer __  dad:DirectAbstractDeclarator? {
     return {
       tag: "Declarator",
-      pointer: p !== "" ? p : null,
-      directDeclarator: dad
+      pointer: p,
+      directDeclarator: dad !== "" ? dad : null
     };
+  }
+  / dad:DirectAbstractDeclarator {
+    return {
+      tag: "Declarator",
+      directDeclarator: dad
+    }
   }
 
 DirectAbstractDeclarator
-  = ds:AbstractDeclaratorSuffix* {
-    return {
-      tag: "DirectDeclarator",
-      declaratorSuffix: ds
-    }
-  }
-  / "(" declarator:AbstractDeclarator ")" __ ds:AbstractDeclaratorSuffix* {
+  = "(" declarator:AbstractDeclarator ")" __ ds:AbstractDeclaratorSuffix* {
     return {
       tag: "DirectDeclarator",
       declarator: declarator,
       declaratorSuffix: ds
     };
   }
+  / ds:AbstractDeclaratorSuffix+ {
+    return {
+      tag: "DirectDeclarator",
+      declaratorSuffix: ds
+    }
+  }
 
 AbstractDeclaratorSuffix
   = "[" __ nl:NumericLiteral __ "]" { return { tag: "ArrayDeclarator", Value: nl}; }
   / "[" __ "]" { return { tag: "ArrayDeclarator" }; }
-  / "(" pl:ParameterList ")" { return { tag: "FunctionDeclarator", parameterList:pl }; }
+  / "(" pl:AbstractParameterList ")" { return { tag: "FunctionDeclarator", parameterList:pl }; }
   / "(" ")" { return { tag: "FunctionDeclarator" }; }
+
+AbstractParameterList
+  = head:AbstractParameterDeclaration tail:(__ "," __ AbstractParameterDeclaration)* {
+    var result = [head];
+    for (var i = 0; i < tail.length; i++) {
+      result.push(tail[i][3]);
+    }
+    return result;
+  }
+
+AbstractParameterDeclaration
+  = typeSpecifier:TypeSpecifier __ d:AbstractDeclarator? {
+    return {
+      tag: "ParameterDeclaration",
+      typeSpecifier: typeSpecifier,
+      declarator: d !== "" ? d : null
+    };
+  }
+
 
 Pointer
   = "*" __ p:Pointer? {

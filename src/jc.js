@@ -1,6 +1,7 @@
 load("util.js");
 load("peg.js");
 load("compiler.js");
+load("memory.js");
 
 var options = new OptionSet("option(s)");
 
@@ -30,11 +31,16 @@ options.parse(arguments.slice(0, arguments.length - 1));
 if (generateParser.value) {
   var parser = P.buildParser(snarf("jc.peg", "text"), { trackLineAndColumn: true});
   print("var parser = " + parser.toSource() + ";");
-  // quit();
+  quit();
 } else {
   load("parser.js");
 }
 
 var source = snarf(file, "text");
 
-print (compile(source));
+print (compile(source, false));
+
+
+// var o = new Function (compile(source))();
+
+// o.add(10);

@@ -1,6 +1,13 @@
 
-function compile(source) {
+function compile(source, generateExports) {
   var program = parser.parse(source);
+
+
+  function check(node, condition, message) {
+    if (!condition) {
+      reportError(node, message);
+    }
+  }
 
   var Type = (function () {
     function type(name, size, defaultValue) {
@@ -78,7 +85,14 @@ function compile(source) {
       return str;
     }
     pointerType.prototype.toString = function () {
-      return this.name || (this.name = this.base + stars(this.pointers + 1));
+      if (this.name) {
+        return this.name;
+      }
+      if (this.type instanceof FunctionType) {
+        return this.name = this.type.returnType.toString() + "(*)" + "(" + this.type.parameterTypes.join(", ") + ")";
+      } else {
+        return this.name = this.type.toString() + "*";
+      }
     };
     pointerType.prototype.toJSON = function () {
       return this.toString();
@@ -112,6 +126,9 @@ function compile(source) {
       }
       return other instanceof FunctionType;
     };
+    functionType.prototype.getSize = function () {
+      return 4;
+    };
     return functionType;
   })();
 
@@ -121,13 +138,14 @@ function compile(source) {
     if (typeof nodes.length === "undefined") {
       nodes = [nodes];
     }
+    var results = [];
     for (var i = 0; i < nodes.length; i++) {
       node = nodes[i];
       if (node.tag in match) {
-        // print (node.tag + " " + (options && Object.keys(options)));
-        match[node.tag].call(node, options);
+        results.push(match[node.tag].call(node, options));
       }
     }
+    return results;
   }
 
   function walkExpression(node, match, options) {
@@ -156,6 +174,7 @@ function compile(source) {
   };
 
   function createType(node) {
+    assert (node);
     assert (node.tag === "Type", "Invalid node type : " + node.tag);
     assert (node.name in types, "Type " + node.name + " is not defined.");
     var type = types[node.name];
@@ -174,25 +193,30 @@ function compile(source) {
 
   (function gatherStructs(program) {
     walk(program.elements, {
-      Struct: function Struct() {
+      StructDeclaration: function StructDeclaration() {
         assert (!(this.name in types), "Type " + this.name + " is already defined.");
         types[this.name] = new Type(this.name);
       }
     });
 
+    /*
     walk(program.elements, {
       Struct: function Struct() {
         var type = types[this.name];
-        assert (this.elements.length);
+        check (this, this.elements.length, "Structs must have at least one field declaration.");
         this.elements.forEach(function (x) {
           type.addField(x.name, createType(x.type));
         });
       }
     });
+    */
+
   })(program);
 
-  function reportError(position, message) {
+  function reportError(node, message) {
     var str = "";
+    var position = node.position;
+
     if (position) {
       /*
       str = source.split("\n")[position.line - 1] + "\n";
@@ -201,27 +225,26 @@ function compile(source) {
       }
       str += "^ ";
       */
-      str = position.line + ":" + position.column+ " ";
+      str = "At " + position.line + ":" + position.column + ": ";
+    } else {
+      str = "At " + node.tag + ": ";
     }
+
     throw new Error(str + message);
   }
 
   function checkTypeAssignment(node, a, b) {
     if (!a.assignableFrom(b)) {
-      reportError(node.position, "Unassignable types " + a + " <= " + b);
-    }
-  }
-
-  function check(node, condition, message) {
-    if (!condition) {
-      reportError(node.position, message);
+      reportError(node, "Unassignable types " + a + " <= " + b);
     }
   }
 
   var Scope = (function () {
-    function scope(parent) {
+    function scope(parent, name) {
+      this.name = name;
       this.parent = parent;
       this.symbols = {};
+      this.symbolList = [];
     }
 
     scope.prototype.get = function get(name) {
@@ -236,33 +259,56 @@ function compile(source) {
 
     scope.prototype.add = function add(name, symbol) {
       assert (name);
-      print("Adding name: " + name + ", symbol: " + symbol + " to scope.");
+      print("Adding name: " + name + ", symbol: " + symbol + " to scope " + this + ".");
       this.symbols[name] = symbol;
+      this.symbolList.push({name: name, symbol: symbol});
     };
+
+    scope.prototype.toString = function toString() {
+      return this.name;
+    };
+
     return scope;
   })();
 
-
   print (JSON.stringify(program, null, 2));
 
-
   (function computeTypes(program) {
-    var global = new Scope();
+    var global = new Scope(null, "global");
 
     var match = {
       Program: function Program() {
         walk(this.elements, match, {scope: global});
       },
-      Struct: function () {},
       VariableStatement: function VariableStatement(o) {
         assert (o.scope);
         o = Object.create(o, {type: {value: getType(this.typeSpecifier)}});
-        walk(this.declarations, match, o);
+        this.declarations = walk(this.declarations, match, o);
       },
       VariableDeclaration: function VariableDeclaration(o) {
         var type = walkExpression(this.declarator, match, o);
+        var name = o.scope.symbolList.last().name;
         var valueType = walkExpression(this.value, match, o);
         checkTypeAssignment(this, type, valueType);
+        return {name: name, type: type, value: this.value};
+      },
+      StructDeclaration: function StructDeclaration(o) {
+        var type = types[this.name];
+        assert (type);
+        check (this, this.declarations.length, "Structs must have at least one field declaration.");
+        var scope = new Scope();
+        walk(this.declarations, match, {scope: scope});
+        scope.symbolList.forEach(function (s) {
+          type.addField(s.name, s.symbol);
+        });
+      },
+      FieldDeclaration: function FieldDeclaration(o) {
+        var type = getType(this.typeSpecifier);
+        if (this.declarator) {
+          o = Object.create(o, {type: {value: type}});
+          type = walkExpression(this.declarator, match, o);
+        }
+        return type;
       },
       Declarator: function Declarator(o) {
         var type = o.type;
@@ -271,8 +317,11 @@ function compile(source) {
             type = new PointerType(type);
           }
         }
-        o = Object.create(o, {type: {value: type}});
-        return walkExpression(this.directDeclarator, match, o);
+        if (this.directDeclarator) {
+          o = Object.create(o, {type: {value: type}});
+          return walkExpression(this.directDeclarator, match, o);
+        }
+        return type;
       },
       DirectDeclarator: function DirectDeclarator(o) {
         assert (o.type);
@@ -280,7 +329,10 @@ function compile(source) {
         for (var i = this.declaratorSuffix.length - 1; i >= 0; i--) {
           type = walkExpression(this.declaratorSuffix[i], match, { returnType: type });
         }
-        if (this.name) {
+        if (this.declarator) {
+          o = Object.create(o, {type: {value: type}});
+          type = walkExpression(this.declarator, match, o);
+        } else if (this.name) {
           o.scope.add(this.name, type);
         }
         return type;
@@ -303,8 +355,12 @@ function compile(source) {
         notImplemented();
       },
       TypeName: function TypeName(o) {
-        o = Object.create(o, {type: {value: getType(this.typeSpecifier)}});
-        return walkExpression(this.declarator, match, o);
+        var type = getType(this.typeSpecifier);
+        if (this.declarator) {
+          o = Object.create(o, {type: {value: type}});
+          return walkExpression(this.declarator, match, o);
+        }
+        return this.type = type;
       },
       Void: function Void() {
         return types.void;
@@ -313,6 +369,13 @@ function compile(source) {
         var l = walkExpression(this.left, match, o);
         var r = walkExpression(this.right, match, o);
         return this.type = l;
+      },
+      UnaryExpression: function UnaryExpression(o) {
+        var type = walkExpression(this.expression, match, o);
+        if (this.operator === "*") {
+          type = type.type;
+        }
+        return this.type = type;
       },
       AssignmentExpression: function AssignmentExpression(o) {
         var l = walkExpression(this.left, match, o);
@@ -329,9 +392,10 @@ function compile(source) {
           parameterTypes.push(type);
           return {name: x.declarator.directDeclarator.name, type: type};
         });
-        walk(this.elements, match, o);
         var returnType = walkExpression(this.type, match, o);
         this.type = new FunctionType(returnType, parameterTypes);
+        o = Object.create(o, {functionType: {value: this.type}});
+        walk(this.elements, match, o);
       },
       Parameter: function Parameter(o) {
         this.type = createType(this.type);
@@ -380,6 +444,17 @@ function compile(source) {
       },
       FunctionCall: function FunctionCall(o) {
         walk(this.arguments, match, o);
+      },
+      ReturnStatement: function ReturnStatement(o) {
+        var type = walkExpression(this.value, match, o);
+        checkTypeAssignment(this, o.functionType.returnType, type);
+      },
+      ConditionalExpression: function ConditionalExpression(o) {
+        var cType = walkExpression(this.condition, match, o);
+        var tType = walkExpression(this.trueExpression, match, o);
+        var fType = walkExpression(this.falseExpression, match, o);
+        // TODO: Merge types here.
+        return tType;
       }
     };
     walk(program, match);
@@ -405,7 +480,7 @@ function compile(source) {
       return variable;
     })();
 
-    var global = new Scope();
+    var global = new Scope(null, "global");
 
     function log2(x) {
       return Math.log(x) / Math.LN2;
@@ -413,9 +488,9 @@ function compile(source) {
 
     function accessMemory(address, type, offset) {
       if (type === types.int) {
-        return "I32[" + address + " + " + offset + " >> " + log2(type.getSize()) + "]";
+        return "I32[" + address + (offset ? " + " + offset : "") + " >> " + log2(type.getSize()) + "]";
       } else if (type === types.uint || type instanceof PointerType) {
-        return "U32[" + address + " + " + offset + " >> " + log2(type.getSize()) + "]";
+        return "U32[" + address + (offset ? " + " + offset : "") + " >> " + log2(type.getSize()) + "]";
       }
       return notImplemented(type);
     };
@@ -424,13 +499,12 @@ function compile(source) {
       Program: function Program() {
         walk(this.elements, match, {scope: global});
       },
-      Struct: function () {},
+      StructDeclaration: function () {},
       VariableStatement: function VariableStatement(o) {
         assert (o.scope);
-        var type = this.type;
         var str = "var " +
           this.declarations.map(function (x) {
-            o.scope.add(x.name, new Variable(x.name, type, 0));
+            o.scope.add(x.name, new Variable(x.name, x.type, 0));
             return x.name + " = " + walkExpression(x.value, match, o);
           }).join(", ");
         if (this.inForInitializer) {
@@ -452,6 +526,13 @@ function compile(source) {
         }
         return "(" + l + " " + this.operator + " " + r + ")";
       },
+      UnaryExpression: function UnaryExpression(o) {
+        if (this.operator === "*") {
+          return accessMemory(walkExpression(this.expression, match, o), this.expression.type);
+        } else {
+          return this.operator + walkExpression(this.expression, match, o);
+        }
+      },
       AssignmentExpression: function AssignmentExpression(o) {
         var l = walkExpression(this.left, match, o);
         var r = walkExpression(this.right, match, o);
@@ -464,7 +545,8 @@ function compile(source) {
         return this.value;
       },
       Function: function Function(o) {
-        o = {scope: new Scope(o.scope)};
+        o.scope.add(this.name, this.type);
+        o = {scope: new Scope(o.scope, "function scope for " + this.name)};
         walk(this.parameters, match, o);
         writer.enter("function " + this.name + "(" +
           this.parameters.map(function (x) {
@@ -502,7 +584,7 @@ function compile(source) {
         writer.leave("}");
       },
       Block: function Block(o) {
-        o = {scope: new Scope(o.scope)};
+        o = {scope: new Scope(o.scope, "block scope")};
         walk(this.statements, match, o);
       },
       ReturnStatement: function ReturnStatement(o) {
@@ -518,6 +600,25 @@ function compile(source) {
         walk(this.statement, match, o);
         writer.leave("}");
       },
+      IfStatement: function IfStatement(o) {
+        writer.enter("if (" + walkExpression(this.condition, match, o) + ") {");
+        walk(this.ifStatement, match, o);
+        if (this.elseStatement) {
+          if (this.elseStatement.tag === "Block") {
+            writer.leaveAndEnter("} else {");
+            walk(this.elseStatement, match, o);
+          } else if (this.elseStatement.tag === "IfStatement") {
+            writer.leaveAndEnter("} else if (" + walkExpression(this.elseStatement.condition, match, o) + ") {");
+            walk(this.elseStatement.ifStatement, match, o);
+          }
+        }
+        writer.leave("}");
+      },
+      ConditionalExpression: function ConditionalExpression(o) {
+        return "((" + walkExpression(this.condition, match, o) + ") ? " +
+          walkExpression(this.trueExpression, match, o) + " : " +
+          walkExpression(this.falseExpression, match, o) + ")";
+      },
       PostfixExpression: function PostfixExpression(o) {
         return walkExpression(this.expression, match, o) + this.operator;
       },
@@ -529,9 +630,18 @@ function compile(source) {
       }
     };
     walk(program, match);
-  })(program);
 
-  // str = new Function (str).toString();
+    if (generateExports) {
+      writer.writeLn("return {" + global.symbolList.filter(function (x) {
+        return x.symbol instanceof FunctionType;
+      }).map(function (x) {
+        return "\"" + x.name + "\": " + x.name;
+      }).join(", ") + "};");
+    }
+
+  })(program);
 
   return str;
 }
+
+

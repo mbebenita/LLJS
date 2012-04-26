@@ -140,6 +140,10 @@ function defineNonEnumerableProperty(obj, name, value) {
     return this.length && this[this.length - 1];
   });
 
+  extendBuiltin(Ap, "last", function() {
+    return this.length && this[this.length - 1];
+  });
+
   extendBuiltin(Ap, "mapWithIndex", function(fn) {
     var arr = [];
     for (var i = 0; i < this.length; i++) {
@@ -604,6 +608,14 @@ var IndentingWriter = (function () {
     if (!this.suppressOutput) {
       this.out.writeLn(this.padding + str);
     }
+  };
+
+  indentingWriter.prototype.leaveAndEnter = function leaveAndEnter(str) {
+    this.outdent();
+    if (!this.suppressOutput) {
+      this.out.writeLn(this.padding + str);
+    }
+    this.indent();
   };
 
   indentingWriter.prototype.indent = function indent() {
