@@ -438,6 +438,13 @@ function compile(source, generateExports) {
         walk(this.counter, match, o);
         walk(this.statement, match, o);
       },
+      IfStatement: function IfStatement(o) {
+        walk(this.condition, match, o);
+        walk(this.ifStatement, match, o);
+        if (this.elseStatement) {
+          walk(this.elseStatement, match, o);
+        }
+      },
       Block: function Block(o) {
         o = {scope: new Scope(o.scope)};
         walk(this.statements, match, o);
@@ -447,7 +454,7 @@ function compile(source, generateExports) {
       },
       ReturnStatement: function ReturnStatement(o) {
         var type = walkExpression(this.value, match, o);
-        checkTypeAssignment(this, o.functionType.returnType, type);
+//        checkTypeAssignment(this, o.functionType.returnType, type);
       },
       ConditionalExpression: function ConditionalExpression(o) {
         var cType = walkExpression(this.condition, match, o);
