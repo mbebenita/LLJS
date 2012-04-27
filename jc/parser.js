@@ -10,6 +10,10 @@ var parser = (function(){
      */
     parse: function(input, startRule) {
       var parseFunctions = {
+        "AbstractDeclarator": parse_AbstractDeclarator,
+        "AbstractDeclaratorSuffix": parse_AbstractDeclaratorSuffix,
+        "AbstractParameterDeclaration": parse_AbstractParameterDeclaration,
+        "AbstractParameterList": parse_AbstractParameterList,
         "AdditiveExpression": parse_AdditiveExpression,
         "AdditiveOperator": parse_AdditiveOperator,
         "ArgumentList": parse_ArgumentList,
@@ -50,9 +54,13 @@ var parser = (function(){
         "DecimalDigits": parse_DecimalDigits,
         "DecimalIntegerLiteral": parse_DecimalIntegerLiteral,
         "DecimalLiteral": parse_DecimalLiteral,
+        "Declarator": parse_Declarator,
+        "DeclaratorSuffix": parse_DeclaratorSuffix,
         "DefaultClause": parse_DefaultClause,
         "DefaultToken": parse_DefaultToken,
         "DeleteToken": parse_DeleteToken,
+        "DirectAbstractDeclarator": parse_DirectAbstractDeclarator,
+        "DirectDeclarator": parse_DirectDeclarator,
         "DoToken": parse_DoToken,
         "DoWhileStatement": parse_DoWhileStatement,
         "DoubleStringCharacter": parse_DoubleStringCharacter,
@@ -75,12 +83,13 @@ var parser = (function(){
         "ExpressionNoIn": parse_ExpressionNoIn,
         "ExpressionStatement": parse_ExpressionStatement,
         "FalseToken": parse_FalseToken,
+        "FieldDeclaration": parse_FieldDeclaration,
+        "FieldDeclarationList": parse_FieldDeclarationList,
         "Finally": parse_Finally,
         "FinallyToken": parse_FinallyToken,
         "ForInStatement": parse_ForInStatement,
         "ForStatement": parse_ForStatement,
         "ForToken": parse_ForToken,
-        "FormalParameter": parse_FormalParameter,
         "FormalParameterList": parse_FormalParameterList,
         "FunctionBody": parse_FunctionBody,
         "FunctionDeclaration": parse_FunctionDeclaration,
@@ -137,7 +146,9 @@ var parser = (function(){
         "NullToken": parse_NullToken,
         "NumericLiteral": parse_NumericLiteral,
         "ObjectLiteral": parse_ObjectLiteral,
+        "ParameterDeclaration": parse_ParameterDeclaration,
         "Pc": parse_Pc,
+        "Pointer": parse_Pointer,
         "PostfixExpression": parse_PostfixExpression,
         "PostfixOperator": parse_PostfixOperator,
         "PrimaryExpression": parse_PrimaryExpression,
@@ -166,8 +177,6 @@ var parser = (function(){
         "StatementList": parse_StatementList,
         "StringLiteral": parse_StringLiteral,
         "StructDeclaration": parse_StructDeclaration,
-        "StructDeclarationList": parse_StructDeclarationList,
-        "StructDeclarator": parse_StructDeclarator,
         "StructToken": parse_StructToken,
         "SwitchStatement": parse_SwitchStatement,
         "SwitchToken": parse_SwitchToken,
@@ -178,6 +187,9 @@ var parser = (function(){
         "TryStatement": parse_TryStatement,
         "TryToken": parse_TryToken,
         "Type": parse_Type,
+        "TypeName": parse_TypeName,
+        "TypeReservedWord": parse_TypeReservedWord,
+        "TypeSpecifier": parse_TypeSpecifier,
         "TypeofToken": parse_TypeofToken,
         "UnaryExpression": parse_UnaryExpression,
         "UnaryOperator": parse_UnaryOperator,
@@ -1264,23 +1276,28 @@ var parser = (function(){
         }
         
         
-        var result4 = parse_Keyword();
-        if (result4 !== null) {
-          var result0 = result4;
+        var result5 = parse_Keyword();
+        if (result5 !== null) {
+          var result0 = result5;
         } else {
-          var result3 = parse_FutureReservedWord();
-          if (result3 !== null) {
-            var result0 = result3;
+          var result4 = parse_FutureReservedWord();
+          if (result4 !== null) {
+            var result0 = result4;
           } else {
-            var result2 = parse_NullLiteral();
-            if (result2 !== null) {
-              var result0 = result2;
+            var result3 = parse_TypeReservedWord();
+            if (result3 !== null) {
+              var result0 = result3;
             } else {
-              var result1 = parse_BooleanLiteral();
-              if (result1 !== null) {
-                var result0 = result1;
+              var result2 = parse_NullLiteral();
+              if (result2 !== null) {
+                var result0 = result2;
               } else {
-                var result0 = null;;
+                var result1 = parse_BooleanLiteral();
+                if (result1 !== null) {
+                  var result0 = result1;
+                } else {
+                  var result0 = null;;
+                };
               };
             };
           };
@@ -1771,6 +1788,166 @@ var parser = (function(){
                       var result1 = result4;
                     } else {
                       var result1 = null;;
+                    };
+                  };
+                };
+              };
+            };
+          };
+        }
+        if (result1 !== null) {
+          var savedPos1 = pos;
+          var savedReportMatchFailuresVar0 = reportMatchFailures;
+          reportMatchFailures = false;
+          var result3 = parse_IdentifierPart();
+          reportMatchFailures = savedReportMatchFailuresVar0;
+          if (result3 === null) {
+            var result2 = '';
+          } else {
+            var result2 = null;
+            pos = savedPos1;
+          }
+          if (result2 !== null) {
+            var result0 = [result1, result2];
+          } else {
+            var result0 = null;
+            pos = savedPos0;
+          }
+        } else {
+          var result0 = null;
+          pos = savedPos0;
+        }
+        
+        
+        
+        cache[cacheKey] = {
+          nextPos: pos,
+          result:  result0
+        };
+        return result0;
+      }
+      
+      function parse_TypeReservedWord() {
+        var cacheKey = 'TypeReservedWord@' + pos;
+        var cachedResult = cache[cacheKey];
+        if (cachedResult) {
+          pos = cachedResult.nextPos;
+          return cachedResult.result;
+        }
+        
+        
+        var savedPos0 = pos;
+        if (input.substr(pos, 4) === "void") {
+          var result12 = "void";
+          pos += 4;
+        } else {
+          var result12 = null;
+          if (reportMatchFailures) {
+            matchFailed("\"void\"");
+          }
+        }
+        if (result12 !== null) {
+          var result1 = result12;
+        } else {
+          if (input.substr(pos, 2) === "u8") {
+            var result11 = "u8";
+            pos += 2;
+          } else {
+            var result11 = null;
+            if (reportMatchFailures) {
+              matchFailed("\"u8\"");
+            }
+          }
+          if (result11 !== null) {
+            var result1 = result11;
+          } else {
+            if (input.substr(pos, 2) === "i8") {
+              var result10 = "i8";
+              pos += 2;
+            } else {
+              var result10 = null;
+              if (reportMatchFailures) {
+                matchFailed("\"i8\"");
+              }
+            }
+            if (result10 !== null) {
+              var result1 = result10;
+            } else {
+              if (input.substr(pos, 3) === "u16") {
+                var result9 = "u16";
+                pos += 3;
+              } else {
+                var result9 = null;
+                if (reportMatchFailures) {
+                  matchFailed("\"u16\"");
+                }
+              }
+              if (result9 !== null) {
+                var result1 = result9;
+              } else {
+                if (input.substr(pos, 3) === "i16") {
+                  var result8 = "i16";
+                  pos += 3;
+                } else {
+                  var result8 = null;
+                  if (reportMatchFailures) {
+                    matchFailed("\"i16\"");
+                  }
+                }
+                if (result8 !== null) {
+                  var result1 = result8;
+                } else {
+                  if (input.substr(pos, 3) === "u32") {
+                    var result7 = "u32";
+                    pos += 3;
+                  } else {
+                    var result7 = null;
+                    if (reportMatchFailures) {
+                      matchFailed("\"u32\"");
+                    }
+                  }
+                  if (result7 !== null) {
+                    var result1 = result7;
+                  } else {
+                    if (input.substr(pos, 3) === "i32") {
+                      var result6 = "i32";
+                      pos += 3;
+                    } else {
+                      var result6 = null;
+                      if (reportMatchFailures) {
+                        matchFailed("\"i32\"");
+                      }
+                    }
+                    if (result6 !== null) {
+                      var result1 = result6;
+                    } else {
+                      if (input.substr(pos, 3) === "int") {
+                        var result5 = "int";
+                        pos += 3;
+                      } else {
+                        var result5 = null;
+                        if (reportMatchFailures) {
+                          matchFailed("\"int\"");
+                        }
+                      }
+                      if (result5 !== null) {
+                        var result1 = result5;
+                      } else {
+                        if (input.substr(pos, 4) === "uint") {
+                          var result4 = "uint";
+                          pos += 4;
+                        } else {
+                          var result4 = null;
+                          if (reportMatchFailures) {
+                            matchFailed("\"uint\"");
+                          }
+                        }
+                        if (result4 !== null) {
+                          var result1 = result4;
+                        } else {
+                          var result1 = null;;
+                        };
+                      };
                     };
                   };
                 };
@@ -12594,15 +12771,27 @@ var parser = (function(){
         
         var savedPos0 = pos;
         var savedPos1 = pos;
-        var result3 = parse_Type();
+        var result3 = parse_VarToken();
         if (result3 !== null) {
           var result4 = parse___();
           if (result4 !== null) {
-            var result5 = parse_VariableDeclarationList();
+            var result5 = parse_TypeSpecifier();
             if (result5 !== null) {
-              var result6 = parse_EOS();
+              var result6 = parse___();
               if (result6 !== null) {
-                var result1 = [result3, result4, result5, result6];
+                var result7 = parse_VariableDeclarationList();
+                if (result7 !== null) {
+                  var result8 = parse_EOS();
+                  if (result8 !== null) {
+                    var result1 = [result3, result4, result5, result6, result7, result8];
+                  } else {
+                    var result1 = null;
+                    pos = savedPos1;
+                  }
+                } else {
+                  var result1 = null;
+                  pos = savedPos1;
+                }
               } else {
                 var result1 = null;
                 pos = savedPos1;
@@ -12620,13 +12809,13 @@ var parser = (function(){
           pos = savedPos1;
         }
         var result2 = result1 !== null
-          ? (function(type, declarations) {
+          ? (function(typeSpecifier, declarations) {
                 return {
-                  tag:          "VariableStatement",
+                  tag: "VariableStatement",
                   declarations: declarations,
-                  type: type
+                  typeSpecifier: typeSpecifier
                 };
-              })(result1[0], result1[2])
+              })(result1[2], result1[4])
           : null;
         if (result2 !== null) {
           var result0 = result2;
@@ -12895,7 +13084,7 @@ var parser = (function(){
         
         var savedPos0 = pos;
         var savedPos1 = pos;
-        var result3 = parse_Identifier();
+        var result3 = parse_Declarator();
         if (result3 !== null) {
           var result4 = parse___();
           if (result4 !== null) {
@@ -12916,10 +13105,10 @@ var parser = (function(){
           pos = savedPos1;
         }
         var result2 = result1 !== null
-          ? (function(name, value) {
+          ? (function(declarator, value) {
                 return {
                   tag:   "VariableDeclaration",
-                  name:  name,
+                  declarator:  declarator,
                   value: value !== "" ? value : null,
                   position: computeErrorPosition()
                 };
@@ -12952,7 +13141,7 @@ var parser = (function(){
         
         var savedPos0 = pos;
         var savedPos1 = pos;
-        var result3 = parse_Identifier();
+        var result3 = parse_Declarator();
         if (result3 !== null) {
           var result4 = parse___();
           if (result4 !== null) {
@@ -12973,10 +13162,10 @@ var parser = (function(){
           pos = savedPos1;
         }
         var result2 = result1 !== null
-          ? (function(name, value) {
+          ? (function(declarator, value) {
                 return {
                   tag:   "VariableDeclaration",
-                  name:  name,
+                  declarator:  declarator,
                   value: value !== "" ? value : null
                 };
               })(result1[0], result1[2])
@@ -13715,13 +13904,25 @@ var parser = (function(){
               if (result6 !== null) {
                 var savedPos2 = pos;
                 var savedPos3 = pos;
-                var result27 = parse_Type();
+                var result27 = parse_VarToken();
                 if (result27 !== null) {
                   var result28 = parse___();
                   if (result28 !== null) {
-                    var result29 = parse_VariableDeclarationListNoIn();
+                    var result29 = parse_TypeSpecifier();
                     if (result29 !== null) {
-                      var result25 = [result27, result28, result29];
+                      var result30 = parse___();
+                      if (result30 !== null) {
+                        var result31 = parse_VariableDeclarationListNoIn();
+                        if (result31 !== null) {
+                          var result25 = [result27, result28, result29, result30, result31];
+                        } else {
+                          var result25 = null;
+                          pos = savedPos3;
+                        }
+                      } else {
+                        var result25 = null;
+                        pos = savedPos3;
+                      }
                     } else {
                       var result25 = null;
                       pos = savedPos3;
@@ -13735,14 +13936,14 @@ var parser = (function(){
                   pos = savedPos3;
                 }
                 var result26 = result25 !== null
-                  ? (function(type, declarations) {
+                  ? (function(typeSpecifier, declarations) {
                             return {
                               tag:          "VariableStatement",
-                              type: type,
+                              typeSpecifier: typeSpecifier,
                               declarations: declarations,
                               inForInitializer: true
                             };
-                          })(result25[0], result25[2])
+                          })(result25[2], result25[4])
                   : null;
                 if (result26 !== null) {
                   var result24 = result26;
@@ -15510,7 +15711,7 @@ var parser = (function(){
         if (result3 !== null) {
           var result4 = parse___();
           if (result4 !== null) {
-            var result5 = parse_Type();
+            var result5 = parse_TypeName();
             if (result5 !== null) {
               var result6 = parse___();
               if (result6 !== null) {
@@ -15643,11 +15844,11 @@ var parser = (function(){
           pos = savedPos1;
         }
         var result2 = result1 !== null
-          ? (function(type, name, params, elements) {
+          ? (function(type, name, parameters, elements) {
                 return {
                   tag:      "Function",
                   name:     name,
-                  params:   params !== "" ? params : [],
+                  parameters:   parameters !== "" ? parameters : [],
                   type:     type,
                   elements: elements
                 };
@@ -15806,11 +16007,11 @@ var parser = (function(){
           pos = savedPos1;
         }
         var result2 = result1 !== null
-          ? (function(name, params, elements) {
+          ? (function(name, parameters, elements) {
                 return {
                   tag:      "Function",
                   name:     name !== "" ? name : null,
-                  params:   params !== "" ? params : [],
+                  parameters:   parameters !== "" ? parameters : [],
                   elements: elements
                 };
               })(result1[2], result1[6], result1[12])
@@ -15863,7 +16064,7 @@ var parser = (function(){
                 if (result7 !== null) {
                   var result8 = parse___();
                   if (result8 !== null) {
-                    var result12 = parse_StructDeclarationList();
+                    var result12 = parse_FieldDeclarationList();
                     var result9 = result12 !== null ? result12 : '';
                     if (result9 !== null) {
                       var result10 = parse___();
@@ -15916,11 +16117,11 @@ var parser = (function(){
           pos = savedPos1;
         }
         var result2 = result1 !== null
-          ? (function(name, elements) {
+          ? (function(name, declarations) {
                 return {
-                  tag:      "Struct",
+                  tag:      "StructDeclaration",
                   name:     name,
-                  elements: elements
+                  declarations: declarations
                 };
               })(result1[2], result1[6])
           : null;
@@ -15942,8 +16143,8 @@ var parser = (function(){
         return result0;
       }
       
-      function parse_StructDeclarator() {
-        var cacheKey = 'StructDeclarator@' + pos;
+      function parse_FieldDeclaration() {
+        var cacheKey = 'FieldDeclaration@' + pos;
         var cachedResult = cache[cacheKey];
         if (cachedResult) {
           pos = cachedResult.nextPos;
@@ -15953,11 +16154,11 @@ var parser = (function(){
         
         var savedPos0 = pos;
         var savedPos1 = pos;
-        var result3 = parse_Type();
+        var result3 = parse_TypeSpecifier();
         if (result3 !== null) {
           var result4 = parse___();
           if (result4 !== null) {
-            var result5 = parse_Identifier();
+            var result5 = parse_Declarator();
             if (result5 !== null) {
               var result1 = [result3, result4, result5];
             } else {
@@ -15973,11 +16174,11 @@ var parser = (function(){
           pos = savedPos1;
         }
         var result2 = result1 !== null
-          ? (function(type, name) {
+          ? (function(typeSpecifier, declarator) {
               return {
-                tag: "StructDeclarator",
-                name: name,
-                type: type
+                tag: "FieldDeclaration",
+                typeSpecifier: typeSpecifier,
+                declarator:declarator
               }
             })(result1[0], result1[2])
           : null;
@@ -15997,8 +16198,8 @@ var parser = (function(){
         return result0;
       }
       
-      function parse_StructDeclarationList() {
-        var cacheKey = 'StructDeclarationList@' + pos;
+      function parse_FieldDeclarationList() {
+        var cacheKey = 'FieldDeclarationList@' + pos;
         var cachedResult = cache[cacheKey];
         if (cachedResult) {
           pos = cachedResult.nextPos;
@@ -16008,7 +16209,7 @@ var parser = (function(){
         
         var savedPos0 = pos;
         var savedPos1 = pos;
-        var result3 = parse_StructDeclarator();
+        var result3 = parse_FieldDeclaration();
         if (result3 !== null) {
           var result4 = [];
           var savedPos2 = pos;
@@ -16026,7 +16227,7 @@ var parser = (function(){
             if (result7 !== null) {
               var result8 = parse___();
               if (result8 !== null) {
-                var result9 = parse_StructDeclarator();
+                var result9 = parse_FieldDeclaration();
                 if (result9 !== null) {
                   var result5 = [result6, result7, result8, result9];
                 } else {
@@ -16062,7 +16263,7 @@ var parser = (function(){
               if (result7 !== null) {
                 var result8 = parse___();
                 if (result8 !== null) {
-                  var result9 = parse_StructDeclarator();
+                  var result9 = parse_FieldDeclaration();
                   if (result9 !== null) {
                     var result5 = [result6, result7, result8, result9];
                   } else {
@@ -16117,61 +16318,6 @@ var parser = (function(){
         return result0;
       }
       
-      function parse_FormalParameter() {
-        var cacheKey = 'FormalParameter@' + pos;
-        var cachedResult = cache[cacheKey];
-        if (cachedResult) {
-          pos = cachedResult.nextPos;
-          return cachedResult.result;
-        }
-        
-        
-        var savedPos0 = pos;
-        var savedPos1 = pos;
-        var result3 = parse_Type();
-        if (result3 !== null) {
-          var result4 = parse___();
-          if (result4 !== null) {
-            var result5 = parse_Identifier();
-            if (result5 !== null) {
-              var result1 = [result3, result4, result5];
-            } else {
-              var result1 = null;
-              pos = savedPos1;
-            }
-          } else {
-            var result1 = null;
-            pos = savedPos1;
-          }
-        } else {
-          var result1 = null;
-          pos = savedPos1;
-        }
-        var result2 = result1 !== null
-          ? (function(type, name) {
-              return {
-                tag: "Parameter",
-                name: name,
-                type: type
-              }
-            })(result1[0], result1[2])
-          : null;
-        if (result2 !== null) {
-          var result0 = result2;
-        } else {
-          var result0 = null;
-          pos = savedPos0;
-        }
-        
-        
-        
-        cache[cacheKey] = {
-          nextPos: pos,
-          result:  result0
-        };
-        return result0;
-      }
-      
       function parse_FormalParameterList() {
         var cacheKey = 'FormalParameterList@' + pos;
         var cachedResult = cache[cacheKey];
@@ -16183,7 +16329,7 @@ var parser = (function(){
         
         var savedPos0 = pos;
         var savedPos1 = pos;
-        var result3 = parse_FormalParameter();
+        var result3 = parse_ParameterDeclaration();
         if (result3 !== null) {
           var result4 = [];
           var savedPos2 = pos;
@@ -16201,7 +16347,7 @@ var parser = (function(){
             if (result7 !== null) {
               var result8 = parse___();
               if (result8 !== null) {
-                var result9 = parse_FormalParameter();
+                var result9 = parse_ParameterDeclaration();
                 if (result9 !== null) {
                   var result5 = [result6, result7, result8, result9];
                 } else {
@@ -16237,7 +16383,7 @@ var parser = (function(){
               if (result7 !== null) {
                 var result8 = parse___();
                 if (result8 !== null) {
-                  var result9 = parse_FormalParameter();
+                  var result9 = parse_ParameterDeclaration();
                   if (result9 !== null) {
                     var result5 = [result6, result7, result8, result9];
                   } else {
@@ -16422,6 +16568,1360 @@ var parser = (function(){
                 }
                 return result;
               })(result1[0], result1[1])
+          : null;
+        if (result2 !== null) {
+          var result0 = result2;
+        } else {
+          var result0 = null;
+          pos = savedPos0;
+        }
+        
+        
+        
+        cache[cacheKey] = {
+          nextPos: pos,
+          result:  result0
+        };
+        return result0;
+      }
+      
+      function parse_Declarator() {
+        var cacheKey = 'Declarator@' + pos;
+        var cachedResult = cache[cacheKey];
+        if (cachedResult) {
+          pos = cachedResult.nextPos;
+          return cachedResult.result;
+        }
+        
+        
+        var savedPos0 = pos;
+        var savedPos1 = pos;
+        var result6 = parse_Pointer();
+        var result3 = result6 !== null ? result6 : '';
+        if (result3 !== null) {
+          var result4 = parse___();
+          if (result4 !== null) {
+            var result5 = parse_DirectDeclarator();
+            if (result5 !== null) {
+              var result1 = [result3, result4, result5];
+            } else {
+              var result1 = null;
+              pos = savedPos1;
+            }
+          } else {
+            var result1 = null;
+            pos = savedPos1;
+          }
+        } else {
+          var result1 = null;
+          pos = savedPos1;
+        }
+        var result2 = result1 !== null
+          ? (function(p, dd) {
+              return {
+                tag: "Declarator",
+                pointer: p !== "" ? p : null,
+                directDeclarator: dd
+              };
+            })(result1[0], result1[2])
+          : null;
+        if (result2 !== null) {
+          var result0 = result2;
+        } else {
+          var result0 = null;
+          pos = savedPos0;
+        }
+        
+        
+        
+        cache[cacheKey] = {
+          nextPos: pos,
+          result:  result0
+        };
+        return result0;
+      }
+      
+      function parse_DirectDeclarator() {
+        var cacheKey = 'DirectDeclarator@' + pos;
+        var cachedResult = cache[cacheKey];
+        if (cachedResult) {
+          pos = cachedResult.nextPos;
+          return cachedResult.result;
+        }
+        
+        
+        var savedPos2 = pos;
+        var savedPos3 = pos;
+        var result13 = parse_Identifier();
+        if (result13 !== null) {
+          var result14 = parse___();
+          if (result14 !== null) {
+            var result15 = [];
+            var result16 = parse_DeclaratorSuffix();
+            while (result16 !== null) {
+              result15.push(result16);
+              var result16 = parse_DeclaratorSuffix();
+            }
+            if (result15 !== null) {
+              var result11 = [result13, result14, result15];
+            } else {
+              var result11 = null;
+              pos = savedPos3;
+            }
+          } else {
+            var result11 = null;
+            pos = savedPos3;
+          }
+        } else {
+          var result11 = null;
+          pos = savedPos3;
+        }
+        var result12 = result11 !== null
+          ? (function(name, ds) {
+              return {
+                tag: "DirectDeclarator",
+                name: name,
+                declaratorSuffix: ds
+              }
+            })(result11[0], result11[2])
+          : null;
+        if (result12 !== null) {
+          var result10 = result12;
+        } else {
+          var result10 = null;
+          pos = savedPos2;
+        }
+        if (result10 !== null) {
+          var result0 = result10;
+        } else {
+          var savedPos0 = pos;
+          var savedPos1 = pos;
+          if (input.substr(pos, 1) === "(") {
+            var result4 = "(";
+            pos += 1;
+          } else {
+            var result4 = null;
+            if (reportMatchFailures) {
+              matchFailed("\"(\"");
+            }
+          }
+          if (result4 !== null) {
+            var result5 = parse_Declarator();
+            if (result5 !== null) {
+              if (input.substr(pos, 1) === ")") {
+                var result6 = ")";
+                pos += 1;
+              } else {
+                var result6 = null;
+                if (reportMatchFailures) {
+                  matchFailed("\")\"");
+                }
+              }
+              if (result6 !== null) {
+                var result7 = parse___();
+                if (result7 !== null) {
+                  var result8 = [];
+                  var result9 = parse_DeclaratorSuffix();
+                  while (result9 !== null) {
+                    result8.push(result9);
+                    var result9 = parse_DeclaratorSuffix();
+                  }
+                  if (result8 !== null) {
+                    var result2 = [result4, result5, result6, result7, result8];
+                  } else {
+                    var result2 = null;
+                    pos = savedPos1;
+                  }
+                } else {
+                  var result2 = null;
+                  pos = savedPos1;
+                }
+              } else {
+                var result2 = null;
+                pos = savedPos1;
+              }
+            } else {
+              var result2 = null;
+              pos = savedPos1;
+            }
+          } else {
+            var result2 = null;
+            pos = savedPos1;
+          }
+          var result3 = result2 !== null
+            ? (function(declarator, ds) {
+                return {
+                  tag: "DirectDeclarator",
+                  declarator: declarator,
+                  declaratorSuffix: ds
+                };
+              })(result2[1], result2[4])
+            : null;
+          if (result3 !== null) {
+            var result1 = result3;
+          } else {
+            var result1 = null;
+            pos = savedPos0;
+          }
+          if (result1 !== null) {
+            var result0 = result1;
+          } else {
+            var result0 = null;;
+          };
+        }
+        
+        
+        
+        cache[cacheKey] = {
+          nextPos: pos,
+          result:  result0
+        };
+        return result0;
+      }
+      
+      function parse_DeclaratorSuffix() {
+        var cacheKey = 'DeclaratorSuffix@' + pos;
+        var cachedResult = cache[cacheKey];
+        if (cachedResult) {
+          pos = cachedResult.nextPos;
+          return cachedResult.result;
+        }
+        
+        
+        var savedPos6 = pos;
+        var savedPos7 = pos;
+        if (input.substr(pos, 1) === "[") {
+          var result21 = "[";
+          pos += 1;
+        } else {
+          var result21 = null;
+          if (reportMatchFailures) {
+            matchFailed("\"[\"");
+          }
+        }
+        if (result21 !== null) {
+          var result22 = parse___();
+          if (result22 !== null) {
+            var result23 = parse_NumericLiteral();
+            if (result23 !== null) {
+              var result24 = parse___();
+              if (result24 !== null) {
+                if (input.substr(pos, 1) === "]") {
+                  var result25 = "]";
+                  pos += 1;
+                } else {
+                  var result25 = null;
+                  if (reportMatchFailures) {
+                    matchFailed("\"]\"");
+                  }
+                }
+                if (result25 !== null) {
+                  var result19 = [result21, result22, result23, result24, result25];
+                } else {
+                  var result19 = null;
+                  pos = savedPos7;
+                }
+              } else {
+                var result19 = null;
+                pos = savedPos7;
+              }
+            } else {
+              var result19 = null;
+              pos = savedPos7;
+            }
+          } else {
+            var result19 = null;
+            pos = savedPos7;
+          }
+        } else {
+          var result19 = null;
+          pos = savedPos7;
+        }
+        var result20 = result19 !== null
+          ? (function(nl) { return { tag: "ArrayDeclarator", Value: nl}; })(result19[2])
+          : null;
+        if (result20 !== null) {
+          var result18 = result20;
+        } else {
+          var result18 = null;
+          pos = savedPos6;
+        }
+        if (result18 !== null) {
+          var result0 = result18;
+        } else {
+          var savedPos4 = pos;
+          var savedPos5 = pos;
+          if (input.substr(pos, 1) === "[") {
+            var result15 = "[";
+            pos += 1;
+          } else {
+            var result15 = null;
+            if (reportMatchFailures) {
+              matchFailed("\"[\"");
+            }
+          }
+          if (result15 !== null) {
+            var result16 = parse___();
+            if (result16 !== null) {
+              if (input.substr(pos, 1) === "]") {
+                var result17 = "]";
+                pos += 1;
+              } else {
+                var result17 = null;
+                if (reportMatchFailures) {
+                  matchFailed("\"]\"");
+                }
+              }
+              if (result17 !== null) {
+                var result13 = [result15, result16, result17];
+              } else {
+                var result13 = null;
+                pos = savedPos5;
+              }
+            } else {
+              var result13 = null;
+              pos = savedPos5;
+            }
+          } else {
+            var result13 = null;
+            pos = savedPos5;
+          }
+          var result14 = result13 !== null
+            ? (function() { return { tag: "ArrayDeclarator" }; })()
+            : null;
+          if (result14 !== null) {
+            var result12 = result14;
+          } else {
+            var result12 = null;
+            pos = savedPos4;
+          }
+          if (result12 !== null) {
+            var result0 = result12;
+          } else {
+            var savedPos2 = pos;
+            var savedPos3 = pos;
+            if (input.substr(pos, 1) === "(") {
+              var result9 = "(";
+              pos += 1;
+            } else {
+              var result9 = null;
+              if (reportMatchFailures) {
+                matchFailed("\"(\"");
+              }
+            }
+            if (result9 !== null) {
+              var result10 = parse_AbstractParameterList();
+              if (result10 !== null) {
+                if (input.substr(pos, 1) === ")") {
+                  var result11 = ")";
+                  pos += 1;
+                } else {
+                  var result11 = null;
+                  if (reportMatchFailures) {
+                    matchFailed("\")\"");
+                  }
+                }
+                if (result11 !== null) {
+                  var result7 = [result9, result10, result11];
+                } else {
+                  var result7 = null;
+                  pos = savedPos3;
+                }
+              } else {
+                var result7 = null;
+                pos = savedPos3;
+              }
+            } else {
+              var result7 = null;
+              pos = savedPos3;
+            }
+            var result8 = result7 !== null
+              ? (function(pl) { return { tag: "FunctionDeclarator", parameterList:pl }; })(result7[1])
+              : null;
+            if (result8 !== null) {
+              var result6 = result8;
+            } else {
+              var result6 = null;
+              pos = savedPos2;
+            }
+            if (result6 !== null) {
+              var result0 = result6;
+            } else {
+              var savedPos0 = pos;
+              var savedPos1 = pos;
+              if (input.substr(pos, 1) === "(") {
+                var result4 = "(";
+                pos += 1;
+              } else {
+                var result4 = null;
+                if (reportMatchFailures) {
+                  matchFailed("\"(\"");
+                }
+              }
+              if (result4 !== null) {
+                if (input.substr(pos, 1) === ")") {
+                  var result5 = ")";
+                  pos += 1;
+                } else {
+                  var result5 = null;
+                  if (reportMatchFailures) {
+                    matchFailed("\")\"");
+                  }
+                }
+                if (result5 !== null) {
+                  var result2 = [result4, result5];
+                } else {
+                  var result2 = null;
+                  pos = savedPos1;
+                }
+              } else {
+                var result2 = null;
+                pos = savedPos1;
+              }
+              var result3 = result2 !== null
+                ? (function() { return { tag: "FunctionDeclarator" }; })()
+                : null;
+              if (result3 !== null) {
+                var result1 = result3;
+              } else {
+                var result1 = null;
+                pos = savedPos0;
+              }
+              if (result1 !== null) {
+                var result0 = result1;
+              } else {
+                var result0 = null;;
+              };
+            };
+          };
+        }
+        
+        
+        
+        cache[cacheKey] = {
+          nextPos: pos,
+          result:  result0
+        };
+        return result0;
+      }
+      
+      function parse_ParameterDeclaration() {
+        var cacheKey = 'ParameterDeclaration@' + pos;
+        var cachedResult = cache[cacheKey];
+        if (cachedResult) {
+          pos = cachedResult.nextPos;
+          return cachedResult.result;
+        }
+        
+        
+        var savedPos0 = pos;
+        var savedPos1 = pos;
+        var result3 = parse_TypeSpecifier();
+        if (result3 !== null) {
+          var result4 = parse___();
+          if (result4 !== null) {
+            var result6 = parse_Declarator();
+            var result5 = result6 !== null ? result6 : '';
+            if (result5 !== null) {
+              var result1 = [result3, result4, result5];
+            } else {
+              var result1 = null;
+              pos = savedPos1;
+            }
+          } else {
+            var result1 = null;
+            pos = savedPos1;
+          }
+        } else {
+          var result1 = null;
+          pos = savedPos1;
+        }
+        var result2 = result1 !== null
+          ? (function(typeSpecifier, d) {
+              return {
+                tag: "ParameterDeclaration",
+                typeSpecifier: typeSpecifier,
+                declarator: d !== "" ? d : null
+              };
+            })(result1[0], result1[2])
+          : null;
+        if (result2 !== null) {
+          var result0 = result2;
+        } else {
+          var result0 = null;
+          pos = savedPos0;
+        }
+        
+        
+        
+        cache[cacheKey] = {
+          nextPos: pos,
+          result:  result0
+        };
+        return result0;
+      }
+      
+      function parse_TypeName() {
+        var cacheKey = 'TypeName@' + pos;
+        var cachedResult = cache[cacheKey];
+        if (cachedResult) {
+          pos = cachedResult.nextPos;
+          return cachedResult.result;
+        }
+        
+        
+        var savedPos0 = pos;
+        var savedPos1 = pos;
+        var result3 = parse_TypeSpecifier();
+        if (result3 !== null) {
+          var result4 = parse___();
+          if (result4 !== null) {
+            var result6 = parse_AbstractDeclarator();
+            var result5 = result6 !== null ? result6 : '';
+            if (result5 !== null) {
+              var result1 = [result3, result4, result5];
+            } else {
+              var result1 = null;
+              pos = savedPos1;
+            }
+          } else {
+            var result1 = null;
+            pos = savedPos1;
+          }
+        } else {
+          var result1 = null;
+          pos = savedPos1;
+        }
+        var result2 = result1 !== null
+          ? (function(ts, ad) {
+              return {
+                tag: "TypeName",
+                typeSpecifier: ts,
+                declarator: ad !== "" ? ad : null
+              };
+            })(result1[0], result1[2])
+          : null;
+        if (result2 !== null) {
+          var result0 = result2;
+        } else {
+          var result0 = null;
+          pos = savedPos0;
+        }
+        
+        
+        
+        cache[cacheKey] = {
+          nextPos: pos,
+          result:  result0
+        };
+        return result0;
+      }
+      
+      function parse_TypeSpecifier() {
+        var cacheKey = 'TypeSpecifier@' + pos;
+        var cachedResult = cache[cacheKey];
+        if (cachedResult) {
+          pos = cachedResult.nextPos;
+          return cachedResult.result;
+        }
+        
+        
+        if (input.substr(pos, 4) === "void") {
+          var result11 = "void";
+          pos += 4;
+        } else {
+          var result11 = null;
+          if (reportMatchFailures) {
+            matchFailed("\"void\"");
+          }
+        }
+        if (result11 !== null) {
+          var result0 = result11;
+        } else {
+          if (input.substr(pos, 2) === "u8") {
+            var result10 = "u8";
+            pos += 2;
+          } else {
+            var result10 = null;
+            if (reportMatchFailures) {
+              matchFailed("\"u8\"");
+            }
+          }
+          if (result10 !== null) {
+            var result0 = result10;
+          } else {
+            if (input.substr(pos, 2) === "i8") {
+              var result9 = "i8";
+              pos += 2;
+            } else {
+              var result9 = null;
+              if (reportMatchFailures) {
+                matchFailed("\"i8\"");
+              }
+            }
+            if (result9 !== null) {
+              var result0 = result9;
+            } else {
+              if (input.substr(pos, 3) === "u16") {
+                var result8 = "u16";
+                pos += 3;
+              } else {
+                var result8 = null;
+                if (reportMatchFailures) {
+                  matchFailed("\"u16\"");
+                }
+              }
+              if (result8 !== null) {
+                var result0 = result8;
+              } else {
+                if (input.substr(pos, 3) === "i16") {
+                  var result7 = "i16";
+                  pos += 3;
+                } else {
+                  var result7 = null;
+                  if (reportMatchFailures) {
+                    matchFailed("\"i16\"");
+                  }
+                }
+                if (result7 !== null) {
+                  var result0 = result7;
+                } else {
+                  if (input.substr(pos, 3) === "u32") {
+                    var result6 = "u32";
+                    pos += 3;
+                  } else {
+                    var result6 = null;
+                    if (reportMatchFailures) {
+                      matchFailed("\"u32\"");
+                    }
+                  }
+                  if (result6 !== null) {
+                    var result0 = result6;
+                  } else {
+                    if (input.substr(pos, 3) === "i32") {
+                      var result5 = "i32";
+                      pos += 3;
+                    } else {
+                      var result5 = null;
+                      if (reportMatchFailures) {
+                        matchFailed("\"i32\"");
+                      }
+                    }
+                    if (result5 !== null) {
+                      var result0 = result5;
+                    } else {
+                      if (input.substr(pos, 3) === "int") {
+                        var result4 = "int";
+                        pos += 3;
+                      } else {
+                        var result4 = null;
+                        if (reportMatchFailures) {
+                          matchFailed("\"int\"");
+                        }
+                      }
+                      if (result4 !== null) {
+                        var result0 = result4;
+                      } else {
+                        if (input.substr(pos, 4) === "uint") {
+                          var result3 = "uint";
+                          pos += 4;
+                        } else {
+                          var result3 = null;
+                          if (reportMatchFailures) {
+                            matchFailed("\"uint\"");
+                          }
+                        }
+                        if (result3 !== null) {
+                          var result0 = result3;
+                        } else {
+                          if (input.substr(pos, 3) === "dyn") {
+                            var result2 = "dyn";
+                            pos += 3;
+                          } else {
+                            var result2 = null;
+                            if (reportMatchFailures) {
+                              matchFailed("\"dyn\"");
+                            }
+                          }
+                          if (result2 !== null) {
+                            var result0 = result2;
+                          } else {
+                            var result1 = parse_Identifier();
+                            if (result1 !== null) {
+                              var result0 = result1;
+                            } else {
+                              var result0 = null;;
+                            };
+                          };
+                        };
+                      };
+                    };
+                  };
+                };
+              };
+            };
+          };
+        }
+        
+        
+        
+        cache[cacheKey] = {
+          nextPos: pos,
+          result:  result0
+        };
+        return result0;
+      }
+      
+      function parse_AbstractDeclarator() {
+        var cacheKey = 'AbstractDeclarator@' + pos;
+        var cachedResult = cache[cacheKey];
+        if (cachedResult) {
+          pos = cachedResult.nextPos;
+          return cachedResult.result;
+        }
+        
+        
+        var savedPos1 = pos;
+        var savedPos2 = pos;
+        var result7 = parse_Pointer();
+        if (result7 !== null) {
+          var result8 = parse___();
+          if (result8 !== null) {
+            var result10 = parse_DirectAbstractDeclarator();
+            var result9 = result10 !== null ? result10 : '';
+            if (result9 !== null) {
+              var result5 = [result7, result8, result9];
+            } else {
+              var result5 = null;
+              pos = savedPos2;
+            }
+          } else {
+            var result5 = null;
+            pos = savedPos2;
+          }
+        } else {
+          var result5 = null;
+          pos = savedPos2;
+        }
+        var result6 = result5 !== null
+          ? (function(p, dad) {
+              return {
+                tag: "Declarator",
+                pointer: p,
+                directDeclarator: dad !== "" ? dad : null
+              };
+            })(result5[0], result5[2])
+          : null;
+        if (result6 !== null) {
+          var result4 = result6;
+        } else {
+          var result4 = null;
+          pos = savedPos1;
+        }
+        if (result4 !== null) {
+          var result0 = result4;
+        } else {
+          var savedPos0 = pos;
+          var result2 = parse_DirectAbstractDeclarator();
+          var result3 = result2 !== null
+            ? (function(dad) {
+                return {
+                  tag: "Declarator",
+                  directDeclarator: dad
+                }
+              })(result2)
+            : null;
+          if (result3 !== null) {
+            var result1 = result3;
+          } else {
+            var result1 = null;
+            pos = savedPos0;
+          }
+          if (result1 !== null) {
+            var result0 = result1;
+          } else {
+            var result0 = null;;
+          };
+        }
+        
+        
+        
+        cache[cacheKey] = {
+          nextPos: pos,
+          result:  result0
+        };
+        return result0;
+      }
+      
+      function parse_DirectAbstractDeclarator() {
+        var cacheKey = 'DirectAbstractDeclarator@' + pos;
+        var cachedResult = cache[cacheKey];
+        if (cachedResult) {
+          pos = cachedResult.nextPos;
+          return cachedResult.result;
+        }
+        
+        
+        var savedPos1 = pos;
+        var savedPos2 = pos;
+        if (input.substr(pos, 1) === "(") {
+          var result8 = "(";
+          pos += 1;
+        } else {
+          var result8 = null;
+          if (reportMatchFailures) {
+            matchFailed("\"(\"");
+          }
+        }
+        if (result8 !== null) {
+          var result9 = parse_AbstractDeclarator();
+          if (result9 !== null) {
+            if (input.substr(pos, 1) === ")") {
+              var result10 = ")";
+              pos += 1;
+            } else {
+              var result10 = null;
+              if (reportMatchFailures) {
+                matchFailed("\")\"");
+              }
+            }
+            if (result10 !== null) {
+              var result11 = parse___();
+              if (result11 !== null) {
+                var result12 = [];
+                var result13 = parse_AbstractDeclaratorSuffix();
+                while (result13 !== null) {
+                  result12.push(result13);
+                  var result13 = parse_AbstractDeclaratorSuffix();
+                }
+                if (result12 !== null) {
+                  var result6 = [result8, result9, result10, result11, result12];
+                } else {
+                  var result6 = null;
+                  pos = savedPos2;
+                }
+              } else {
+                var result6 = null;
+                pos = savedPos2;
+              }
+            } else {
+              var result6 = null;
+              pos = savedPos2;
+            }
+          } else {
+            var result6 = null;
+            pos = savedPos2;
+          }
+        } else {
+          var result6 = null;
+          pos = savedPos2;
+        }
+        var result7 = result6 !== null
+          ? (function(declarator, ds) {
+              return {
+                tag: "DirectDeclarator",
+                declarator: declarator,
+                declaratorSuffix: ds
+              };
+            })(result6[1], result6[4])
+          : null;
+        if (result7 !== null) {
+          var result5 = result7;
+        } else {
+          var result5 = null;
+          pos = savedPos1;
+        }
+        if (result5 !== null) {
+          var result0 = result5;
+        } else {
+          var savedPos0 = pos;
+          var result4 = parse_AbstractDeclaratorSuffix();
+          if (result4 !== null) {
+            var result2 = [];
+            while (result4 !== null) {
+              result2.push(result4);
+              var result4 = parse_AbstractDeclaratorSuffix();
+            }
+          } else {
+            var result2 = null;
+          }
+          var result3 = result2 !== null
+            ? (function(ds) {
+                return {
+                  tag: "DirectDeclarator",
+                  declaratorSuffix: ds
+                }
+              })(result2)
+            : null;
+          if (result3 !== null) {
+            var result1 = result3;
+          } else {
+            var result1 = null;
+            pos = savedPos0;
+          }
+          if (result1 !== null) {
+            var result0 = result1;
+          } else {
+            var result0 = null;;
+          };
+        }
+        
+        
+        
+        cache[cacheKey] = {
+          nextPos: pos,
+          result:  result0
+        };
+        return result0;
+      }
+      
+      function parse_AbstractDeclaratorSuffix() {
+        var cacheKey = 'AbstractDeclaratorSuffix@' + pos;
+        var cachedResult = cache[cacheKey];
+        if (cachedResult) {
+          pos = cachedResult.nextPos;
+          return cachedResult.result;
+        }
+        
+        
+        var savedPos6 = pos;
+        var savedPos7 = pos;
+        if (input.substr(pos, 1) === "[") {
+          var result21 = "[";
+          pos += 1;
+        } else {
+          var result21 = null;
+          if (reportMatchFailures) {
+            matchFailed("\"[\"");
+          }
+        }
+        if (result21 !== null) {
+          var result22 = parse___();
+          if (result22 !== null) {
+            var result23 = parse_NumericLiteral();
+            if (result23 !== null) {
+              var result24 = parse___();
+              if (result24 !== null) {
+                if (input.substr(pos, 1) === "]") {
+                  var result25 = "]";
+                  pos += 1;
+                } else {
+                  var result25 = null;
+                  if (reportMatchFailures) {
+                    matchFailed("\"]\"");
+                  }
+                }
+                if (result25 !== null) {
+                  var result19 = [result21, result22, result23, result24, result25];
+                } else {
+                  var result19 = null;
+                  pos = savedPos7;
+                }
+              } else {
+                var result19 = null;
+                pos = savedPos7;
+              }
+            } else {
+              var result19 = null;
+              pos = savedPos7;
+            }
+          } else {
+            var result19 = null;
+            pos = savedPos7;
+          }
+        } else {
+          var result19 = null;
+          pos = savedPos7;
+        }
+        var result20 = result19 !== null
+          ? (function(nl) { return { tag: "ArrayDeclarator", Value: nl}; })(result19[2])
+          : null;
+        if (result20 !== null) {
+          var result18 = result20;
+        } else {
+          var result18 = null;
+          pos = savedPos6;
+        }
+        if (result18 !== null) {
+          var result0 = result18;
+        } else {
+          var savedPos4 = pos;
+          var savedPos5 = pos;
+          if (input.substr(pos, 1) === "[") {
+            var result15 = "[";
+            pos += 1;
+          } else {
+            var result15 = null;
+            if (reportMatchFailures) {
+              matchFailed("\"[\"");
+            }
+          }
+          if (result15 !== null) {
+            var result16 = parse___();
+            if (result16 !== null) {
+              if (input.substr(pos, 1) === "]") {
+                var result17 = "]";
+                pos += 1;
+              } else {
+                var result17 = null;
+                if (reportMatchFailures) {
+                  matchFailed("\"]\"");
+                }
+              }
+              if (result17 !== null) {
+                var result13 = [result15, result16, result17];
+              } else {
+                var result13 = null;
+                pos = savedPos5;
+              }
+            } else {
+              var result13 = null;
+              pos = savedPos5;
+            }
+          } else {
+            var result13 = null;
+            pos = savedPos5;
+          }
+          var result14 = result13 !== null
+            ? (function() { return { tag: "ArrayDeclarator" }; })()
+            : null;
+          if (result14 !== null) {
+            var result12 = result14;
+          } else {
+            var result12 = null;
+            pos = savedPos4;
+          }
+          if (result12 !== null) {
+            var result0 = result12;
+          } else {
+            var savedPos2 = pos;
+            var savedPos3 = pos;
+            if (input.substr(pos, 1) === "(") {
+              var result9 = "(";
+              pos += 1;
+            } else {
+              var result9 = null;
+              if (reportMatchFailures) {
+                matchFailed("\"(\"");
+              }
+            }
+            if (result9 !== null) {
+              var result10 = parse_AbstractParameterList();
+              if (result10 !== null) {
+                if (input.substr(pos, 1) === ")") {
+                  var result11 = ")";
+                  pos += 1;
+                } else {
+                  var result11 = null;
+                  if (reportMatchFailures) {
+                    matchFailed("\")\"");
+                  }
+                }
+                if (result11 !== null) {
+                  var result7 = [result9, result10, result11];
+                } else {
+                  var result7 = null;
+                  pos = savedPos3;
+                }
+              } else {
+                var result7 = null;
+                pos = savedPos3;
+              }
+            } else {
+              var result7 = null;
+              pos = savedPos3;
+            }
+            var result8 = result7 !== null
+              ? (function(pl) { return { tag: "FunctionDeclarator", parameterList:pl }; })(result7[1])
+              : null;
+            if (result8 !== null) {
+              var result6 = result8;
+            } else {
+              var result6 = null;
+              pos = savedPos2;
+            }
+            if (result6 !== null) {
+              var result0 = result6;
+            } else {
+              var savedPos0 = pos;
+              var savedPos1 = pos;
+              if (input.substr(pos, 1) === "(") {
+                var result4 = "(";
+                pos += 1;
+              } else {
+                var result4 = null;
+                if (reportMatchFailures) {
+                  matchFailed("\"(\"");
+                }
+              }
+              if (result4 !== null) {
+                if (input.substr(pos, 1) === ")") {
+                  var result5 = ")";
+                  pos += 1;
+                } else {
+                  var result5 = null;
+                  if (reportMatchFailures) {
+                    matchFailed("\")\"");
+                  }
+                }
+                if (result5 !== null) {
+                  var result2 = [result4, result5];
+                } else {
+                  var result2 = null;
+                  pos = savedPos1;
+                }
+              } else {
+                var result2 = null;
+                pos = savedPos1;
+              }
+              var result3 = result2 !== null
+                ? (function() { return { tag: "FunctionDeclarator" }; })()
+                : null;
+              if (result3 !== null) {
+                var result1 = result3;
+              } else {
+                var result1 = null;
+                pos = savedPos0;
+              }
+              if (result1 !== null) {
+                var result0 = result1;
+              } else {
+                var result0 = null;;
+              };
+            };
+          };
+        }
+        
+        
+        
+        cache[cacheKey] = {
+          nextPos: pos,
+          result:  result0
+        };
+        return result0;
+      }
+      
+      function parse_AbstractParameterList() {
+        var cacheKey = 'AbstractParameterList@' + pos;
+        var cachedResult = cache[cacheKey];
+        if (cachedResult) {
+          pos = cachedResult.nextPos;
+          return cachedResult.result;
+        }
+        
+        
+        var savedPos0 = pos;
+        var savedPos1 = pos;
+        var result3 = parse_AbstractParameterDeclaration();
+        if (result3 !== null) {
+          var result4 = [];
+          var savedPos2 = pos;
+          var result6 = parse___();
+          if (result6 !== null) {
+            if (input.substr(pos, 1) === ",") {
+              var result7 = ",";
+              pos += 1;
+            } else {
+              var result7 = null;
+              if (reportMatchFailures) {
+                matchFailed("\",\"");
+              }
+            }
+            if (result7 !== null) {
+              var result8 = parse___();
+              if (result8 !== null) {
+                var result9 = parse_AbstractParameterDeclaration();
+                if (result9 !== null) {
+                  var result5 = [result6, result7, result8, result9];
+                } else {
+                  var result5 = null;
+                  pos = savedPos2;
+                }
+              } else {
+                var result5 = null;
+                pos = savedPos2;
+              }
+            } else {
+              var result5 = null;
+              pos = savedPos2;
+            }
+          } else {
+            var result5 = null;
+            pos = savedPos2;
+          }
+          while (result5 !== null) {
+            result4.push(result5);
+            var savedPos2 = pos;
+            var result6 = parse___();
+            if (result6 !== null) {
+              if (input.substr(pos, 1) === ",") {
+                var result7 = ",";
+                pos += 1;
+              } else {
+                var result7 = null;
+                if (reportMatchFailures) {
+                  matchFailed("\",\"");
+                }
+              }
+              if (result7 !== null) {
+                var result8 = parse___();
+                if (result8 !== null) {
+                  var result9 = parse_AbstractParameterDeclaration();
+                  if (result9 !== null) {
+                    var result5 = [result6, result7, result8, result9];
+                  } else {
+                    var result5 = null;
+                    pos = savedPos2;
+                  }
+                } else {
+                  var result5 = null;
+                  pos = savedPos2;
+                }
+              } else {
+                var result5 = null;
+                pos = savedPos2;
+              }
+            } else {
+              var result5 = null;
+              pos = savedPos2;
+            }
+          }
+          if (result4 !== null) {
+            var result1 = [result3, result4];
+          } else {
+            var result1 = null;
+            pos = savedPos1;
+          }
+        } else {
+          var result1 = null;
+          pos = savedPos1;
+        }
+        var result2 = result1 !== null
+          ? (function(head, tail) {
+              var result = [head];
+              for (var i = 0; i < tail.length; i++) {
+                result.push(tail[i][3]);
+              }
+              return result;
+            })(result1[0], result1[1])
+          : null;
+        if (result2 !== null) {
+          var result0 = result2;
+        } else {
+          var result0 = null;
+          pos = savedPos0;
+        }
+        
+        
+        
+        cache[cacheKey] = {
+          nextPos: pos,
+          result:  result0
+        };
+        return result0;
+      }
+      
+      function parse_AbstractParameterDeclaration() {
+        var cacheKey = 'AbstractParameterDeclaration@' + pos;
+        var cachedResult = cache[cacheKey];
+        if (cachedResult) {
+          pos = cachedResult.nextPos;
+          return cachedResult.result;
+        }
+        
+        
+        var savedPos0 = pos;
+        var savedPos1 = pos;
+        var result3 = parse_TypeSpecifier();
+        if (result3 !== null) {
+          var result4 = parse___();
+          if (result4 !== null) {
+            var result6 = parse_AbstractDeclarator();
+            var result5 = result6 !== null ? result6 : '';
+            if (result5 !== null) {
+              var result1 = [result3, result4, result5];
+            } else {
+              var result1 = null;
+              pos = savedPos1;
+            }
+          } else {
+            var result1 = null;
+            pos = savedPos1;
+          }
+        } else {
+          var result1 = null;
+          pos = savedPos1;
+        }
+        var result2 = result1 !== null
+          ? (function(typeSpecifier, d) {
+              return {
+                tag: "ParameterDeclaration",
+                typeSpecifier: typeSpecifier,
+                declarator: d !== "" ? d : null
+              };
+            })(result1[0], result1[2])
+          : null;
+        if (result2 !== null) {
+          var result0 = result2;
+        } else {
+          var result0 = null;
+          pos = savedPos0;
+        }
+        
+        
+        
+        cache[cacheKey] = {
+          nextPos: pos,
+          result:  result0
+        };
+        return result0;
+      }
+      
+      function parse_Pointer() {
+        var cacheKey = 'Pointer@' + pos;
+        var cachedResult = cache[cacheKey];
+        if (cachedResult) {
+          pos = cachedResult.nextPos;
+          return cachedResult.result;
+        }
+        
+        
+        var savedPos0 = pos;
+        var savedPos1 = pos;
+        if (input.substr(pos, 1) === "*") {
+          var result3 = "*";
+          pos += 1;
+        } else {
+          var result3 = null;
+          if (reportMatchFailures) {
+            matchFailed("\"*\"");
+          }
+        }
+        if (result3 !== null) {
+          var result4 = parse___();
+          if (result4 !== null) {
+            var result6 = parse_Pointer();
+            var result5 = result6 !== null ? result6 : '';
+            if (result5 !== null) {
+              var result1 = [result3, result4, result5];
+            } else {
+              var result1 = null;
+              pos = savedPos1;
+            }
+          } else {
+            var result1 = null;
+            pos = savedPos1;
+          }
+        } else {
+          var result1 = null;
+          pos = savedPos1;
+        }
+        var result2 = result1 !== null
+          ? (function(p) {
+              return {
+                tag: "Pointer", count: p !== "" ? p.count + 1 : 1
+              };
+            })(result1[2])
           : null;
         if (result2 !== null) {
           var result0 = result2;

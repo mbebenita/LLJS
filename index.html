@@ -14,172 +14,98 @@
   <script src="jc/parser.js"></script>
   <script src="jc/compiler.js"></script>
   <body>
-    <div id="flybar">
-      <a id="logo" href="#top"></a>
-      <div class="navigation toc">
-        <div class="button">
-          Table of Contents
-        </div>
-        <div class="contents menu">
-          <a href="#overview">Overview</a>
-          <a href="#installation">Installation</a>
-          <a href="#usage">Usage</a>
-          <a href="#language">Language Reference</a>
-        </div>
-      </div>
-      <div class="navigation try">
-        <div class="button">
-          Try JS*
-          <div class="repl_bridge"></div>
-        </div>
-        <div class="contents repl_wrapper">
-          <div class="code">
-            <div class="screenshadow tl"></div>
-            <div class="screenshadow tr"></div>
-            <div class="screenshadow bl"></div>
-            <div class="screenshadow br"></div>
-            <div id="repl_source_wrap">
-              <textarea id="repl_source" rows="100" spellcheck="false">int x;</textarea>
-            </div>
-            <div id="repl_results_wrap"><pre id="repl_results"></pre></div>
-            <div class="minibutton dark run" title="Ctrl-Enter">Run</div>
-            <a class="minibutton permalink" id="repl_permalink">Link</a>
-            <br class="clear" />
-          </div>
-        </div>
-      </div>
-      <div id="error" style="display:none;"></div>
-    </div>
     <div class="container">
-      <span class="bookmark" id="top"></span>
-      <p>
-        <b>JS*</b> adds pointer and struct types to JS. Today's JS VMs are incredibly fast but
-        still suffer from several major problems:
-        <ul>
-          <li>
-            Automatic memory management, although very convenient in JS, introduces garbage collection
-            pause times that can be a nuisance to applications which must exhibit real time behaviour, such as games.
-            One way to reduce pause times is to allocate less memory, but this requires JS developers to write
-            code in a style that doesn't allocate objects, which can be nearly impossible in JS.
-            JS* gives you access to explicit memory management, we're talking C style <tt>malloc() / free()</tt>.
-          </li>
-          <li>
-            Dynamic typing is great, but accessing propertys in objects can be slow, for instance, the JS expression
-            <tt>foo.bar.baz.fuz</tt> requires three propert lookups to get the value of <tt>fuz</tt>, now imagine the
-            same expression in C, it's one single memory read from a computed offset. This is possible because C has
-            struct types and is statically typed. Just like C, <b>JS*</b> gives you structs and static typing as well as
-            interopability with dynamic JS types.
-          </li>
-        </ul>
-      </p>
-      <p>
-        In short, <b>JS*</b> is just JS, but with types and explicit memory managment.
-      </p>
-      <h2>
-        <span id="overview" class="bookmark"></span>
-        Overview
-      </h2>
+      <h1>JS* = JS + C /* Lower Level JavaScript */</h1>
+    <p>
+        <b>JS*</b> is a typed dialect of JavaScript that offers a
+        C-like type system with manual memory management. It compiles to explicit typed array operations and
+        lets you write memory-efficient and GC pause-free code less painfully. JS* lets you mix typed and
+        untyped JavaScript. In short, JS* = JS + C.
+    </p>
 
-      <p>JS* on the left, compiled JS output on the right.</p>
+    <p>Unlike JS, JS* is block scoped and variable declarations can by typed.</p>
 
-      <div class='code'>
-        <pre class="idle">
-struct Node { int value, Node * next }
+    <pre class="example">
+var int x = 0;
+var int * y = null, z = 1;
+</pre>
+<p>Function types, and function pointers are also supported, so the statement <tt>var int *(x)(int, int*, int**)</tt> means
+"declare x as function (int, pointer to int, pointer to pointer to int) returning pointer to int".
+</p>
 
-Node * head, tail = null;
+    <pre class="example">
+var int *(x)(int, int*, int**) = null;</pre>
 
-function Node * addNode(int value) {
-  Node * node = new Node;
-  node->value = value;
-  head->next = node;
-  head = node;
+    <p>So, what's the point? Well imagine you wanted to write a linked list data structure in JavaScript.
+You would probably chain a sequence of objects together, as such:
+
+    <pre>
+var head = {value: 0, next: null}, tail = head;
+
+function add(value) {
+  var next = {value: value, next: null};
+  tail.next = next;
+  tail = next;
+}
+    </pre>
+
+This is not as efficient as it could be, in JS* you could write. </p>
+
+    <pre class="example">
+struct Node {
+  Node *next, int value
 }
 
-function int count (Node * node) {
-  int sum = 0;
-  while (node) {
-    sum = node->value;
-    node = node->next;
+var Node *head = new Node, *tail = head;
+
+function add (int value) {
+  var Node * next = new Node;
+  next->value = value;
+  tail->next = next;
+  tail = next;
+}
+
+function Node * find(int value) {
+  var Node * curr = head;
+  while (curr) {
+    if (curr->value === value) {
+       return curr;
+    }
+    curr = curr->next;
   }
-  return sum;
+  return null;
 }
-
-for (int i = 0; i < 1000; i++) {
-  addNode(i);
-}
-        </pre>
-        <pre class="idle">
-var head = 0, tail = 0;
-function addNode(value) {
-  var node = allocate(8);
-  M[node + 0] = value;
-  M[head + 4] = node;
-  head = node;
-}
-function count(node) {
-  var sum = 0;
-  while (node) {
-    sum = M[node + 0];
-    node = M[node + 4];
-  }
-  return sum;
-}
-for (var i = 0; (i < 1000); i++) {
-  addNode(i);
-}
-        </pre>
-        <br class='clear' />
-      </div>
-    </div>
+</pre>
 
 
-
+</div>
     <script>
-      function closeMenus() {
-        $('.navigation.active').removeClass('active')
-      }
+     var id = 0;
+     $('.example').replaceWith(function() {
+       var src = this.innerHTML;
+       var lineCount = src.split("\n").length + 1;
+       return '<div><div><textarea id="ex:' + id + ':source" class="jcCode" rows="' + lineCount + '" spellcheck="false">' + src + '</textarea></div><div><pre id="ex:' + id++ + ':result" class="jcResult"></pre></div></div>';
+     });
 
-      function compileSource() {
-        var jcSrc = $('#repl_source').val();
+     function compileExample() {
+        var number = this.id.split(":")[1];
+        var result = document.getElementById("ex:" + number + ":result");
         try {
-          var jsSrc = compile(jcSrc);
-          var res = $('#repl_results')[0];
-          res.innerText = jsSrc;
+          result.innerHTML = compile(this.value);
         } catch (x) {
-          $('#error').text(x.message).show()
+          result.innerHTML = x.message;
         }
-      }
+     }
 
-      $('#repl_source').keyup(function () {
-        compileSource();
-      });
+     $('.jcCode').each(compileExample);
+     $('.jcCode').keyup(compileExample);
 
-      function evalJS() {
-        try {
-          eval(window.compiledJS);
-        } catch (x) {
-          alert (x.message);
-        }
-      }
-
-      $('.minibutton.run').click(function () {
-        evalJS();
-      });
-
-      $('.navigation').click(function (e) {
-        if (e.target.tagName.toLowerCase() === 'a') {
-          return;
-        }
-        if ($(e.target).closest('.repl_wrapper').length) {
-          return false;
-        }
-        if ($(this).hasClass('active')) {
-          closeMenus();
-        } else {
-          closeMenus()
-          $(this).addClass('active')
-        }
-      });
+     /*
+     $('.jcCode').keyup(function () {
+       var lines = this.value.split("\n").length;
+       this.rows = Math.min(lines, 10);
+     });
+     */
 
     </script>
   </body>

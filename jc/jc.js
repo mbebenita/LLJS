@@ -1,6 +1,7 @@
 load("util.js");
 load("peg.js");
 load("compiler.js");
+load("memory.js");
 
 var options = new OptionSet("option(s)");
 
@@ -37,4 +38,9 @@ if (generateParser.value) {
 
 var source = snarf(file, "text");
 
-print (compile(source));
+print (compile(source, false));
+
+
+// var o = new Function (compile(source))();
+
+// o.add(10);
