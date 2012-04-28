@@ -19,8 +19,7 @@
     <p>
         <b>JS*</b> is a typed dialect of JavaScript that offers a
         C-like type system with manual memory management. It compiles to operations on typed array and
-        lets you write memory-efficient and GC pause-free code less painfully. JS* lets you mix typed and
-        untyped JavaScript. In short, JS* = JS + C.
+        lets you write memory-efficient and GC pause-free code less painfully, in short, JS* = JS + C.
     </p>
 
     <p>Unlike JS, JS* is block scoped and variable declarations can by typed.</p>
@@ -58,7 +57,7 @@ struct Node {
 
 var Node *head = new Node, *tail = head;
 
-function add (int value) {
+function void add (int value) {
   var Node * next = new Node;
   next->value = value;
   tail->next = next;
