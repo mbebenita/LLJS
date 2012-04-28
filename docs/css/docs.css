@@ -62,7 +62,7 @@ table.definitions td {
 */
 code, pre, tt, textarea {
     font-family: Monaco, Consolas, "Lucida Console", monospace;
-    font-size: 14px;
+    font-size: 12px;
     line-height: 18px;
     color: #155;
     white-space: pre-wrap;
@@ -75,7 +75,7 @@ tt {
     padding: 0px 0.2em;
 }
 pre {
-    border-left: 5px solid rgba(0,0,0,0.2);
+    border-left: 5px solid rgba(0,0,0,0.1);
     padding: 3px 0 3px 12px;
     font-size: 12px;
 }
@@ -362,6 +362,8 @@ div.code pre:first-child {
     box-shadow: 0 1px 2px rgba(0,0,0,0.2); -webkit-box-shadow: 0 1px 2px rgba(0,0,0,0.2); -moz-box-shadow: 0 1px 2px rgba(0,0,0,0.2);
     border: 1px solid #b2b2b2; border-top-color: #c9c9c9; border-bottom-color: #9a9a9a;
     background: url(../images/button_bg.png) repeat-x left top;
+    font-family: "Helvetica Neue", "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, sans-serif !important;
+
 }
 .minibutton:active {
     border-color: #aaa;
@@ -408,9 +410,28 @@ div.code pre:first-child {
 
 .example textarea {
     resize:vertical;
+    border: 2px solid #d8d8d8;
+    background: #fafaf;
+    cursor: text;
+  }
+
+.example td {
+    padding: 4px;
 }
 
-.example div {
-    float: left;
-    margin: 10px;
+table.example {
+    position: relative;
+    background: #fff;
+    border: 2px solid #d8d8d8;
+    -webkit-box-shadow: 0px 0px 4px rgba(0,0,0,0.23);
+    -moz-box-shadow: 0px 0px 4px rgba(0,0,0,0.23);
+    box-shadow: 0px 0px 4px rgba(0,0,0,0.23);
+    zoom: 1;
+}
+
+.example .minibutton {
+    text-transform: none;
+//    position: absolute;
+    right: 8px; bottom: 8px;
+    width: 20px;
 }

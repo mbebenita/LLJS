@@ -1,3 +1,10 @@
+{
+  function savePosition(node) {
+    node.position = computeErrorPosition();
+    return node;
+  }
+}
+
 /*
  * JavaScript parser based on the grammar described in ECMA-262, 5th ed.
  * (http://www.ecma-international.org/publications/standards/Ecma-262.htm)
@@ -191,25 +198,15 @@ TypeReservedWord
 Literal
   = NullLiteral
   / BooleanLiteral
-  / value:NumericLiteral {
-      return {
-        tag:   "NumericLiteral",
-        value: value
-      };
-    }
-  / value:StringLiteral {
-      return {
-        tag:   "StringLiteral",
-        value: value
-      };
-    }
+  / value:NumericLiteral { return savePosition(new Literal("number", value)); }
+  / value:StringLiteral { return savePosition(new Literal("string", value)); }
 
 NullLiteral
-  = NullToken { return { tag:  "NullLiteral" }; }
+  = NullToken { return savePosition(new Literal("null")); }
 
 BooleanLiteral
-  = TrueToken  { return { tag:  "BooleanLiteral", value: true  }; }
-  / FalseToken { return { tag:  "BooleanLiteral", value: false }; }
+  = TrueToken  { return savePosition(new Literal("boolean", true)); }
+  / FalseToken { return savePosition(new Literal("boolean", false)); }
 
 NumericLiteral "number"
   = literal:(HexIntegerLiteral / DecimalLiteral) !IdentifierStart {
@@ -442,7 +439,7 @@ __
 
 PrimaryExpression
   = ThisToken       { return { tag:  "This" }; }
-  / name:Identifier { return { tag:  "Variable", name: name }; }
+  / name:Identifier { return savePosition(new VariableIdentifier(name)); }
   / Literal
   / ArrayLiteral
   / ObjectLiteral
@@ -536,17 +533,13 @@ MemberExpression
         }
     )
     accessors:(
-        __ "[" __ name:Expression __ "]" { return name; }
-      / __ "." __ name:IdentifierName    { return name; }
-      / __ "->" __ name:IdentifierName   { return {dereference:true, name: name}; }
+        __ "[" __ name:Expression __ "]" { return {tag: "bracket", expression: name}; }
+      / __ "." __ name:IdentifierName    { return {tag: "dot", name: name}; }
+      / __ "->" __ name:IdentifierName   { return {tag: "arrow", name: name}; }
     )* {
       var result = base;
       for (var i = 0; i < accessors.length; i++) {
-        result = {
-          tag:  "PropertyAccess",
-          base: result,
-          name: accessors[i]
-        };
+        result = savePosition(new PropertyAccess(result, accessors[i]));
       }
       return result;
     }
@@ -554,11 +547,7 @@ MemberExpression
 NewExpression
   = MemberExpression
   / NewToken __ constructor:NewExpression {
-      return {
-        tag:         "NewOperator",
-        constructor: constructor,
-        arguments:   []
-      };
+      return savePosition(new NewExpression(constructor, []));
     }
 
 CallExpression
@@ -683,12 +672,7 @@ MultiplicativeExpression
     tail:(__ MultiplicativeOperator __ UnaryExpression)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -701,12 +685,7 @@ AdditiveExpression
     tail:(__ AdditiveOperator __ MultiplicativeExpression)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -720,12 +699,7 @@ ShiftExpression
     tail:(__ ShiftOperator __ AdditiveExpression)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -740,12 +714,7 @@ RelationalExpression
     tail:(__ RelationalOperator __ ShiftExpression)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -763,12 +732,7 @@ RelationalExpressionNoIn
     tail:(__ RelationalOperatorNoIn __ ShiftExpression)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -785,12 +749,7 @@ EqualityExpression
     tail:(__ EqualityOperator __ RelationalExpression)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -800,12 +759,7 @@ EqualityExpressionNoIn
     tail:(__ EqualityOperator __ RelationalExpressionNoIn)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -821,12 +775,7 @@ BitwiseANDExpression
     tail:(__ BitwiseANDOperator __ EqualityExpression)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -836,12 +785,7 @@ BitwiseANDExpressionNoIn
     tail:(__ BitwiseANDOperator __ EqualityExpressionNoIn)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -854,12 +798,7 @@ BitwiseXORExpression
     tail:(__ BitwiseXOROperator __ BitwiseANDExpression)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -869,12 +808,7 @@ BitwiseXORExpressionNoIn
     tail:(__ BitwiseXOROperator __ BitwiseANDExpressionNoIn)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -887,12 +821,7 @@ BitwiseORExpression
     tail:(__ BitwiseOROperator __ BitwiseXORExpression)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -902,12 +831,7 @@ BitwiseORExpressionNoIn
     tail:(__ BitwiseOROperator __ BitwiseXORExpressionNoIn)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -920,12 +844,7 @@ LogicalANDExpression
     tail:(__ LogicalANDOperator __ BitwiseORExpression)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -935,12 +854,7 @@ LogicalANDExpressionNoIn
     tail:(__ LogicalANDOperator __ BitwiseORExpressionNoIn)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -953,12 +867,7 @@ LogicalORExpression
     tail:(__ LogicalOROperator __ LogicalANDExpression)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -968,12 +877,7 @@ LogicalORExpressionNoIn
     tail:(__ LogicalOROperator __ LogicalANDExpressionNoIn)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -985,12 +889,7 @@ ConditionalExpression
   = condition:LogicalORExpression __
     "?" __ trueExpression:AssignmentExpression __
     ":" __ falseExpression:AssignmentExpression {
-      return {
-        tag:             "ConditionalExpression",
-        condition:       condition,
-        trueExpression:  trueExpression,
-        falseExpression: falseExpression
-      };
+      return savePosition(new ConditionalExpression(condition, trueExpression, falseExpression));
     }
   / LogicalORExpression
 
@@ -998,12 +897,7 @@ ConditionalExpressionNoIn
   = condition:LogicalORExpressionNoIn __
     "?" __ trueExpression:AssignmentExpressionNoIn __
     ":" __ falseExpression:AssignmentExpressionNoIn {
-      return {
-        tag:             "ConditionalExpression",
-        condition:       condition,
-        trueExpression:  trueExpression,
-        falseExpression: falseExpression
-      };
+      return savePosition(new ConditionalExpression(condition, trueExpression, falseExpression));
     }
   / LogicalORExpressionNoIn
 
@@ -1011,12 +905,7 @@ AssignmentExpression
   = left:LeftHandSideExpression __
     operator:AssignmentOperator __
     right:AssignmentExpression {
-      return {
-        tag:      "AssignmentExpression",
-        operator: operator,
-        left:     left,
-        right:    right
-      };
+      return savePosition(new AssignmentExpression(operator, left, right));
     }
   / ConditionalExpression
 
@@ -1024,12 +913,7 @@ AssignmentExpressionNoIn
   = left:LeftHandSideExpression __
     operator:AssignmentOperator __
     right:AssignmentExpressionNoIn {
-      return {
-        tag:      "AssignmentExpression",
-        operator: operator,
-        left:     left,
-        right:    right
-      };
+      return savePosition(new AssignmentExpression(operator, left, right));
     }
   / ConditionalExpressionNoIn
 
@@ -1052,12 +936,7 @@ Expression
     tail:(__ "," __ AssignmentExpression)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -1067,12 +946,7 @@ ExpressionNoIn
     tail:(__ "," __ AssignmentExpressionNoIn)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
-        result = {
-          tag:      "BinaryExpression",
-          operator: tail[i][1],
-          left:     result,
-          right:    tail[i][3]
-        };
+        result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
       }
       return result;
     }
@@ -1129,11 +1003,7 @@ Type
 
 VariableStatement
   = VarToken __ typeSpecifier:TypeSpecifier __ declarations:VariableDeclarationList EOS {
-      return {
-        tag: "VariableStatement",
-        declarations: declarations,
-        typeSpecifier: typeSpecifier
-      };
+      return savePosition(new VariableStatement(typeSpecifier, declarations));
     }
 
 VariableDeclarationList
@@ -1156,12 +1026,7 @@ VariableDeclarationListNoIn
 
 VariableDeclaration
   = declarator:Declarator __ value:Initialiser? {
-      return {
-        tag:   "VariableDeclaration",
-        declarator:  declarator,
-        value: value !== "" ? value : null,
-        position: computeErrorPosition()
-      };
+      return savePosition(new VariableDeclaration(declarator, value !== "" ? value : null));
     }
 
 VariableDeclarationNoIn
@@ -1183,7 +1048,7 @@ EmptyStatement
   = ";" { return { tag:  "EmptyStatement" }; }
 
 ExpressionStatement
-  = !("{" / FunctionToken) expression:Expression EOS { return { tag: "ExpressionStatement", expression:expression }; }
+  = !("{" / FunctionToken) expression:Expression EOS { return savePosition(new ExpressionStatement(expression)); }
 
 IfStatement
   = IfToken __
@@ -1304,10 +1169,7 @@ ReturnStatement
         expression:Expression EOS { return expression; }
       / EOSNoLineTerminator       { return ""; }
     ) {
-      return {
-        tag:   "ReturnStatement",
-        value: value !== "" ? value : null
-      };
+      return savePosition(new ReturnStatement(value !== "" ? value : null));
     }
 
 WithStatement
@@ -1442,45 +1304,26 @@ FunctionDeclaration
   = FunctionToken __ type:TypeName __ name:Identifier __
     "(" __ parameters:FormalParameterList? __ ")" __
     "{" __ elements:FunctionBody __ "}" {
-      return {
-        tag:      "Function",
-        name:     name,
-        parameters:   parameters !== "" ? parameters : [],
-        type:     type,
-        elements: elements
-      };
+      return savePosition(new FunctionDeclaration(name, type, parameters !== "" ? parameters : [], elements));
     }
 
 FunctionExpression
-  = FunctionToken __ name:Identifier? __
+  = FunctionToken __ type:TypeName __ name:Identifier? __
     "(" __ parameters:FormalParameterList? __ ")" __
     "{" __ elements:FunctionBody __ "}" {
-      return {
-        tag:      "Function",
-        name:     name !== "" ? name : null,
-        parameters:   parameters !== "" ? parameters : [],
-        elements: elements
-      };
+      return savePosition(new FunctionDeclaration(name, type, parameters !== "" ? parameters : [], elements));
     }
 
 StructDeclaration "struct"
   = StructToken __ name:Identifier __
     "{" __ declarations:FieldDeclarationList? __ "}" {
-      return {
-        tag:      "StructDeclaration",
-        name:     name,
-        declarations: declarations
-      };
-    }
+       return savePosition(new StructDeclaration(name, declarations));
+     }
 
 FieldDeclaration
   = typeSpecifier:TypeSpecifier __ declarator:Declarator {
-    return {
-      tag: "FieldDeclaration",
-      typeSpecifier: typeSpecifier,
-      declarator:declarator
+      return savePosition(new FieldDeclaration(typeSpecifier, declarator));
     }
-  }
 
 FieldDeclarationList
   = head:FieldDeclaration tail:(__ "," __ FieldDeclaration)* {
@@ -1517,10 +1360,7 @@ FunctionBody
 
 Program
   = elements:SourceElements? {
-      return {
-        tag:      "Program",
-        elements: elements !== "" ? elements : []
-      };
+      return new Program(elements !== "" ? elements : []);
     }
 
 SourceElements
@@ -1559,52 +1399,32 @@ SourceElement
 
 Declarator
   = p:Pointer? __ dd:DirectDeclarator {
-    return {
-      tag: "Declarator",
-      pointer: p !== "" ? p : null,
-      directDeclarator: dd
-    };
-  }
+      return savePosition(new Declarator(p !== "" ? p : null, dd));
+    }
 
 DirectDeclarator
   = name:Identifier __ ds:DeclaratorSuffix* {
-    return {
-      tag: "DirectDeclarator",
-      name: name,
-      declaratorSuffix: ds
+      return savePosition(new DirectDeclarator(name, undefined, ds));
     }
-  }
   / "(" declarator:Declarator ")" __ ds:DeclaratorSuffix* {
-    return {
-      tag: "DirectDeclarator",
-      declarator: declarator,
-      declaratorSuffix: ds
-    };
-  }
+      return savePosition(new DirectDeclarator(null, declarator, ds));
+    }
 
 DeclaratorSuffix
   = "[" __ nl:NumericLiteral __ "]" { return { tag: "ArrayDeclarator", Value: nl}; }
   / "[" __ "]" { return { tag: "ArrayDeclarator" }; }
-  / "(" pl:AbstractParameterList ")" { return { tag: "FunctionDeclarator", parameterList:pl }; }
-  / "(" ")" { return { tag: "FunctionDeclarator" }; }
+  / "(" pl:AbstractParameterList ")" { return savePosition(new FunctionDeclarator(pl)) }
+  / "(" ")" { return savePosition(new FunctionDeclarator()) }
 
 ParameterDeclaration
-  = typeSpecifier:TypeSpecifier __ d:Declarator? {
-    return {
-      tag: "ParameterDeclaration",
-      typeSpecifier: typeSpecifier,
-      declarator: d !== "" ? d : null
-    };
-  }
+  = typeSpecifier:TypeSpecifier __ declarator:Declarator? {
+      return savePosition(new ParameterDeclaration(typeSpecifier, declarator));
+    }
 
 TypeName
 	= ts:TypeSpecifier __ ad:AbstractDeclarator? {
-    return {
-      tag: "TypeName",
-      typeSpecifier: ts,
-      declarator: ad !== "" ? ad : null
-    };
-  }
+      return savePosition(new TypeName(ts, ad !== "" ? ad : null));
+    }
 
 TypeSpecifier
 	= "void"
@@ -1621,39 +1441,25 @@ TypeSpecifier
 
 AbstractDeclarator
   = p:Pointer __  dad:DirectAbstractDeclarator? {
-    return {
-      tag: "Declarator",
-      pointer: p,
-      directDeclarator: dad !== "" ? dad : null
-    };
-  }
-  / dad:DirectAbstractDeclarator {
-    return {
-      tag: "Declarator",
-      directDeclarator: dad
+      return savePosition(new Declarator(p, dad !== "" ? dad : null));
     }
-  }
+  / dad:DirectAbstractDeclarator {
+      return savePosition(new Declarator(null, dad !== "" ? dad : null));
+    }
 
 DirectAbstractDeclarator
   = "(" declarator:AbstractDeclarator ")" __ ds:AbstractDeclaratorSuffix* {
-    return {
-      tag: "DirectDeclarator",
-      declarator: declarator,
-      declaratorSuffix: ds
-    };
-  }
+       return savePosition(new DirectDeclarator(null, declarator, ds, true));
+     }
   / ds:AbstractDeclaratorSuffix+ {
-    return {
-      tag: "DirectDeclarator",
-      declaratorSuffix: ds
+      return savePosition(new DirectDeclarator(null, null, ds, true));
     }
-  }
 
 AbstractDeclaratorSuffix
   = "[" __ nl:NumericLiteral __ "]" { return { tag: "ArrayDeclarator", Value: nl}; }
   / "[" __ "]" { return { tag: "ArrayDeclarator" }; }
-  / "(" pl:AbstractParameterList ")" { return { tag: "FunctionDeclarator", parameterList:pl }; }
-  / "(" ")" { return { tag: "FunctionDeclarator" }; }
+  / "(" pl:AbstractParameterList ")" { return savePosition(new FunctionDeclarator(pl)) }
+  / "(" ")" { return savePosition(new FunctionDeclarator()) }
 
 AbstractParameterList
   = head:AbstractParameterDeclaration tail:(__ "," __ AbstractParameterDeclaration)* {
@@ -1666,13 +1472,8 @@ AbstractParameterList
 
 AbstractParameterDeclaration
   = typeSpecifier:TypeSpecifier __ d:AbstractDeclarator? {
-    return {
-      tag: "ParameterDeclaration",
-      typeSpecifier: typeSpecifier,
-      declarator: d !== "" ? d : null
-    };
-  }
-
+      return savePosition(new ParameterDeclaration(typeSpecifier, d !== "" ? d : null, true));
+    }
 
 Pointer
   = "*" __ p:Pointer? {

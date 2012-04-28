@@ -2007,12 +2007,7 @@ var parser = (function(){
             var savedPos1 = pos;
             var result5 = parse_NumericLiteral();
             var result6 = result5 !== null
-              ? (function(value) {
-                    return {
-                      tag:   "NumericLiteral",
-                      value: value
-                    };
-                  })(result5)
+              ? (function(value) { return savePosition(new Literal("number", value)); })(result5)
               : null;
             if (result6 !== null) {
               var result4 = result6;
@@ -2026,12 +2021,7 @@ var parser = (function(){
               var savedPos0 = pos;
               var result2 = parse_StringLiteral();
               var result3 = result2 !== null
-                ? (function(value) {
-                      return {
-                        tag:   "StringLiteral",
-                        value: value
-                      };
-                    })(result2)
+                ? (function(value) { return savePosition(new Literal("string", value)); })(result2)
                 : null;
               if (result3 !== null) {
                 var result1 = result3;
@@ -2069,7 +2059,7 @@ var parser = (function(){
         var savedPos0 = pos;
         var result1 = parse_NullToken();
         var result2 = result1 !== null
-          ? (function() { return { tag:  "NullLiteral" }; })()
+          ? (function() { return savePosition(new Literal("null")); })()
           : null;
         if (result2 !== null) {
           var result0 = result2;
@@ -2099,7 +2089,7 @@ var parser = (function(){
         var savedPos1 = pos;
         var result5 = parse_TrueToken();
         var result6 = result5 !== null
-          ? (function() { return { tag:  "BooleanLiteral", value: true  }; })()
+          ? (function() { return savePosition(new Literal("boolean", true)); })()
           : null;
         if (result6 !== null) {
           var result4 = result6;
@@ -2113,7 +2103,7 @@ var parser = (function(){
           var savedPos0 = pos;
           var result2 = parse_FalseToken();
           var result3 = result2 !== null
-            ? (function() { return { tag:  "BooleanLiteral", value: false }; })()
+            ? (function() { return savePosition(new Literal("boolean", false)); })()
             : null;
           if (result3 !== null) {
             var result1 = result3;
@@ -6049,7 +6039,7 @@ var parser = (function(){
           var savedPos2 = pos;
           var result13 = parse_Identifier();
           var result14 = result13 !== null
-            ? (function(name) { return { tag:  "Variable", name: name }; })(result13)
+            ? (function(name) { return savePosition(new VariableIdentifier(name)); })(result13)
             : null;
           if (result14 !== null) {
             var result12 = result14;
@@ -7269,7 +7259,7 @@ var parser = (function(){
             pos = savedPos7;
           }
           var result22 = result21 !== null
-            ? (function(name) { return name; })(result21[3])
+            ? (function(name) { return {tag: "bracket", expression: name}; })(result21[3])
             : null;
           if (result22 !== null) {
             var result20 = result22;
@@ -7316,7 +7306,7 @@ var parser = (function(){
               pos = savedPos5;
             }
             var result15 = result14 !== null
-              ? (function(name) { return name; })(result14[3])
+              ? (function(name) { return {tag: "dot", name: name}; })(result14[3])
               : null;
             if (result15 !== null) {
               var result13 = result15;
@@ -7363,7 +7353,7 @@ var parser = (function(){
                 pos = savedPos3;
               }
               var result8 = result7 !== null
-                ? (function(name) { return {dereference:true, name: name}; })(result7[3])
+                ? (function(name) { return {tag: "arrow", name: name}; })(result7[3])
                 : null;
               if (result8 !== null) {
                 var result6 = result8;
@@ -7436,7 +7426,7 @@ var parser = (function(){
               pos = savedPos7;
             }
             var result22 = result21 !== null
-              ? (function(name) { return name; })(result21[3])
+              ? (function(name) { return {tag: "bracket", expression: name}; })(result21[3])
               : null;
             if (result22 !== null) {
               var result20 = result22;
@@ -7483,7 +7473,7 @@ var parser = (function(){
                 pos = savedPos5;
               }
               var result15 = result14 !== null
-                ? (function(name) { return name; })(result14[3])
+                ? (function(name) { return {tag: "dot", name: name}; })(result14[3])
                 : null;
               if (result15 !== null) {
                 var result13 = result15;
@@ -7530,7 +7520,7 @@ var parser = (function(){
                   pos = savedPos3;
                 }
                 var result8 = result7 !== null
-                  ? (function(name) { return {dereference:true, name: name}; })(result7[3])
+                  ? (function(name) { return {tag: "arrow", name: name}; })(result7[3])
                   : null;
                 if (result8 !== null) {
                   var result6 = result8;
@@ -7560,11 +7550,7 @@ var parser = (function(){
           ? (function(base, accessors) {
                 var result = base;
                 for (var i = 0; i < accessors.length; i++) {
-                  result = {
-                    tag:  "PropertyAccess",
-                    base: result,
-                    name: accessors[i]
-                  };
+                  result = savePosition(new PropertyAccess(result, accessors[i]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -7621,11 +7607,7 @@ var parser = (function(){
           }
           var result3 = result2 !== null
             ? (function(constructor) {
-                  return {
-                    tag:         "NewOperator",
-                    constructor: constructor,
-                    arguments:   []
-                  };
+                  return savePosition(new NewExpression(constructor, []));
                 })(result2[2])
             : null;
           if (result3 !== null) {
@@ -8799,12 +8781,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -9008,12 +8985,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -9281,12 +9253,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -9449,12 +9416,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -9640,12 +9602,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -9826,12 +9783,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -9935,12 +9887,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -10116,12 +10063,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -10225,12 +10167,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -10421,12 +10358,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -10530,12 +10462,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -10726,12 +10653,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -10835,12 +10757,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -11031,12 +10948,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -11140,12 +11052,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -11318,12 +11225,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -11427,12 +11329,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -11606,12 +11503,7 @@ var parser = (function(){
         }
         var result4 = result3 !== null
           ? (function(condition, trueExpression, falseExpression) {
-                return {
-                  tag:             "ConditionalExpression",
-                  condition:       condition,
-                  trueExpression:  trueExpression,
-                  falseExpression: falseExpression
-                };
+                return savePosition(new ConditionalExpression(condition, trueExpression, falseExpression));
               })(result3[0], result3[4], result3[8])
           : null;
         if (result4 !== null) {
@@ -11724,12 +11616,7 @@ var parser = (function(){
         }
         var result4 = result3 !== null
           ? (function(condition, trueExpression, falseExpression) {
-                return {
-                  tag:             "ConditionalExpression",
-                  condition:       condition,
-                  trueExpression:  trueExpression,
-                  falseExpression: falseExpression
-                };
+                return savePosition(new ConditionalExpression(condition, trueExpression, falseExpression));
               })(result3[0], result3[4], result3[8])
           : null;
         if (result4 !== null) {
@@ -11802,12 +11689,7 @@ var parser = (function(){
         }
         var result4 = result3 !== null
           ? (function(left, operator, right) {
-                return {
-                  tag:      "AssignmentExpression",
-                  operator: operator,
-                  left:     left,
-                  right:    right
-                };
+                return savePosition(new AssignmentExpression(operator, left, right));
               })(result3[0], result3[2], result3[4])
           : null;
         if (result4 !== null) {
@@ -11880,12 +11762,7 @@ var parser = (function(){
         }
         var result4 = result3 !== null
           ? (function(left, operator, right) {
-                return {
-                  tag:      "AssignmentExpression",
-                  operator: operator,
-                  left:     left,
-                  right:    right
-                };
+                return savePosition(new AssignmentExpression(operator, left, right));
               })(result3[0], result3[2], result3[4])
           : null;
         if (result4 !== null) {
@@ -12230,12 +12107,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -12355,12 +12227,7 @@ var parser = (function(){
           ? (function(head, tail) {
                 var result = head;
                 for (var i = 0; i < tail.length; i++) {
-                  result = {
-                    tag:      "BinaryExpression",
-                    operator: tail[i][1],
-                    left:     result,
-                    right:    tail[i][3]
-                  };
+                  result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
                 }
                 return result;
               })(result1[0], result1[1])
@@ -12810,11 +12677,7 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(typeSpecifier, declarations) {
-                return {
-                  tag: "VariableStatement",
-                  declarations: declarations,
-                  typeSpecifier: typeSpecifier
-                };
+                return savePosition(new VariableStatement(typeSpecifier, declarations));
               })(result1[2], result1[4])
           : null;
         if (result2 !== null) {
@@ -13106,12 +12969,7 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(declarator, value) {
-                return {
-                  tag:   "VariableDeclaration",
-                  declarator:  declarator,
-                  value: value !== "" ? value : null,
-                  position: computeErrorPosition()
-                };
+                return savePosition(new VariableDeclaration(declarator, value !== "" ? value : null));
               })(result1[0], result1[2])
           : null;
         if (result2 !== null) {
@@ -13445,7 +13303,7 @@ var parser = (function(){
           pos = savedPos1;
         }
         var result2 = result1 !== null
-          ? (function(expression) { return { tag: "ExpressionStatement", expression:expression }; })(result1[1])
+          ? (function(expression) { return savePosition(new ExpressionStatement(expression)); })(result1[1])
           : null;
         if (result2 !== null) {
           var result0 = result2;
@@ -14549,10 +14407,7 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(value) {
-                return {
-                  tag:   "ReturnStatement",
-                  value: value !== "" ? value : null
-                };
+                return savePosition(new ReturnStatement(value !== "" ? value : null));
               })(result1[2])
           : null;
         if (result2 !== null) {
@@ -15845,13 +15700,7 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(type, name, parameters, elements) {
-                return {
-                  tag:      "Function",
-                  name:     name,
-                  parameters:   parameters !== "" ? parameters : [],
-                  type:     type,
-                  elements: elements
-                };
+                return savePosition(new FunctionDeclaration(name, type, parameters !== "" ? parameters : [], elements));
               })(result1[2], result1[4], result1[8], result1[14])
           : null;
         if (result2 !== null) {
@@ -15885,67 +15734,79 @@ var parser = (function(){
         if (result3 !== null) {
           var result4 = parse___();
           if (result4 !== null) {
-            var result19 = parse_Identifier();
-            var result5 = result19 !== null ? result19 : '';
+            var result5 = parse_TypeName();
             if (result5 !== null) {
               var result6 = parse___();
               if (result6 !== null) {
-                if (input.substr(pos, 1) === "(") {
-                  var result7 = "(";
-                  pos += 1;
-                } else {
-                  var result7 = null;
-                  if (reportMatchFailures) {
-                    matchFailed("\"(\"");
-                  }
-                }
+                var result21 = parse_Identifier();
+                var result7 = result21 !== null ? result21 : '';
                 if (result7 !== null) {
                   var result8 = parse___();
                   if (result8 !== null) {
-                    var result18 = parse_FormalParameterList();
-                    var result9 = result18 !== null ? result18 : '';
+                    if (input.substr(pos, 1) === "(") {
+                      var result9 = "(";
+                      pos += 1;
+                    } else {
+                      var result9 = null;
+                      if (reportMatchFailures) {
+                        matchFailed("\"(\"");
+                      }
+                    }
                     if (result9 !== null) {
                       var result10 = parse___();
                       if (result10 !== null) {
-                        if (input.substr(pos, 1) === ")") {
-                          var result11 = ")";
-                          pos += 1;
-                        } else {
-                          var result11 = null;
-                          if (reportMatchFailures) {
-                            matchFailed("\")\"");
-                          }
-                        }
+                        var result20 = parse_FormalParameterList();
+                        var result11 = result20 !== null ? result20 : '';
                         if (result11 !== null) {
                           var result12 = parse___();
                           if (result12 !== null) {
-                            if (input.substr(pos, 1) === "{") {
-                              var result13 = "{";
+                            if (input.substr(pos, 1) === ")") {
+                              var result13 = ")";
                               pos += 1;
                             } else {
                               var result13 = null;
                               if (reportMatchFailures) {
-                                matchFailed("\"{\"");
+                                matchFailed("\")\"");
                               }
                             }
                             if (result13 !== null) {
                               var result14 = parse___();
                               if (result14 !== null) {
-                                var result15 = parse_FunctionBody();
+                                if (input.substr(pos, 1) === "{") {
+                                  var result15 = "{";
+                                  pos += 1;
+                                } else {
+                                  var result15 = null;
+                                  if (reportMatchFailures) {
+                                    matchFailed("\"{\"");
+                                  }
+                                }
                                 if (result15 !== null) {
                                   var result16 = parse___();
                                   if (result16 !== null) {
-                                    if (input.substr(pos, 1) === "}") {
-                                      var result17 = "}";
-                                      pos += 1;
-                                    } else {
-                                      var result17 = null;
-                                      if (reportMatchFailures) {
-                                        matchFailed("\"}\"");
-                                      }
-                                    }
+                                    var result17 = parse_FunctionBody();
                                     if (result17 !== null) {
-                                      var result1 = [result3, result4, result5, result6, result7, result8, result9, result10, result11, result12, result13, result14, result15, result16, result17];
+                                      var result18 = parse___();
+                                      if (result18 !== null) {
+                                        if (input.substr(pos, 1) === "}") {
+                                          var result19 = "}";
+                                          pos += 1;
+                                        } else {
+                                          var result19 = null;
+                                          if (reportMatchFailures) {
+                                            matchFailed("\"}\"");
+                                          }
+                                        }
+                                        if (result19 !== null) {
+                                          var result1 = [result3, result4, result5, result6, result7, result8, result9, result10, result11, result12, result13, result14, result15, result16, result17, result18, result19];
+                                        } else {
+                                          var result1 = null;
+                                          pos = savedPos1;
+                                        }
+                                      } else {
+                                        var result1 = null;
+                                        pos = savedPos1;
+                                      }
                                     } else {
                                       var result1 = null;
                                       pos = savedPos1;
@@ -16007,14 +15868,9 @@ var parser = (function(){
           pos = savedPos1;
         }
         var result2 = result1 !== null
-          ? (function(name, parameters, elements) {
-                return {
-                  tag:      "Function",
-                  name:     name !== "" ? name : null,
-                  parameters:   parameters !== "" ? parameters : [],
-                  elements: elements
-                };
-              })(result1[2], result1[6], result1[12])
+          ? (function(type, name, parameters, elements) {
+                return savePosition(new FunctionDeclaration(name, type, parameters !== "" ? parameters : [], elements));
+              })(result1[2], result1[4], result1[8], result1[14])
           : null;
         if (result2 !== null) {
           var result0 = result2;
@@ -16118,12 +15974,8 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(name, declarations) {
-                return {
-                  tag:      "StructDeclaration",
-                  name:     name,
-                  declarations: declarations
-                };
-              })(result1[2], result1[6])
+                 return savePosition(new StructDeclaration(name, declarations));
+               })(result1[2], result1[6])
           : null;
         if (result2 !== null) {
           var result0 = result2;
@@ -16175,12 +16027,8 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(typeSpecifier, declarator) {
-              return {
-                tag: "FieldDeclaration",
-                typeSpecifier: typeSpecifier,
-                declarator:declarator
-              }
-            })(result1[0], result1[2])
+                return savePosition(new FieldDeclaration(typeSpecifier, declarator));
+              })(result1[0], result1[2])
           : null;
         if (result2 !== null) {
           var result0 = result2;
@@ -16483,10 +16331,7 @@ var parser = (function(){
         var result1 = result3 !== null ? result3 : '';
         var result2 = result1 !== null
           ? (function(elements) {
-                return {
-                  tag:      "Program",
-                  elements: elements !== "" ? elements : []
-                };
+                return new Program(elements !== "" ? elements : []);
               })(result1)
           : null;
         if (result2 !== null) {
@@ -16618,12 +16463,8 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(p, dd) {
-              return {
-                tag: "Declarator",
-                pointer: p !== "" ? p : null,
-                directDeclarator: dd
-              };
-            })(result1[0], result1[2])
+                return savePosition(new Declarator(p !== "" ? p : null, dd));
+              })(result1[0], result1[2])
           : null;
         if (result2 !== null) {
           var result0 = result2;
@@ -16678,12 +16519,8 @@ var parser = (function(){
         }
         var result12 = result11 !== null
           ? (function(name, ds) {
-              return {
-                tag: "DirectDeclarator",
-                name: name,
-                declaratorSuffix: ds
-              }
-            })(result11[0], result11[2])
+                return savePosition(new DirectDeclarator(name, undefined, ds));
+              })(result11[0], result11[2])
           : null;
         if (result12 !== null) {
           var result10 = result12;
@@ -16750,12 +16587,8 @@ var parser = (function(){
           }
           var result3 = result2 !== null
             ? (function(declarator, ds) {
-                return {
-                  tag: "DirectDeclarator",
-                  declarator: declarator,
-                  declaratorSuffix: ds
-                };
-              })(result2[1], result2[4])
+                  return savePosition(new DirectDeclarator(null, declarator, ds));
+                })(result2[1], result2[4])
             : null;
           if (result3 !== null) {
             var result1 = result3;
@@ -16936,7 +16769,7 @@ var parser = (function(){
               pos = savedPos3;
             }
             var result8 = result7 !== null
-              ? (function(pl) { return { tag: "FunctionDeclarator", parameterList:pl }; })(result7[1])
+              ? (function(pl) { return savePosition(new FunctionDeclarator(pl)) })(result7[1])
               : null;
             if (result8 !== null) {
               var result6 = result8;
@@ -16979,7 +16812,7 @@ var parser = (function(){
                 pos = savedPos1;
               }
               var result3 = result2 !== null
-                ? (function() { return { tag: "FunctionDeclarator" }; })()
+                ? (function() { return savePosition(new FunctionDeclarator()) })()
                 : null;
               if (result3 !== null) {
                 var result1 = result3;
@@ -17037,13 +16870,9 @@ var parser = (function(){
           pos = savedPos1;
         }
         var result2 = result1 !== null
-          ? (function(typeSpecifier, d) {
-              return {
-                tag: "ParameterDeclaration",
-                typeSpecifier: typeSpecifier,
-                declarator: d !== "" ? d : null
-              };
-            })(result1[0], result1[2])
+          ? (function(typeSpecifier, declarator) {
+                return savePosition(new ParameterDeclaration(typeSpecifier, declarator));
+              })(result1[0], result1[2])
           : null;
         if (result2 !== null) {
           var result0 = result2;
@@ -17094,12 +16923,8 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(ts, ad) {
-              return {
-                tag: "TypeName",
-                typeSpecifier: ts,
-                declarator: ad !== "" ? ad : null
-              };
-            })(result1[0], result1[2])
+                return savePosition(new TypeName(ts, ad !== "" ? ad : null));
+              })(result1[0], result1[2])
           : null;
         if (result2 !== null) {
           var result0 = result2;
@@ -17305,12 +17130,8 @@ var parser = (function(){
         }
         var result6 = result5 !== null
           ? (function(p, dad) {
-              return {
-                tag: "Declarator",
-                pointer: p,
-                directDeclarator: dad !== "" ? dad : null
-              };
-            })(result5[0], result5[2])
+                return savePosition(new Declarator(p, dad !== "" ? dad : null));
+              })(result5[0], result5[2])
           : null;
         if (result6 !== null) {
           var result4 = result6;
@@ -17325,11 +17146,8 @@ var parser = (function(){
           var result2 = parse_DirectAbstractDeclarator();
           var result3 = result2 !== null
             ? (function(dad) {
-                return {
-                  tag: "Declarator",
-                  directDeclarator: dad
-                }
-              })(result2)
+                  return savePosition(new Declarator(null, dad !== "" ? dad : null));
+                })(result2)
             : null;
           if (result3 !== null) {
             var result1 = result3;
@@ -17418,12 +17236,8 @@ var parser = (function(){
         }
         var result7 = result6 !== null
           ? (function(declarator, ds) {
-              return {
-                tag: "DirectDeclarator",
-                declarator: declarator,
-                declaratorSuffix: ds
-              };
-            })(result6[1], result6[4])
+                 return savePosition(new DirectDeclarator(null, declarator, ds, true));
+               })(result6[1], result6[4])
           : null;
         if (result7 !== null) {
           var result5 = result7;
@@ -17447,11 +17261,8 @@ var parser = (function(){
           }
           var result3 = result2 !== null
             ? (function(ds) {
-                return {
-                  tag: "DirectDeclarator",
-                  declaratorSuffix: ds
-                }
-              })(result2)
+                  return savePosition(new DirectDeclarator(null, null, ds, true));
+                })(result2)
             : null;
           if (result3 !== null) {
             var result1 = result3;
@@ -17632,7 +17443,7 @@ var parser = (function(){
               pos = savedPos3;
             }
             var result8 = result7 !== null
-              ? (function(pl) { return { tag: "FunctionDeclarator", parameterList:pl }; })(result7[1])
+              ? (function(pl) { return savePosition(new FunctionDeclarator(pl)) })(result7[1])
               : null;
             if (result8 !== null) {
               var result6 = result8;
@@ -17675,7 +17486,7 @@ var parser = (function(){
                 pos = savedPos1;
               }
               var result3 = result2 !== null
-                ? (function() { return { tag: "FunctionDeclarator" }; })()
+                ? (function() { return savePosition(new FunctionDeclarator()) })()
                 : null;
               if (result3 !== null) {
                 var result1 = result3;
@@ -17854,12 +17665,8 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(typeSpecifier, d) {
-              return {
-                tag: "ParameterDeclaration",
-                typeSpecifier: typeSpecifier,
-                declarator: d !== "" ? d : null
-              };
-            })(result1[0], result1[2])
+                return savePosition(new ParameterDeclaration(typeSpecifier, d !== "" ? d : null, true));
+              })(result1[0], result1[2])
           : null;
         if (result2 !== null) {
           var result0 = result2;
@@ -18005,6 +17812,16 @@ var parser = (function(){
       }
       
       
+      
+    function savePosition(node) {
+      
+      node.position = computeErrorPosition();
+      
+      return node;
+      
+    }
+      
+  
       
       var result = parseFunctions[startRule]();
       

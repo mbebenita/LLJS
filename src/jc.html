@@ -48,9 +48,10 @@
   new FileReader("jc.peg", "text").readAll(null, function (text) {
     parser = P.buildParser(text, { trackLineAndColumn: true});
     new FileReader("tests/simple.jc", "text").readAll(null, function (source) {
-      document.write("<pre>" + compile(source) + "</pre>");
+      var com = compile(source);
+      document.write("<pre>" + com + "</pre>");
 
-      var o = new Function (compile(source))();
+      var o = new Function (com)();
       document.write("<pre> Result: " + o.test() + "</pre>");
     });
   });

@@ -18,9 +18,8 @@
       <h1>JS* = JS + C /* Lower Level JavaScript */</h1>
     <p>
         <b>JS*</b> is a typed dialect of JavaScript that offers a
-        C-like type system with manual memory management. It compiles to explicit typed array operations and
-        lets you write memory-efficient and GC pause-free code less painfully. JS* lets you mix typed and
-        untyped JavaScript. In short, JS* = JS + C.
+        C-like type system with manual memory management. It compiles to operations on typed array and
+        lets you write memory-efficient and GC pause-free code less painfully, in short, JS* = JS + C.
     </p>
 
     <p>Unlike JS, JS* is block scoped and variable declarations can by typed.</p>
@@ -30,14 +29,14 @@ var int x = 0;
 var int * y = null, z = 1;
 </pre>
 <p>Function types, and function pointers are also supported, so the statement <tt>var int *(x)(int, int*, int**)</tt> means
-"declare x as function (int, pointer to int, pointer to pointer to int) returning pointer to int".
+"declare x as function with the parameters (int, pointer to int, pointer to pointer to int) that returns a pointer to int".
 </p>
 
     <pre class="example">
 var int *(x)(int, int*, int**) = null;</pre>
 
-    <p>So, what's the point? Well imagine you wanted to write a linked list data structure in JavaScript.
-You would probably chain a sequence of objects together, as such:
+    <p>So, what's the point? Well imagine you wanted to write a linked list in JavaScript.
+You would probably chain a sequence of objects together, for example:
 
     <pre>
 var head = {value: 0, next: null}, tail = head;
@@ -64,7 +63,9 @@ function add (int value) {
   tail->next = next;
   tail = next;
 }
+</pre>
 
+<!--
 function Node * find(int value) {
   var Node * curr = head;
   while (curr) {
@@ -75,7 +76,7 @@ function Node * find(int value) {
   }
   return null;
 }
-</pre>
+-->
 
 
 </div>
@@ -84,7 +85,8 @@ function Node * find(int value) {
      $('.example').replaceWith(function() {
        var src = this.innerHTML;
        var lineCount = src.split("\n").length + 1;
-       return '<div><div><textarea id="ex:' + id + ':source" class="jcCode" rows="' + lineCount + '" spellcheck="false">' + src + '</textarea></div><div><pre id="ex:' + id++ + ':result" class="jcResult"></pre></div></div>';
+       return '<table class="example"><tr><td><textarea id="ex:' + id + ':source" class="jcCode" rows="' + lineCount + '" spellcheck="false">' + src + '</textarea></td><td valign="top"><pre id="ex:' + id++ + ':result" class="jcResult"></pre></td></tr></table>'
+       // <div class="minibutton ok run" title="Ctrl-Enter">Run</div>
      });
 
      function compileExample() {

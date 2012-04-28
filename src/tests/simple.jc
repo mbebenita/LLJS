@@ -1,22 +1,48 @@
-// int **a[][][];
+// var int x, *y, **z;
+// var int *(x)(int, int*, int**);
 
-int *a(int, int *());
+struct Node {
+  Node *next, int value
+}
 
+var Node *head = new Node, *tail = head;
+
+function int max (int x, int y) {
+  return x > y ? y : x;
+}
+
+
+function int add (int value) {
+  var Node * next = new Node;
+  next->value = value = 2;
+  tail->next = next;
+  tail = next;
+  return value;
+}
 
 /*
-int a;
-int * b;
-int * c[3];
-int i, *pi, *const cpi;
-int f(), *fpi(), (*pfi)();
-int strcpy(int *dest, int *source);
-int f(), *fpi(), (*pfi)();
-
-function int f(int *a, int b) {
-
+function int test() {
+  for (var int i = 0; i < 1000; i++) {
+    add(i);
+  }
+  var int sum = 0;
+  var Node * curr = head;
+  while (curr) {
+    sum += curr->value;
+    curr = curr->next;
+  }
+  return sum;
 }
-*/
 
-//int (*)[] d;
-// int *() e;
-//int (*[])(void) f;
+function Node * find(int value) {
+  var Node * curr = head;
+  while (curr) {
+    if (curr->value === value) {
+       return curr;
+    }
+    curr = curr->next;
+  }
+  return null;
+}
+
+*/
