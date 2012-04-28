@@ -553,11 +553,7 @@ NewExpression
 CallExpression
   = base:(
       name:MemberExpression __ arguments:Arguments {
-        return {
-          tag:       "FunctionCall",
-          name:      name,
-          arguments: arguments
-        };
+        return savePosition(new FunctionCall(name, arguments));
       }
     )
     argumentsOrAccessors:(
@@ -633,11 +629,7 @@ LeftHandSideExpression
 
 PostfixExpression
   = expression:LeftHandSideExpression _ operator:PostfixOperator {
-      return {
-        tag:        "PostfixExpression",
-        operator:   operator,
-        expression: expression
-      };
+      return savePosition(new PostfixExpression(operator, expression));
     }
   / LeftHandSideExpression
 
@@ -648,11 +640,7 @@ PostfixOperator
 UnaryExpression
   = PostfixExpression
   / operator:UnaryOperator __ expression:UnaryExpression {
-      return {
-        tag:        "UnaryExpression",
-        operator:   operator,
-        expression: expression
-      };
+      return savePosition(new UnaryExpression(operator, expression));
     }
 
 UnaryOperator
@@ -980,10 +968,7 @@ Statement
 
 Block
   = "{" __ statements:(StatementList __)? "}" {
-      return {
-        tag:        "Block",
-        statements: statements !== "" ? statements[0] : []
-      };
+      return new Block(statements !== "" ? statements[0] : []);
     }
 
 StatementList
@@ -1031,11 +1016,7 @@ VariableDeclaration
 
 VariableDeclarationNoIn
   = declarator:Declarator __ value:InitialiserNoIn? {
-      return {
-        tag:   "VariableDeclaration",
-        declarator:  declarator,
-        value: value !== "" ? value : null
-      };
+      return savePosition(new VariableDeclaration(declarator, value !== "" ? value : null));
     }
 
 Initialiser
@@ -1055,12 +1036,7 @@ IfStatement
     "(" __ condition:Expression __ ")" __
     ifStatement:Statement
     elseStatement:(__ ElseToken __ Statement)? {
-      return {
-        tag:           "IfStatement",
-        condition:     condition,
-        ifStatement:   ifStatement,
-        elseStatement: elseStatement !== "" ? elseStatement[3] : null
-      };
+      return savePosition(new IfStatement(condition, ifStatement, elseStatement !== "" ? elseStatement[3] : null));
     }
 
 IterationStatement
@@ -1073,20 +1049,12 @@ DoWhileStatement
   = DoToken __
     statement:Statement __
     WhileToken __ "(" __ condition:Expression __ ")" EOS {
-      return {
-        tag:  "DoWhileStatement",
-        condition: condition,
-        statement: statement
-      };
+      return savePosition(new WhileStatement(condition, statement, true));
     }
 
 WhileStatement
   = WhileToken __ "(" __ condition:Expression __ ")" __ statement:Statement {
-      return {
-        tag:  "WhileStatement",
-        condition: condition,
-        statement: statement
-      };
+      return savePosition(new WhileStatement(condition, statement));
     }
 
 ForStatement
@@ -1094,12 +1062,7 @@ ForStatement
     "(" __
     initializer:(
         VarToken __ typeSpecifier:TypeSpecifier __ declarations:VariableDeclarationListNoIn {
-          return {
-            tag:          "VariableStatement",
-            typeSpecifier: typeSpecifier,
-            declarations: declarations,
-            inForInitializer: true
-          };
+          return savePosition(new VariableStatement(typeSpecifier, declarations, true));
         }
       / ExpressionNoIn?
     ) __
@@ -1110,13 +1073,7 @@ ForStatement
     ")" __
     statement:Statement
     {
-      return {
-        tag:         "ForStatement",
-        initializer: initializer !== "" ? initializer : null,
-        test:        test !== "" ? test : null,
-        counter:     counter !== "" ? counter : null,
-        statement:   statement
-      };
+      return savePosition(new ForStatement(initializer !== "" ? initializer : null, test !== "" ? test : null, counter !== "" ? counter : null, statement));
     }
 
 ForInStatement

@@ -1,6 +1,7 @@
 // var int x, *y, **z;
 // var int *(x)(int, int*, int**);
 
+
 struct Node {
   Node *next, int value
 }
@@ -11,7 +12,6 @@ function int max (int x, int y) {
   return x > y ? y : x;
 }
 
-
 function int add (int value) {
   var Node * next = new Node;
   next->value = value = 2;
@@ -20,7 +20,7 @@ function int add (int value) {
   return value;
 }
 
-/*
+
 function int test() {
   for (var int i = 0; i < 1000; i++) {
     add(i);
@@ -33,6 +33,8 @@ function int test() {
   }
   return sum;
 }
+
+/*
 
 function Node * find(int value) {
   var Node * curr = head;

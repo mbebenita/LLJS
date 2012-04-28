@@ -268,10 +268,11 @@ Program.prototype = {
   }
 };
 
-function VariableStatement (typeSpecifier, variableDeclarations) {
+function VariableStatement (typeSpecifier, variableDeclarations, inForStatement) {
   this.tag = "VariableStatement";
   this.typeSpecifier = typeSpecifier;
   this.variableDeclarations = variableDeclarations;
+  this.inForStatement = inForStatement;
 }
 
 VariableStatement.prototype = {
@@ -291,7 +292,8 @@ VariableStatement.prototype = {
         return x.name + " = " + x.value.generateCode(null, scope);
       }).join(", ");
 
-    if (this.inForInitializer) {
+    if (this.inForStatement) {
+      assert (!writer);
       return str;
     }
     writer.writeLn(str + ";");
@@ -369,7 +371,7 @@ FunctionDeclarator.prototype = {
     return new FunctionType(returnType, walkCreateTypes(this.parameters));
   },
   generateCode: function (writer, scope) {
-  
+
   }
 };
 
@@ -572,6 +574,54 @@ BinaryExpression.prototype = {
   }
 };
 
+
+function UnaryExpression (operator, expression) {
+  this.tag = "UnaryExpression";
+  this.operator = operator;
+  this.expression = expression;
+}
+
+UnaryExpression.prototype = {
+  computeType: function (scope) {
+    this.expression.computeType(scope);
+  },
+  generateCode: function (writer, scope) {
+    return this.operator + this.expression.generateCode(null, scope);
+  }
+};
+
+function PostfixExpression (operator, expression) {
+  this.tag = "PostfixExpression";
+  this.operator = operator;
+  this.expression = expression;
+}
+
+PostfixExpression.prototype = {
+  computeType: function (scope) {
+    this.expression.computeType(scope);
+  },
+  generateCode: function (writer, scope) {
+    return this.expression.generateCode(null, scope) + this.operator;
+  }
+};
+
+function FunctionCall (name, arguments) {
+  this.tag = "FunctionCall";
+  this.name = name;
+  this.arguments = arguments;
+}
+
+FunctionCall.prototype = {
+  computeType: function (scope) {
+    walkComputeTypes(this.arguments, scope);
+  },
+  generateCode: function (writer, scope) {
+    var functionName = this.name.name;
+    // TODO: Apply scoping rules.
+    return functionName + "(" + walkGenerateCode(this.arguments, null, scope).join(", ") + ")";
+  }
+};
+
 function VariableIdentifier (name) {
   this.tag = "VariableIdentifier";
   this.name = name;
@@ -686,6 +736,112 @@ NewExpression.prototype = {
   }
 };
 
+function Block (statements) {
+  this.tag = "Block";
+  this.statements = statements;
+}
+
+Block.prototype = {
+  computeType: function (scope) {
+    walkComputeTypes(this.statements, scope);
+  },
+  generateCode: function (writer, scope) {
+    walkGenerateCode(this.statements, writer, scope);
+  }
+};
+
+function WhileStatement (condition, statement, isDoWhile) {
+  this.tag = "WhileStatement";
+  this.condition = condition;
+  this.statement = statement;
+  this.isDoWhile = isDoWhile;
+}
+
+WhileStatement.prototype = {
+  computeType: function (scope) {
+    this.condition.computeType(scope);
+    this.statement.computeType(scope);
+  },
+  generateCode: function (writer, scope) {
+    if (this.isDoWhile) {
+      writer.enter("do {");
+    } else {
+      writer.enter("while (" + this.condition.generateCode(null, scope) + ") {");
+    }
+    this.statement.generateCode(writer, scope);
+    if (this.isDoWhile) {
+      writer.leave("} while (" + this.condition.generateCode(null, scope) + ")");
+    } else {
+      writer.leave("}");
+    }
+  }
+};
+
+function IfStatement (condition, ifStatement, elseStatement) {
+  this.tag = "IfStatement";
+  this.condition = condition;
+  this.ifStatement = ifStatement;
+  this.elseStatement = elseStatement;
+}
+
+IfStatement.prototype = {
+  computeType: function (scope) {
+    this.condition.computeType(scope);
+    this.ifStatement.computeType(scope);
+    if (this.elseStatement) {
+      this.elseStatement.computeType(scope);
+    }
+  },
+  generateCode: function (writer, scope) {
+    writer.enter("if (" + this.condition.generateCode(null, scope) + ") {");
+    this.ifStatement.generateCode(writer, scope);
+    if (this.elseStatement) {
+      if (this.elseStatement instanceof Block) {
+        writer.leaveAndEnter("} else {");
+        this.elseStatement.generateCode(writer, scope);
+      } else if (this.elseStatement instanceof IfStatement) {
+        writer.leaveAndEnter("} else if (" + this.elseStatement.condition.generateCode(null, scope) + ") {");
+        this.elseStatement.ifStatement.generateCode(writer, scope);
+      }
+    }
+    writer.leave("}");
+  }
+};
+
+function ForStatement (initializer, test, counter, statement) {
+  this.tag = "ForStatement";
+  this.initializer = initializer;
+  this.test = test;
+  this.counter = counter;
+  this.statement = statement;
+}
+
+ForStatement.prototype = {
+  computeType: function (scope) {
+    if (this.initializer) {
+      this.initializer.computeType(scope);
+    }
+    if (this.test) {
+      this.test.computeType(scope);
+    }
+    if (this.counter) {
+      this.counter.computeType(scope);
+    }
+    this.statement.computeType(scope);
+  },
+  generateCode: function (writer, scope) {
+    scope = new Scope(scope, "For");
+    var str = "for (";
+    str += (this.initializer ? this.initializer.generateCode(null, scope) : "") + ";";
+    str += (this.test ? this.test.generateCode(null, scope) : "") + ";";
+    str += (this.counter ? this.counter.generateCode(null, scope) : "");
+    str += ") {";
+    writer.enter(str);
+    this.statement.generateCode(writer, scope);
+    writer.leave("}");
+  }
+};
+
 function compile(source, generateExports) {
   types = {
     int:  new Type("int",  4, 0),
@@ -717,7 +873,6 @@ function compile(source, generateExports) {
 
   program.generateCode(writer);
 
-  print (str);
   return str;
 
 }

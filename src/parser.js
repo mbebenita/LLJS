@@ -7666,11 +7666,7 @@ var parser = (function(){
         }
         var result35 = result34 !== null
           ? (function(name, arguments) {
-                  return {
-                    tag:       "FunctionCall",
-                    name:      name,
-                    arguments: arguments
-                  };
+                  return savePosition(new FunctionCall(name, arguments));
                 })(result34[0], result34[2])
           : null;
         if (result35 !== null) {
@@ -8428,11 +8424,7 @@ var parser = (function(){
         }
         var result4 = result3 !== null
           ? (function(expression, operator) {
-                return {
-                  tag:        "PostfixExpression",
-                  operator:   operator,
-                  expression: expression
-                };
+                return savePosition(new PostfixExpression(operator, expression));
               })(result3[0], result3[2])
           : null;
         if (result4 !== null) {
@@ -8543,11 +8535,7 @@ var parser = (function(){
           }
           var result3 = result2 !== null
             ? (function(operator, expression) {
-                  return {
-                    tag:        "UnaryExpression",
-                    operator:   operator,
-                    expression: expression
-                  };
+                  return savePosition(new UnaryExpression(operator, expression));
                 })(result2[0], result2[2])
             : null;
           if (result3 !== null) {
@@ -12426,10 +12414,7 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(statements) {
-                return {
-                  tag:        "Block",
-                  statements: statements !== "" ? statements[0] : []
-                };
+                return new Block(statements !== "" ? statements[0] : []);
               })(result1[2])
           : null;
         if (result2 !== null) {
@@ -13021,11 +13006,7 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(declarator, value) {
-                return {
-                  tag:   "VariableDeclaration",
-                  declarator:  declarator,
-                  value: value !== "" ? value : null
-                };
+                return savePosition(new VariableDeclaration(declarator, value !== "" ? value : null));
               })(result1[0], result1[2])
           : null;
         if (result2 !== null) {
@@ -13437,12 +13418,7 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(condition, ifStatement, elseStatement) {
-                return {
-                  tag:           "IfStatement",
-                  condition:     condition,
-                  ifStatement:   ifStatement,
-                  elseStatement: elseStatement !== "" ? elseStatement[3] : null
-                };
+                return savePosition(new IfStatement(condition, ifStatement, elseStatement !== "" ? elseStatement[3] : null));
               })(result1[4], result1[8], result1[9])
           : null;
         if (result2 !== null) {
@@ -13603,11 +13579,7 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(statement, condition) {
-                return {
-                  tag:  "DoWhileStatement",
-                  condition: condition,
-                  statement: statement
-                };
+                return savePosition(new WhileStatement(condition, statement, true));
               })(result1[2], result1[8])
           : null;
         if (result2 !== null) {
@@ -13710,11 +13682,7 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(condition, statement) {
-                return {
-                  tag:  "WhileStatement",
-                  condition: condition,
-                  statement: statement
-                };
+                return savePosition(new WhileStatement(condition, statement));
               })(result1[4], result1[8])
           : null;
         if (result2 !== null) {
@@ -13795,12 +13763,7 @@ var parser = (function(){
                 }
                 var result26 = result25 !== null
                   ? (function(typeSpecifier, declarations) {
-                            return {
-                              tag:          "VariableStatement",
-                              typeSpecifier: typeSpecifier,
-                              declarations: declarations,
-                              inForInitializer: true
-                            };
+                            return savePosition(new VariableStatement(typeSpecifier, declarations, true));
                           })(result25[2], result25[4])
                   : null;
                 if (result26 !== null) {
@@ -13942,13 +13905,7 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(initializer, test, counter, statement) {
-                return {
-                  tag:         "ForStatement",
-                  initializer: initializer !== "" ? initializer : null,
-                  test:        test !== "" ? test : null,
-                  counter:     counter !== "" ? counter : null,
-                  statement:   statement
-                };
+                return savePosition(new ForStatement(initializer !== "" ? initializer : null, test !== "" ? test : null, counter !== "" ? counter : null, statement));
               })(result1[4], result1[8], result1[12], result1[16])
           : null;
         if (result2 !== null) {

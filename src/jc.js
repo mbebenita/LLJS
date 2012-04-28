@@ -19,6 +19,8 @@ options.parse(arguments.slice(0, arguments.length - 1));
 
 var generateParser = options.register(new Option("p", "p", false, "Generate Parser"));
 
+var execute = options.register(new Option("x", "x", false, "Execute"));
+
 if (help.value) {
   printUsage();
   quit();
@@ -31,7 +33,9 @@ options.parse(arguments.slice(0, arguments.length - 1));
 if (generateParser.value) {
   var parser = P.buildParser(snarf("jc.peg", "text"), { trackLineAndColumn: true});
   print("var parser = " + parser.toSource() + ";");
-  quit();
+  if (!execute.value) {
+    quit();
+  }
 } else {
   load("parser.js");
 }
