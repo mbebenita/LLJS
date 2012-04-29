@@ -73,6 +73,9 @@ var PointerType = (function () {
     }
     return str;
   }
+
+  pointerType.prototype.defaultValue = 0;
+
   pointerType.prototype.toString = function () {
     if (this.name) {
       return this.name;
@@ -93,6 +96,9 @@ var PointerType = (function () {
     if (other === types.void) {
       return true;
     }
+    if (other === types.null) {
+      return true;
+    }
     return other instanceof PointerType && this.base.assignableFrom(other.base) && this.pointers === other.pointers;
   };
   return pointerType;
@@ -111,6 +117,9 @@ var FunctionType = (function () {
   };
   functionType.prototype.assignableFrom = function (other) {
     if (other === types.void) {
+      return true;
+    }
+    if (other === types.null) {
       return true;
     }
     return other instanceof FunctionType;
@@ -180,6 +189,21 @@ var Scope = (function () {
 })();
 
 
+var Frame = (function () {
+  function frame() {
+    this.variables = [];
+    this.size = 0;
+  }
+  frame.prototype.add = function add (variable) {
+    assert (variable instanceof Variable);
+    this.variables.push(variable);
+    variable.offset = this.size;
+    this.size += variable.type.getSize();
+  };
+  return frame;
+})();
+
+
 function walkComputeTypes(nodes, o) {
   return nodes.map(function (x) {
     assert ("computeType" in x, "Node: " + x.tag + " doesn't have a computeType function.");
@@ -234,12 +258,11 @@ function check(node, condition, message) {
 }
 
 var Variable = (function () {
-  function variable(name, type, address, isLocal) {
+  function variable(name, type, offset) {
     assert (name && type);
     this.name = name;
     this.type = type;
-    this.address = address;
-    this.isLocal = isLocal;
+    this.offset = offset;
   }
   variable.prototype.toString = function () {
     return "variable " + this.name;
@@ -261,10 +284,15 @@ Program.prototype = {
         types[node.name] = new Type(node.name);
       }
     }
-    walkComputeTypes(this.elements, new Scope(null, "Program"));
+    var scope = new Scope(null, "Program");
+    scope.add("extern", types.dyn);
+    walkComputeTypes(this.elements, scope);
   },
   generateCode: function (writer) {
-    walkGenerateCode(this.elements, writer, new Scope(null, "Program"));
+    var scope = new Scope(null, "Program");
+    scope.add("extern", new Variable("extern", types.dyn));
+    scope.options.frame = new Frame();
+    walkGenerateCode(this.elements, writer, scope);
   }
 };
 
@@ -286,18 +314,52 @@ VariableStatement.prototype = {
   },
   generateCode: function (writer, scope) {
     assert (scope);
-    var str = "var " +
-      this.variableDeclarations.map(function (x) {
-        scope.add(x.name, new Variable(x.name, x.type, 0));
-        return x.name + " = " + x.value.generateCode(null, scope);
-      }).join(", ");
-
     if (this.inForStatement) {
+      var str = "var " +
+        this.variableDeclarations.map(function (x) {
+          var variable = new Variable(x.name, x.type);
+          scope.add(x.name, variable);
+
+          if (x.type.fields) {
+            scope.options.frame.add(variable);
+            var type = x.type;
+            var size = x.type.getSize();
+            if (x.value) {
+              return "_ = " + generateMemoryCopy("FP + " + variable.offset, x.value.generateCode(null, scope), size);
+            } else {
+              return "_";
+            }
+          } else {
+            if (x.value) {
+              return x.name + " = " + x.value.generateCode(null, scope);
+            } else {
+              return x.name + " = " + x.type.defaultValue;
+            }
+          }
+        }).join(", ");
       assert (!writer);
       return str;
+    } else {
+        this.variableDeclarations.forEach(function (x) {
+          var variable = new Variable(x.name, x.type);
+          scope.add(x.name, variable);
+
+          if (x.type.fields) {
+            scope.options.frame.add(variable);
+            var type = x.type;
+            var size = x.type.getSize();
+            if (x.value) {
+              writer.writeLn(generateMemoryCopy("FP + " + variable.offset, x.value.generateCode(null, scope), size) + ";");
+            }
+          } else {
+            if (x.value) {
+              writer.writeLn("var " +  x.name + " = " + x.value.generateCode(null, scope) + ";");
+            } else {
+              writer.writeLn("var " + x.name + " = " + x.type.defaultValue + ";");
+            }
+          }
+        });
     }
-    writer.writeLn(str + ";");
-    return null;
   }
 };
 
@@ -312,7 +374,8 @@ VariableDeclaration.prototype = {
     var result = {name: null, type: getType(typeSpecifier)};
     this.declarator.createType(result);
     if (this.value) {
-      this.value.computeType(scope);
+      var vt = this.value.computeType(scope);
+      checkTypeAssignment(this, result.type, vt);
     }
     delete this.declarator;
     this.name = result.name;
@@ -450,16 +513,20 @@ Literal.prototype = {
     switch (this.kind) {
       case "number": return types.int;
       case "boolean": return types.int;
-      case "null": return types.int;
+      case "null": return types.null;
+      case "string": return types.dyn;
       default: return notImplemented();
     }
   },
   generateCode: function (writer, scope) {
     assert(!writer);
-    if (this.kind === "null") {
-      return "0";
+     switch (this.kind) {
+      case "number": return JSON.stringify(this.value);
+      case "boolean": return JSON.stringify(this.value);
+      case "null": return "null";
+      case "string": return JSON.stringify(this.value);
+      default: return notImplemented();
     }
-    return String(this.value);
   }
 };
 
@@ -492,6 +559,7 @@ FunctionDeclaration.prototype = {
   },
   generateCode: function (writer, scope) {
     scope = new Scope(scope, "code gen function " + this.name);
+    scope.options.frame = new Frame();
     writer.enter("function " + this.name + "(" +
       this.parameters.map(function (x) {
         scope.add(x.name, new Variable(x.name, x.type, 0));
@@ -613,12 +681,12 @@ function FunctionCall (name, arguments) {
 
 FunctionCall.prototype = {
   computeType: function (scope) {
+    this.name.computeType(scope);
     walkComputeTypes(this.arguments, scope);
   },
   generateCode: function (writer, scope) {
-    var functionName = this.name.name;
     // TODO: Apply scoping rules.
-    return functionName + "(" + walkGenerateCode(this.arguments, null, scope).join(", ") + ")";
+    return this.name.generateCode(null, scope) + "(" + walkGenerateCode(this.arguments, null, scope).join(", ") + ")";
   }
 };
 
@@ -630,9 +698,12 @@ function VariableIdentifier (name) {
 VariableIdentifier.prototype = {
   computeType: function (scope) {
     check (this, scope.get(this.name), "variable " + this.name + " is not defined in scope " + scope);
-    return scope.get(this.name, true);
+    return this.type = scope.get(this.name, true);
   },
   generateCode: function (writer, scope) {
+    if (scope.get(this.name).type.fields) {
+      return "FP + " + scope.get(this.name).offset + " /*" + this.name + "*/";
+    }
     return scope.get(this.name).name;
   }
 };
@@ -658,14 +729,27 @@ function AssignmentExpression (operator, left, right) {
   this.right = right;
 }
 
+function generateMemoryCopy(dst, src, size) {
+  return "memoryCopy(" + dst + ", " + src + ", " + size + ")";
+}
+
+function generateMemoryZero(dst, size) {
+  return "memoryZero(" + dst + ", " + size + ")";
+}
+
 AssignmentExpression.prototype = {
   computeType: function (scope) {
-    var tl = this.left.computeType(scope);
+    var tl = this.leftType = this.left.computeType(scope);
     var tr = this.right.computeType(scope);
     return tl;
   },
   generateCode: function (writer, scope) {
-    return this.left.generateCode(null, scope) + " = " + this.right.generateCode(null, scope);
+    var l = this.left.generateCode(null, scope);
+    var r = this.right.generateCode(null, scope);
+    if (this.leftType.fields) {
+      return generateMemoryCopy(l, r, this.leftType.getSize());
+    }
+    return l + " = " + r;
   }
 };
 
@@ -695,7 +779,7 @@ PropertyAccess.prototype = {
     if (this.accessor.tag === "expression") {
       this.accessor.expression.computeType(scope);
       if (type instanceof PointerType) {
-        return type.type;
+        return this.type = type.type;
       }
       assert (false);
     } else if (this.accessor.tag === "arrow") {
@@ -705,15 +789,25 @@ PropertyAccess.prototype = {
     } else {
       check(this, !(type instanceof PointerType), "Cannot use . operator on pointer types.");
     }
-    check(this, type.fields, "Property access on non structs is not possible.");
-    var field = type.getField(this.accessor.name);
-    check(this, field, "Field \"" + this.accessor.name + "\" does not exist in type " + type + ".");
-    this.field = field;
-    return field.type;
+    if (type.fields) {
+      check(this, type.fields, "Property access on non structs is not possible.");
+      var field = type.getField(this.accessor.name);
+      check(this, field, "Field \"" + this.accessor.name + "\" does not exist in type " + type + ".");
+      this.field = field;
+      return this.type = field.type;
+    } else {
+      return this.type = types.dyn;
+    }
   },
   generateCode: function (writer, scope) {
     if (this.accessor.tag === "arrow") {
       return accessMemory(this.base.generateCode(null, scope), this.field.type, this.field.offset);
+    } else if (this.accessor.tag === "dot") {
+      if (this.base.type === types.dyn) {
+        return this.base.generateCode(null, scope) + "." + this.accessor.name;
+      } else {
+        return accessMemory(this.base.generateCode(null, scope), this.field.type, this.field.offset);
+      }
     }
     throw notImplemented();
   }
@@ -855,7 +949,8 @@ function compile(source, generateExports) {
     i32:  new Type("i32",  4, 0),
 
     void: new Type("void", undefined, 0),
-    dyn:  new Type("dyn",  undefined, 0)
+    dyn:  new Type("dyn",  undefined, 0),
+    null: new Type("null", undefined, 0)
   };
 
   var program = parser.parse(source);
@@ -875,212 +970,6 @@ function compile(source, generateExports) {
 
   return str;
 
-}
-
-function compile2(source, generateExports) {
-  var program = parser.parse(source);
-
-
-
-  function walk(node, match, options) {
-    assert (node);
-    var nodes = node;
-    if (typeof nodes.length === "undefined") {
-      nodes = [nodes];
-    }
-    var results = [];
-    for (var i = 0; i < nodes.length; i++) {
-      node = nodes[i];
-      if (node.tag in match) {
-        results.push(match[node.tag].call(node, options));
-      }
-    }
-    return results;
-  }
-
-  function walkExpression(node, match, options) {
-    if (node === null) {
-      node = {tag: "Void"};
-    } else if (node === undefined) {
-      node = {tag: "Void"};
-    }
-    assert (node.tag in match, "Tag " + node.tag + " not implemented.");
-    return match[node.tag].call(node, options);
-  }
-
-
-  function createType(node) {
-    assert (node);
-    assert (node.tag === "Type", "Invalid node type : " + node.tag);
-    assert (node.name in types, "Type " + node.name + " is not defined.");
-    var type = types[node.name];
-    var pointers = node.pointers;
-    while(pointers--) {
-      type = new PointerType(type);
-    }
-    return type;
-  }
-
-  print (JSON.stringify(program, null, 2));
-
-  var str = "";
-  var writer = new IndentingWriter(false, {writeLn: function (x) {
-    str += x + "\n";
-  }});
-
-  (function generateCode(program) {
-
-
-    var global = new Scope(null, "global");
-
-
-    var match = {
-      Program: function Program() {
-        walk(this.elements, match, {scope: global});
-      },
-      StructDeclaration: function () {},
-      VariableStatement: function VariableStatement(o) {
-        assert (o.scope);
-        var str = "var " +
-          this.declarations.map(function (x) {
-            o.scope.add(x.name, new Variable(x.name, x.type, 0));
-            return x.name + " = " + walkExpression(x.value, match, o);
-          }).join(", ");
-        if (this.inForInitializer) {
-          return str;
-        }
-        writer.writeLn(str + ";");
-      },
-      VariableDeclaration: function VariableDeclaration(o) {
-        return walkExpression(this.value, match, o);
-      },
-      Void: function Void() {
-        return types.void.defaultValue;
-      },
-      BinaryExpression: function BinaryExpression(o) {
-        var l = walkExpression(this.left, match, o);
-        var r = walkExpression(this.right, match, o);
-        if (this.left.type instanceof PointerType) {
-          r = "(" + r + " * " + this.left.type.type.getSize() + ")";
-        }
-        return "(" + l + " " + this.operator + " " + r + ")";
-      },
-      UnaryExpression: function UnaryExpression(o) {
-        if (this.operator === "*") {
-          return accessMemory(walkExpression(this.expression, match, o), this.expression.type);
-        } else {
-          return this.operator + walkExpression(this.expression, match, o);
-        }
-      },
-      AssignmentExpression: function AssignmentExpression(o) {
-        var l = walkExpression(this.left, match, o);
-        var r = walkExpression(this.right, match, o);
-        return l + " " + this.operator + " " + r;
-      },
-      ExpressionStatement: function ExpressionStatement(o) {
-        writer.writeLn(walkExpression(this.expression, match, o) + ";");
-      },
-      NumericLiteral: function NumericLiteral(o) {
-        return this.value;
-      },
-      Function: function Function(o) {
-        o.scope.add(this.name, this.type);
-        o = {scope: new Scope(o.scope, "function scope for " + this.name)};
-        walk(this.parameters, match, o);
-        writer.enter("function " + this.name + "(" +
-          this.parameters.map(function (x) {
-            o.scope.add(x.name, new Variable(x.name, x.type, 0));
-            return x.name;
-          }).join(", ") + ") {");
-        walk(this.elements, match, o);
-        writer.leave("}");
-      },
-      Parameter: function Parameter(o) {
-        o.scope.add(this.name, new Variable(this.name, this.type, 0));
-      },
-      NewOperator: function () {
-        return "malloc(" + this.type.type.getSize() + ")";
-      },
-      NullLiteral: function NullLiteral() {
-        return types.void.defaultValue;
-      },
-      PropertyAccess: function PropertyAccess(o) {
-        var base = walkExpression(this.base, match, o);
-        if (this.name.dereference) {
-          var field = this.base.type.type.getField(this.name.name);
-          return accessMemory(base, field.type, field.offset);
-        }
-        return notImplemented();
-      },
-      Variable: function Variable(o) {
-        var v = o.scope.get(this.name);
-        assert (v);
-        return v.name;
-      },
-      WhileStatement: function WhileStatement(o) {
-        writer.enter("while (" + walkExpression(this.condition, match, o) + ") {");
-        walk(this.statement, match, o);
-        writer.leave("}");
-      },
-      Block: function Block(o) {
-        o = {scope: new Scope(o.scope, "block scope")};
-        walk(this.statements, match, o);
-      },
-      ReturnStatement: function ReturnStatement(o) {
-        writer.writeLn("return " + walkExpression(this.value, match, o) + ";");
-      },
-      ForStatement: function ForStatement(o) {
-        o = {scope: new Scope(o.scope), isExpression: true};
-        writer.enter("for (" +
-          walkExpression(this.initializer, match, o) + "; " +
-          walkExpression(this.test, match, o) + "; " +
-          walkExpression(this.counter, match, o) + ") {"
-        );
-        walk(this.statement, match, o);
-        writer.leave("}");
-      },
-      IfStatement: function IfStatement(o) {
-        writer.enter("if (" + walkExpression(this.condition, match, o) + ") {");
-        walk(this.ifStatement, match, o);
-        if (this.elseStatement) {
-          if (this.elseStatement.tag === "Block") {
-            writer.leaveAndEnter("} else {");
-            walk(this.elseStatement, match, o);
-          } else if (this.elseStatement.tag === "IfStatement") {
-            writer.leaveAndEnter("} else if (" + walkExpression(this.elseStatement.condition, match, o) + ") {");
-            walk(this.elseStatement.ifStatement, match, o);
-          }
-        }
-        writer.leave("}");
-      },
-      ConditionalExpression: function ConditionalExpression(o) {
-        return "((" + walkExpression(this.condition, match, o) + ") ? " +
-          walkExpression(this.trueExpression, match, o) + " : " +
-          walkExpression(this.falseExpression, match, o) + ")";
-      },
-      PostfixExpression: function PostfixExpression(o) {
-        return walkExpression(this.expression, match, o) + this.operator;
-      },
-      FunctionCall: function FunctionCall(o) {
-        return this.name.name + "(" +
-          this.arguments.map(function (x) {
-            return walkExpression(x, match, o);
-          }).join(", ") + ")";
-      }
-    };
-    walk(program, match);
-
-    if (generateExports) {
-      writer.writeLn("return {" + global.symbolList.filter(function (x) {
-        return x.symbol instanceof FunctionType;
-      }).map(function (x) {
-        return "\"" + x.name + "\": " + x.name;
-      }).join(", ") + "};");
-    }
-
-  })(program);
-
-  return str;
 }
 
 

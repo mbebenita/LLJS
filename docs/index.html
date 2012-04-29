@@ -13,6 +13,7 @@
   <script src="jc/util.js"></script>
   <script src="jc/parser.js"></script>
   <script src="jc/compiler.js"></script>
+  <script src="jc/memory.js"></script>
   <body>
     <div class="container">
       <h1>JS* = JS + C /* Lower Level JavaScript */</h1>
@@ -21,6 +22,36 @@
         C-like type system with manual memory management. It compiles to operations on typed array and
         lets you write memory-efficient and GC pause-free code less painfully, in short, JS* = JS + C.
     </p>
+
+
+
+    <pre class="example">
+struct Point {
+  int x,
+  int y
+}
+
+struct Line {
+  Point s,
+  Point e
+}
+
+var Line l0;
+var Line l1;
+
+var Point p;
+
+var int foo = p.x;
+
+var Point z = p;
+
+z = p;
+
+for (var Point a, b, c;;) {}
+
+</pre>
+
+
 
     <p>Unlike JS, JS* is block scoped and variable declarations can by typed.</p>
 
@@ -108,11 +139,38 @@ function Node * find(int value) {
         }
      }
 
+     var extern = {};
+
+     function executeExample() {
+        var number = this.id.split(":")[1];
+        var result = document.getElementById("ex:" + number + ":result");
+        try {
+          resetMemory();
+          result.innerHTML = "";
+          extern.trace = function (x) {
+            result.innerHTML += x;
+          };
+          new Function (compile(this.value))();
+        } catch (x) {
+          result.innerHTML = x.message;
+        }
+     }
+
      $('.jcCode').each(compileExample);
-     $('.jcCode').keyup(compileExample);
+     $('.jcCode').keyup(function (e) {
+       if (e.which >= 37 && e.which <= 40) {
+         return;
+       }
+       if (e.which == 13 && (e.metaKey || e.ctrlKey) || e.which == 91) {
+         executeExample.call(this);
+       } else {
+         compileExample.call(this);
+       }
+     });
+
 
      /*
-     $('.jcCode').keyup(function () {
+     $('.jcCode').keyup(function (e) {
        var lines = this.value.split("\n").length;
        this.rows = Math.min(lines, 10);
      });

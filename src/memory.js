@@ -12,8 +12,17 @@ var I32 = new Int32Array(memory);
 var F32 = new Float32Array(memory);
 var F64 = new Float64Array(memory);
 
-var address = 4;
+var HP = 4;
+var FP = 0;
 
 function malloc(size) {
-  return address += size;
+  return HP += size;
 }
+
+
+function resetMemory() {
+  HP = 4;
+  FP = 1024;
+}
+
+resetMemory();
