@@ -30,6 +30,7 @@ var Type = (function () {
 
 var StructType = (function () {
   function structType(name) {
+    this.name = name;
     this.fields = [];
     this.offset = 0;
   }
@@ -167,30 +168,44 @@ var Scope = (function () {
   function scope(parent, name) {
     this.name = name;
     this.parent = parent;
-    this.symbols = {};
-    this.symbolList = [];
-    // Useful for 
+    this.variables = {};
+    this.types = {};
     this.options = parent ? Object.create(parent.options) : {};
   }
 
-  scope.prototype.get = function get(name, strict) {
-    var symbol = this.symbols[name];
-    if (symbol) {
-      return symbol;
+  scope.prototype.getVariable = function getVariable(name, strict) {
+    var variable = this.variables[name];
+    if (variable) {
+      return variable;
     } else if (this.parent) {
-      return this.parent.get(name, strict);
+      return this.parent.getVariable(name, strict);
     }
     if (strict) {
-      return unexpected ("Undefined symbol " + name);
+      return unexpected ("Undefined variable " + name);
     }
     return null;
   };
 
-  scope.prototype.add = function add(name, symbol) {
-    assert (name);
-    print("Adding name: " + name + ", symbol: " + symbol + " to scope " + this + ".");
-    this.symbols[name] = symbol;
-    this.symbolList.push({name: name, symbol: symbol});
+  scope.prototype.addVariable = function addVariable(variable) {
+    assert (variable);
+    print("Adding variable " + variable + " to scope " + this + ".");
+    this.variables[variable.name] = variable;
+  };
+
+  scope.prototype.getType = function getType(name) {
+    var type = this.types[name];
+    if (type) {
+      return type;
+    } else if (this.parent) {
+      return this.parent.geType(name);
+    }
+    return unexpected ("Undefined type " + name);
+  };
+
+  scope.prototype.addType = function addType(type) {
+    assert (type);
+    print("Adding type " + type + " to scope " + this + ".");
+    this.types[type.name] = type;
   };
 
   scope.prototype.toString = function toString() {
@@ -216,10 +231,10 @@ var Frame = (function () {
 })();
 
 
-function walkComputeTypes(nodes, o) {
+function walkComputeTypes(nodes, scope, a) {
   return nodes.map(function (x) {
     assert ("computeType" in x, "Node: " + x.tag + " doesn't have a computeType function.");
-    return x.computeType(o);
+    return x.computeType(scope, a);
   });
 }
 
@@ -288,23 +303,23 @@ function Program (elements) {
 }
 
 Program.prototype = {
-  computeType: function () {
+  computeType: function (types) {
+    var scope = this.scope = new Scope(null, "Program");
+    scope.types = clone(types);
+    scope.addVariable("extern", types.dyn);
+
     for (var i = 0; i < this.elements.length; i++) {
       var node = this.elements[i];
       if (node instanceof StructDeclaration) {
         assert (!(node.name in types), "Type " + node.name + " is already defined.");
-        types[node.name] = new StructType(node.name);
+        scope.addType(new StructType(node.name));
       }
     }
-    var scope = new Scope(null, "Program");
-    scope.add("extern", types.dyn);
+
     walkComputeTypes(this.elements, scope);
   },
   generateCode: function (writer) {
-    var scope = new Scope(null, "Program");
-    scope.add("extern", new Variable("extern", types.dyn));
-    scope.options.frame = new Frame();
-    walkGenerateCode(this.elements, writer, scope);
+    walkGenerateCode(this.elements, writer, this.scope);
   }
 };
 
@@ -320,7 +335,7 @@ VariableStatement.prototype = {
     var typeSpecifier = this.typeSpecifier;
     this.variableDeclarations.forEach(function (x) {
       x.computeType(typeSpecifier, scope);
-      scope.add(x.name, x.type);
+      scope.addVariable(new Variable(x.name, x.type));
     });
     delete this.typeSpecifier;
   },
@@ -337,7 +352,7 @@ VariableStatement.prototype = {
             var type = x.type;
             var size = x.type.getSize();
             if (x.value) {
-              return "_ = " + generateMemoryCopy("FP + " + variable.offset, x.value.generateCode(null, scope), size);
+              return "_ = " + generateMemoryCopy("FP+" + variable.offset, x.value.generateCode(null, scope), size);
             } else {
               return "_";
             }
@@ -353,15 +368,12 @@ VariableStatement.prototype = {
       return str;
     } else {
         this.variableDeclarations.forEach(function (x) {
-          var variable = new Variable(x.name, x.type);
-          scope.add(x.name, variable);
-
           if (x.type instanceof StructType) {
             scope.options.frame.add(variable);
             var type = x.type;
             var size = x.type.getSize();
             if (x.value) {
-              writer.writeLn(generateMemoryCopy("FP + " + variable.offset, x.value.generateCode(null, scope), size) + ";");
+              writer.writeLn(generateMemoryCopy("FP+" + variable.offset, x.value.generateCode(null, scope), size) + ";");
             }
           } else {
             if (x.value) {
@@ -383,7 +395,7 @@ function VariableDeclaration (declarator, value) {
 
 VariableDeclaration.prototype = {
   computeType: function (typeSpecifier, scope) {
-    var result = {name: null, type: getType(typeSpecifier)};
+    var result = {name: null, type: scope.getType(typeSpecifier)};
     this.declarator.createType(result);
     if (this.value) {
       var vt = this.value.computeType(scope);
@@ -461,7 +473,7 @@ ParameterDeclaration.prototype = {
     return this.createParameter().type;
   },
   createParameter: function () {
-    var result = {name: null, type: getType(this.typeSpecifier)};
+    var result = {name: null, type: scope.getType(this.typeSpecifier)};
     if (this.declarator) {
       this.declarator.createType(result);
     }
@@ -477,9 +489,10 @@ function StructDeclaration (name, fields) {
 }
 
 StructDeclaration.prototype = {
-  computeType: function () {
-    this.type = getType(this.name);
-    walkComputeTypes(this.fields, this.type);
+  computeType: function (scope) {
+    this.type = scope.getType(this.name);
+    check(this, this.fields, "Struct " + quote(this.name) + " must have at least one field declaration.");
+    walkComputeTypes(this.fields, scope, this.type);
   },
   generateCode: function (writer, scope) {}
 };
@@ -491,8 +504,8 @@ function FieldDeclaration (typeSpecifier, declarator) {
 }
 
 FieldDeclaration.prototype = {
-  computeType: function (type) {
-    var result = {name: null, type: getType(this.typeSpecifier)};
+  computeType: function (scope, type) {
+    var result = {name: null, type: scope.getType(this.typeSpecifier)};
     this.declarator.createType(result);
     type.addField(result.name, result.type);
   }
@@ -506,7 +519,7 @@ function TypeName (typeSpecifier, declarator) {
 
 TypeName.prototype = {
   createType: function () {
-    var result = {name: null, type: getType(this.typeSpecifier)};
+    var result = {name: null, type: scope.getType(this.typeSpecifier)};
     if (this.declarator) {
       this.declarator.createType(result);
     }
@@ -729,7 +742,7 @@ VariableIdentifier.prototype = {
   },
   generateCode: function (writer, scope) {
     if (scope.get(this.name).type instanceof StructType) {
-      return "FP + " + scope.get(this.name).offset + " /*" + this.name + "*/";
+      return "FP+" + scope.get(this.name).offset;
     }
     return scope.get(this.name).name;
   }
@@ -787,9 +800,9 @@ function log2(x) {
 
 function accessMemory(address, type, offset) {
   if (type === types.int) {
-    return "I32[" + address + (offset ? " + " + offset : "") + " >> " + log2(type.getSize()) + "]";
+    return "I32[" + address + (offset ? "+" + offset : "") + ">>" + log2(type.getSize()) + "]";
   } else if (type === types.uint || type instanceof PointerType) {
-    return "U32[" + address + (offset ? " + " + offset : "") + " >> " + log2(type.getSize()) + "]";
+    return "U32[" + address + (offset ? "+" + offset : "") + ">>" + log2(type.getSize()) + "]";
   }
   return notImplemented(type);
 };
@@ -848,7 +861,7 @@ function NewExpression (constructor, arguments) {
 
 NewExpression.prototype = {
   computeType: function (scope) {
-    var ct = getType(this.constructor.name);
+    var ct = scope.getType(this.constructor.name);
     return this.type = new PointerType(ct);
   },
   generateCode: function (writer, scope) {
@@ -963,28 +976,14 @@ ForStatement.prototype = {
   }
 };
 
+
 function compile(source, generateExports) {
-  types = {
-    int:  new Type("int",  4, 0),
-    uint: new Type("uint", 4, 0),
-
-    u8:   new Type("u8",   1, 0),
-    i8:   new Type("i8",   1, 0),
-    u16:  new Type("u16",  2, 0),
-    i16:  new Type("i16",  2, 0),
-    u32:  new Type("u32",  4, 0),
-    i32:  new Type("i32",  4, 0),
-
-    void: new Type("void", undefined, 0),
-    dyn:  new Type("dyn",  undefined, 0),
-    null: new Type("null", undefined, 0)
-  };
 
   var program = parser.parse(source);
 
   print (JSON.stringify(program, null, 2));
 
-  program.computeType();
+  program.computeType(types);
 
   print (JSON.stringify(program, null, 2));
 
@@ -993,7 +992,7 @@ function compile(source, generateExports) {
     str += x + "\n";
   }});
 
-  program.generateCode(writer);
+//  program.generateCode(writer);
 
   return str;
 

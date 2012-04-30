@@ -1281,7 +1281,7 @@ FunctionExpression
 StructDeclaration "struct"
   = StructToken __ name:Identifier __
     "{" __ declarations:FieldDeclarationList? __ "}" {
-       return savePosition(new StructDeclaration(name, declarations));
+       return savePosition(new StructDeclaration(name, declarations !== "" ? declarations : null));
      }
 
 FieldDeclaration
