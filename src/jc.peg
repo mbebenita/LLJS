@@ -158,6 +158,7 @@ Keyword
       / "throw"
       / "try"
       / "typeof"
+      / "sizeof"
       / "var"
       / "void"
       / "while"
@@ -349,6 +350,7 @@ ThrowToken      = "throw"            !IdentifierPart
 TrueToken       = "true"             !IdentifierPart
 TryToken        = "try"              !IdentifierPart
 TypeofToken     = "typeof"           !IdentifierPart { return "typeof"; }
+SizeofToken     = "sizeof"           !IdentifierPart { return "sizeof"; }
 VarToken        = "var"              !IdentifierPart
 VoidToken       = "void"             !IdentifierPart { return "void"; }
 WhileToken      = "while"            !IdentifierPart
@@ -639,6 +641,9 @@ PostfixOperator
 
 UnaryExpression
   = PostfixExpression
+  / operator:SizeofToken __ "(" __ type:TypeName __ ")" {
+      return savePosition(new UnaryExpression(operator, type));
+    }
   / operator:UnaryOperator __ expression:UnaryExpression {
       return savePosition(new UnaryExpression(operator, expression));
     }
@@ -647,6 +652,7 @@ UnaryOperator
   = DeleteToken
   / VoidToken
   / TypeofToken
+  / SizeofToken
   / "++"
   / "--"
   / "+"
@@ -654,6 +660,7 @@ UnaryOperator
   / "~"
   / "!"
   / "*"
+  / "&"
 
 MultiplicativeExpression
   = head:UnaryExpression

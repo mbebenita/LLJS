@@ -14,16 +14,8 @@ var Type = (function () {
   };
 
   type.prototype.getSize = function () {
-    if (this.size) {
-      return this.size;
-    }
-    assert (this.fields);
-    var size = 0;
-    this.fields.forEach(function (field) {
-      size += field.type.getSize();
-    });
-    this.size = size;
-    return size;
+    assert (this.size);
+    return this.size;
   };
 
   type.prototype.assignableFrom = function (other) {
@@ -33,16 +25,33 @@ var Type = (function () {
     return this === other;
   };
 
-  type.prototype.addField = function addField(name, type) {
-    if (!this.fields) {
-      this.fields = [];
-      this.offset = 0;
-    }
+  return type;
+})();
+
+var StructType = (function () {
+  function structType(name) {
+    this.fields = [];
+    this.offset = 0;
+  }
+
+  structType.prototype = Object.create(Type.prototype);
+
+  structType.prototype.getSize = function () {
+    assert (this.fields);
+    var size = 0;
+    this.fields.forEach(function (field) {
+      size += field.type.getSize();
+    });
+    this.size = size;
+    return size;
+  };
+
+  structType.prototype.addField = function addField(name, type) {
     this.fields.push({name: name, type: type, offset: this.offset});
     this.offset += type.getSize();
   };
 
-  type.prototype.getField = function getField(name) {
+  structType.prototype.getField = function getField(name) {
     var fields = this.fields;
     for (var i = 0; i < fields.length; i++) {
       if (fields[i].name === name) {
@@ -52,7 +61,7 @@ var Type = (function () {
     return null;
   };
 
-  return type;
+  return structType;
 })();
 
 var PointerType = (function () {
@@ -97,6 +106,9 @@ var PointerType = (function () {
       return true;
     }
     if (other === types.null) {
+      return true;
+    }
+    if (this.base === types.void && other instanceof PointerType) {
       return true;
     }
     return other instanceof PointerType && this.base.assignableFrom(other.base) && this.pointers === other.pointers;
@@ -281,7 +293,7 @@ Program.prototype = {
       var node = this.elements[i];
       if (node instanceof StructDeclaration) {
         assert (!(node.name in types), "Type " + node.name + " is already defined.");
-        types[node.name] = new Type(node.name);
+        types[node.name] = new StructType(node.name);
       }
     }
     var scope = new Scope(null, "Program");
@@ -320,7 +332,7 @@ VariableStatement.prototype = {
           var variable = new Variable(x.name, x.type);
           scope.add(x.name, variable);
 
-          if (x.type.fields) {
+          if (x.type instanceof StructType) {
             scope.options.frame.add(variable);
             var type = x.type;
             var size = x.type.getSize();
@@ -344,7 +356,7 @@ VariableStatement.prototype = {
           var variable = new Variable(x.name, x.type);
           scope.add(x.name, variable);
 
-          if (x.type.fields) {
+          if (x.type instanceof StructType) {
             scope.options.frame.add(variable);
             var type = x.type;
             var size = x.type.getSize();
@@ -499,6 +511,9 @@ TypeName.prototype = {
       this.declarator.createType(result);
     }
     return result.type;
+  },
+  computeType: function () {
+    return this.createType();
   }
 };
 
@@ -651,9 +666,21 @@ function UnaryExpression (operator, expression) {
 
 UnaryExpression.prototype = {
   computeType: function (scope) {
-    this.expression.computeType(scope);
+    if (this.operator === "sizeof") {
+      return types.int;
+    } else if (this.operator === "&") {
+      return new PointerType(this.expression.computeType(scope));
+    }
+    return this.expression.computeType(scope);
   },
   generateCode: function (writer, scope) {
+    if (this.expression instanceof TypeName) {
+      return this.expression.computeType().getSize();
+    } else if (this.operator === "&") {
+      if (this.expression.type instanceof StructType) {
+        return this.expression.generateCode(null, scope);
+      }
+    }
     return this.operator + this.expression.generateCode(null, scope);
   }
 };
@@ -701,7 +728,7 @@ VariableIdentifier.prototype = {
     return this.type = scope.get(this.name, true);
   },
   generateCode: function (writer, scope) {
-    if (scope.get(this.name).type.fields) {
+    if (scope.get(this.name).type instanceof StructType) {
       return "FP + " + scope.get(this.name).offset + " /*" + this.name + "*/";
     }
     return scope.get(this.name).name;
@@ -746,10 +773,10 @@ AssignmentExpression.prototype = {
   generateCode: function (writer, scope) {
     var l = this.left.generateCode(null, scope);
     var r = this.right.generateCode(null, scope);
-    if (this.leftType.fields) {
+    if (this.leftType instanceof StructType) {
       return generateMemoryCopy(l, r, this.leftType.getSize());
     }
-    return l + " = " + r;
+    return l + " " + this.operator + " " + r;
   }
 };
 
@@ -789,8 +816,8 @@ PropertyAccess.prototype = {
     } else {
       check(this, !(type instanceof PointerType), "Cannot use . operator on pointer types.");
     }
-    if (type.fields) {
-      check(this, type.fields, "Property access on non structs is not possible.");
+    if (type instanceof StructType) {
+      check(this, type instanceof StructType, "Property access on non structs is not possible.");
       var field = type.getField(this.accessor.name);
       check(this, field, "Field \"" + this.accessor.name + "\" does not exist in type " + type + ".");
       this.field = field;
