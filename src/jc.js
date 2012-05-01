@@ -40,11 +40,11 @@ if (generateParser.value) {
   load("parser.js");
 }
 
+var extern = {trace: function (x) { print(x); }};
+
 var source = snarf(file, "text");
 
-print (compile(source, false));
+var com = compile(source, false);
+print (com);
 
-
-// var o = new Function (compile(source))();
-
-// o.add(10);
+var o = new Function (com)();

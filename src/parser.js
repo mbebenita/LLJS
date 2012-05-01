@@ -8650,7 +8650,6 @@ var parser = (function(){
           }
           var result9 = result8 !== null
             ? (function(operator, type) {
-                  print("FOOO");
                   return savePosition(new UnaryExpression(operator, type));
                 })(result8[0], result8[4])
             : null;
@@ -16101,7 +16100,7 @@ var parser = (function(){
         }
         var result2 = result1 !== null
           ? (function(name, declarations) {
-                 return savePosition(new StructDeclaration(name, declarations));
+                 return savePosition(new StructDeclaration(name, declarations !== "" ? declarations : null));
                })(result1[2], result1[6])
           : null;
         if (result2 !== null) {

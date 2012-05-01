@@ -1,10 +1,77 @@
-struct Node {
-
+/*
+struct Header {
+  Header * next,
+  int size
 }
 
-var int x;
-var int y;
+var Header base;
+var Header * freep;
 
-function int foo(int x) {
+function void * malloc(int nbytes) {
+  var Header *prevp;
+  var int nunits = (nbytes + sizeof(Header) - 1) / sizeof(Header) + 1;
+  if ((prevp = freep) == 0) {
+    base.next = freep = prevp = &base;
+    base.size = 0;
+  }
+  for (var Header *p = prevp->next; ; prevp = p, p = p->next) {
+    if (p->size >= nunits) {
+      if (p->size == nunits) {
+        prevp->next = p->next;
+      } else {
+        p->size -= 1;
+        p += p->size;
+        p->size = nunits;
+      }
+      freep = prevp;
+      // return p + 1;
+    }
+    if (p == freep) {
+      extern.trace("MALLOC FAIL");
+    }
+  }
+}
+*/
 
+struct Point {
+  int x,
+  int y
+}
+
+var Point p;
+
+p.x = 1;
+p.y = 2;
+
+var Point k = p;
+
+p.x = 3;
+
+extern.trace(p.x);
+
+
+extern.trace(k.x);
+extern.trace(k.y);
+
+var Point * pk = &k;
+
+pk->x = 5;
+
+extern.trace(k.x);
+
+
+foo(&k, 10);
+
+function int foo(Point *z, int depth) {
+  var Point a;
+  var Point b;
+  var Point c = *z;
+
+  extern.trace(a);
+
+  if (depth) {
+    foo(z, depth - 1, 2);
+  }
+
+  return 0;
 }

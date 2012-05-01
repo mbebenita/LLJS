@@ -168,16 +168,16 @@ var Scope = (function () {
   function scope(parent, name) {
     this.name = name;
     this.parent = parent;
-    this.variables = {};
     this.types = {};
+    this.variables = {};
     this.options = parent ? Object.create(parent.options) : {};
   }
 
-  scope.prototype.getVariable = function getVariable(name, strict) {
+  scope.prototype.getVariable = function getVariable(name, strict, local) {
     var variable = this.variables[name];
     if (variable) {
       return variable;
-    } else if (this.parent) {
+    } else if (!local && this.parent) {
       return this.parent.getVariable(name, strict);
     }
     if (strict) {
@@ -197,7 +197,7 @@ var Scope = (function () {
     if (type) {
       return type;
     } else if (this.parent) {
-      return this.parent.geType(name);
+      return this.parent.getType(name);
     }
     return unexpected ("Undefined type " + name);
   };
@@ -210,6 +210,19 @@ var Scope = (function () {
 
   scope.prototype.toString = function toString() {
     return this.name;
+  };
+
+  scope.prototype.close = function close() {
+    var offset = 0;
+    for (var key in this.variables) {
+      var x = this.variables[key];
+      if (x.isStackAllocated || x.type instanceof StructType) {
+        x.offset = offset;
+        offset += x.type.getSize();
+      }
+    }
+    this.frameSize = offset;
+    print(JSON.stringify(this.variables));
   };
 
   return scope;
@@ -273,6 +286,7 @@ function reportError(node, message) {
 }
 
 function checkTypeAssignment(node, a, b, message) {
+  assert (a && b);
   if (!a.assignableFrom(b)) {
     reportError(node, "Unassignable types " + a + " <= " + b + (message ? " " + message : ""));
   }
@@ -294,6 +308,17 @@ var Variable = (function () {
   variable.prototype.toString = function () {
     return "variable " + this.name;
   };
+  variable.prototype.generateCode = function () {
+    if (this.type instanceof StructType) {
+      return this.frameOffset();
+    } else if (this.isStackAllocated) {
+      return accessMemory(this.frameOffset(), this.type);
+    }
+    return this.name;
+  };
+  variable.prototype.frameOffset = function () {
+    return "$SP + " + this.offset;
+  };
   return variable;
 })();
 
@@ -302,23 +327,43 @@ function Program (elements) {
   this.elements = elements;
 }
 
+function createFrame(writer, scope) {
+  if (scope.frameSize) {
+    // writer.writeLn("tracer.enter(" + quote(scope.name + " {") + ")");
+    writer.writeLn("$SP -= " + scope.frameSize + ";");
+  }
+};
+
+function destroyFrame(writer, scope) {
+  if (scope.frameSize) {
+    writer.writeLn("$SP += " + scope.frameSize + ";");
+    // writer.writeLn("tracer.leave(\"}\");");
+  }
+};
+
+function computeDeclarations(elements, scope) {
+  for (var i = 0; i < elements.length; i++) {
+    var node = elements[i];
+    if (node instanceof StructDeclaration) {
+      assert (!(node.name in types), "Type " + node.name + " is already defined.");
+      scope.addType(new StructType(node.name));
+    } else if (node instanceof FunctionDeclaration) {
+      scope.addVariable(new Variable(node.name, node.computeTypeAndDeclarations(scope)));
+    }
+  }
+}
+
 Program.prototype = {
   computeType: function (types) {
     var scope = this.scope = new Scope(null, "Program");
     scope.types = clone(types);
-    scope.addVariable("extern", types.dyn);
-
-    for (var i = 0; i < this.elements.length; i++) {
-      var node = this.elements[i];
-      if (node instanceof StructDeclaration) {
-        assert (!(node.name in types), "Type " + node.name + " is already defined.");
-        scope.addType(new StructType(node.name));
-      }
-    }
-
+    scope.addVariable(new Variable("extern", types.dyn));
+    computeDeclarations(this.elements, scope);
     walkComputeTypes(this.elements, scope);
+    scope.close();
   },
   generateCode: function (writer) {
+    createFrame(writer, this.scope);
     walkGenerateCode(this.elements, writer, this.scope);
   }
 };
@@ -335,54 +380,54 @@ VariableStatement.prototype = {
     var typeSpecifier = this.typeSpecifier;
     this.variableDeclarations.forEach(function (x) {
       x.computeType(typeSpecifier, scope);
-      scope.addVariable(new Variable(x.name, x.type));
+      check(x, !scope.getVariable(x.name, false, true), "Variable " + quote(x.name) + " is already declared.");
+      scope.addVariable(x.variable = new Variable(x.name, x.type));
     });
     delete this.typeSpecifier;
   },
+
   generateCode: function (writer, scope) {
     assert (scope);
+    var add;
+    var str = "";
     if (this.inForStatement) {
-      var str = "var " +
-        this.variableDeclarations.map(function (x) {
-          var variable = new Variable(x.name, x.type);
-          scope.add(x.name, variable);
-
-          if (x.type instanceof StructType) {
-            scope.options.frame.add(variable);
-            var type = x.type;
-            var size = x.type.getSize();
-            if (x.value) {
-              return "_ = " + generateMemoryCopy("FP+" + variable.offset, x.value.generateCode(null, scope), size);
-            } else {
-              return "_";
-            }
-          } else {
-            if (x.value) {
-              return x.name + " = " + x.value.generateCode(null, scope);
-            } else {
-              return x.name + " = " + x.type.defaultValue;
-            }
-          }
-        }).join(", ");
-      assert (!writer);
-      return str;
+      var first = true;
+      add = function (name, value) {
+        name = name || "_";
+        if (first) {
+          str = "var ";
+        } else {
+          str += ", ";
+        }
+        str += name + " = " + value;
+        first = false;
+      };
     } else {
-        this.variableDeclarations.forEach(function (x) {
-          if (x.type instanceof StructType) {
-            scope.options.frame.add(variable);
-            var type = x.type;
-            var size = x.type.getSize();
-            if (x.value) {
-              writer.writeLn(generateMemoryCopy("FP+" + variable.offset, x.value.generateCode(null, scope), size) + ";");
-            }
-          } else {
-            if (x.value) {
-              writer.writeLn("var " +  x.name + " = " + x.value.generateCode(null, scope) + ";");
-            } else {
-              writer.writeLn("var " + x.name + " = " + x.type.defaultValue + ";");
-            }
-          }
-        });
+      add = function (name, value) {
+        name = name || "_";
+        writer.writeLn("var " + name + " = " + value + ";");
+      };
+    }
+
+    this.variableDeclarations.forEach(function (x) {
+      if (x.type instanceof StructType) {
+        var type = x.variable.type;
+        var size = type.getSize();
+        if (x.value) {
+          add(null, generateMemoryCopy(x.variable.frameOffset(), x.value.generateCode(null, scope), size));
+        }
+      } else {
+        var value = x.value ? x.value.generateCode(null, scope) : x.variable.type.defaultValue;
+        if (x.variable.isStackAllocated) {
+          add(x.variable.generateCode(),  value);
+        } else {
+          add(x.name, value);
+        }
+      }
+    });
+
+    if (this.inForStatement) {
+      return str;
     }
   }
 };
@@ -469,10 +514,11 @@ function ParameterDeclaration (typeSpecifier, declarator) {
 }
 
 ParameterDeclaration.prototype = {
-  createType: function () {
-    return this.createParameter().type;
+  createType: function (scope) {
+    return this.createParameter(scope).type;
   },
-  createParameter: function () {
+  createParameter: function (scope) {
+    assert (scope);
     var result = {name: null, type: scope.getType(this.typeSpecifier)};
     if (this.declarator) {
       this.declarator.createType(result);
@@ -518,15 +564,16 @@ function TypeName (typeSpecifier, declarator) {
 }
 
 TypeName.prototype = {
-  createType: function () {
+  createType: function (scope) {
+    assert (scope);
     var result = {name: null, type: scope.getType(this.typeSpecifier)};
     if (this.declarator) {
       this.declarator.createType(result);
     }
     return result.type;
   },
-  computeType: function () {
-    return this.createType();
+  computeType: function (scope) {
+    return this.createType(scope);
   }
 };
 
@@ -567,46 +614,46 @@ function FunctionDeclaration (name, returnType, parameters, elements) {
 }
 
 FunctionDeclaration.prototype = {
-  computeType: function (scope) {
+  computeTypeAndDeclarations: function (scope) {
     this.parameters = this.parameters.map(function (x) {
-      return x.createParameter();
+      return x.createParameter(scope);
     });
+
     var parameterTypes = this.parameters.map(function (x) {
       return x.type;
     });
-    this.returnType = this.returnType.createType();
-    this.type = new FunctionType(this.returnType, parameterTypes);
 
-    scope = new Scope(scope, "type function " + this.name);
-    scope.options.returnType = this.type.returnType;
+    this.returnType = this.returnType.createType(scope);
+    this.type = new FunctionType(this.returnType, parameterTypes);
+    computeDeclarations(this.elements, scope);
+    return this.type;
+  },
+  computeType: function (scope, signatureOnly) {
+    this.scope = scope = new Scope(scope, "Function " + this.name);
+    scope.options.enclosingFunction = this;
     this.parameters.forEach(function (x) {
-      scope.add(x.name, x.type);
+      scope.addVariable(new Variable(x.name, x.type));
     });
 
     walkComputeTypes(this.elements, scope);
+
+    scope.close();
+
+    if (this.type.returnType !== types.void) {
+      check(this, this.hasReturn, "Function must return a value of type " + quote(this.type.returnType) + ".");
+    }
+    return this.type;
   },
-  generateCode: function (writer, scope) {
-    scope = new Scope(scope, "code gen function " + this.name);
+  generateCode: function (writer) {
+    var scope = this.scope;
     scope.options.frame = new Frame();
     writer.enter("function " + this.name + "(" +
       this.parameters.map(function (x) {
-        scope.add(x.name, new Variable(x.name, x.type, 0));
         return x.name;
       }).join(", ") + ") {");
+    createFrame(writer, scope);
     walkGenerateCode(this.elements, writer, scope);
     writer.leave("}");
-/*
-    o.scope.add(this.name, this.type);
-    o = {scope: new Scope(o.scope, "function scope for " + this.name)};
-    walk(this.parameters, match, o);
-    writer.enter("function " + this.name + "(" +
-                 this.parameters.map(function (x) {
-                   o.scope.add(x.name, new Variable(x.name, x.type, 0));
-                   return x.name;
-                 }).join(", ") + ") {");
-    walk(this.elements, match, o);
-    writer.leave("}");
-*/
   }
 };
 
@@ -618,10 +665,18 @@ function ReturnStatement (value) {
 ReturnStatement.prototype = {
   computeType: function (scope) {
     var type = this.value.computeType(scope);
-    checkTypeAssignment(this, scope.options.returnType, type);
+    checkTypeAssignment(this, scope.options.enclosingFunction.type.returnType, type);
+    scope.options.enclosingFunction.hasReturn = true;
   },
   generateCode: function (writer, scope) {
-    writer.writeLn("return" + (this.value ? " " + this.value.generateCode(null, scope) : "") + ";");
+    var value = (this.value ? " " + this.value.generateCode(null, scope) : "");
+    if  (scope.frameSize) {
+      writer.writeLn("var $T =" + value + ";");
+      destroyFrame(writer, scope);
+      writer.writeLn("return $T;");
+    } else {
+      writer.writeLn("return" + value + ";");
+    }
   }
 };
 
@@ -682,19 +737,36 @@ UnaryExpression.prototype = {
     if (this.operator === "sizeof") {
       return types.int;
     } else if (this.operator === "&") {
-      return new PointerType(this.expression.computeType(scope));
+      var type = this.expression.computeType(scope);
+      if (this.expression instanceof VariableIdentifier) {
+        this.expression.variable.isStackAllocated = true;
+      }
+      return this.type = new PointerType(type);
+    } else if (this.operator === "*") {
+      var type = this.expression.computeType(scope);
+      check(this, type instanceof PointerType, "Cannot dereference non pointer type.");
+      return type.type;
     }
     return this.expression.computeType(scope);
   },
   generateCode: function (writer, scope) {
     if (this.expression instanceof TypeName) {
-      return this.expression.computeType().getSize();
+      return this.expression.computeType(scope).getSize();
     } else if (this.operator === "&") {
-      if (this.expression.type instanceof StructType) {
+      if (this.expression instanceof VariableIdentifier) {
+        var variable = this.expression.variable;
+        assert (variable.isStackAllocated);
+        return variable.frameOffset();
+      } else {
+        notImplemented();
+      }
+    } else if (this.operator === "*") {
+      if (this.expression.type.type instanceof StructType) {
         return this.expression.generateCode(null, scope);
       }
+      return accessMemory(this.expression.generateCode(null, scope), this.expression.type);
     }
-    return this.operator + this.expression.generateCode(null, scope);
+    return this.operator + " " + this.expression.generateCode(null, scope);
   }
 };
 
@@ -721,8 +793,19 @@ function FunctionCall (name, arguments) {
 
 FunctionCall.prototype = {
   computeType: function (scope) {
-    this.name.computeType(scope);
-    walkComputeTypes(this.arguments, scope);
+    var type = this.name.computeType(scope);
+    var argumentTypes = walkComputeTypes(this.arguments, scope);
+    if (type !== types.dyn) {
+      assert (type instanceof FunctionType);
+      check(this, argumentTypes.length === type.parameterTypes.length, "Argument / parameter mismatch.");
+      for (var i = 0; i < this.arguments.length; i++) {
+        var aType = argumentTypes[i];
+        var pType = type.parameterTypes[i];
+        checkTypeAssignment(this, aType, pType);
+      }
+      return type.returnType;
+    }
+    return type;
   },
   generateCode: function (writer, scope) {
     // TODO: Apply scoping rules.
@@ -737,14 +820,11 @@ function VariableIdentifier (name) {
 
 VariableIdentifier.prototype = {
   computeType: function (scope) {
-    check (this, scope.get(this.name), "variable " + this.name + " is not defined in scope " + scope);
-    return this.type = scope.get(this.name, true);
+    this.variable = scope.getVariable(this.name, true);
+    return this.type = this.variable.type;
   },
   generateCode: function (writer, scope) {
-    if (scope.get(this.name).type instanceof StructType) {
-      return "FP+" + scope.get(this.name).offset;
-    }
-    return scope.get(this.name).name;
+    return this.variable.generateCode();
   }
 };
 
@@ -770,11 +850,11 @@ function AssignmentExpression (operator, left, right) {
 }
 
 function generateMemoryCopy(dst, src, size) {
-  return "memoryCopy(" + dst + ", " + src + ", " + size + ")";
+  return "mc(" + dst + ", " + src + ", " + size + ")";
 }
 
 function generateMemoryZero(dst, size) {
-  return "memoryZero(" + dst + ", " + size + ")";
+  return "mz(" + dst + ", " + size + ")";
 }
 
 AssignmentExpression.prototype = {
@@ -800,9 +880,9 @@ function log2(x) {
 
 function accessMemory(address, type, offset) {
   if (type === types.int) {
-    return "I32[" + address + (offset ? "+" + offset : "") + ">>" + log2(type.getSize()) + "]";
+    return "I32[" + address + (offset ? " + " + offset : "") + " >> " + log2(type.getSize()) + "]";
   } else if (type === types.uint || type instanceof PointerType) {
-    return "U32[" + address + (offset ? "+" + offset : "") + ">>" + log2(type.getSize()) + "]";
+    return "U32[" + address + (offset ? " + " + offset : "") + " >> " + log2(type.getSize()) + "]";
   }
   return notImplemented(type);
 };
@@ -866,7 +946,7 @@ NewExpression.prototype = {
   },
   generateCode: function (writer, scope) {
     assert (!writer);
-    return "malloc (" + this.type.type.getSize() + ")";
+    return "ma(" + this.type.type.getSize() + ")";
   }
 };
 
@@ -981,18 +1061,18 @@ function compile(source, generateExports) {
 
   var program = parser.parse(source);
 
-  print (JSON.stringify(program, null, 2));
+//  print (JSON.stringify(program, null, 2));
 
   program.computeType(types);
 
-  print (JSON.stringify(program, null, 2));
+//  print (JSON.stringify(program, null, 2));
 
   var str = "";
   var writer = new IndentingWriter(false, {writeLn: function (x) {
     str += x + "\n";
   }});
 
-//  program.generateCode(writer);
+  program.generateCode(writer);
 
   return str;
 
