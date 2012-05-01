@@ -331,6 +331,16 @@ function createFrame(writer, scope) {
   if (scope.frameSize) {
     // writer.writeLn("tracer.enter(" + quote(scope.name + " {") + ")");
     writer.writeLn("$SP -= " + scope.frameSize + ";");
+    for (var key in scope.variables) {
+      var variable = scope.variables[key];
+      if (variable.isParameter && variable.isStackAllocated) {
+        if (variable.type instanceof StructType) {
+          writer.writeLn(generateMemoryCopy(variable.generateCode(null, scope), variable.name, variable.type.getSize()) + ";");
+        } else {
+          writer.writeLn(variable.generateCode(null, scope) + " = " + variable.name + ";");
+        }
+      }
+    }
   }
 };
 
@@ -632,7 +642,9 @@ FunctionDeclaration.prototype = {
     this.scope = scope = new Scope(scope, "Function " + this.name);
     scope.options.enclosingFunction = this;
     this.parameters.forEach(function (x) {
-      scope.addVariable(new Variable(x.name, x.type));
+      var variable = new Variable(x.name, x.type);
+      variable.isParameter = true;
+      scope.addVariable(variable);
     });
 
     walkComputeTypes(this.elements, scope);
@@ -864,15 +876,19 @@ AssignmentExpression.prototype = {
     return tl;
   },
   generateCode: function (writer, scope) {
-    var l = this.left.generateCode(null, scope);
-    var r = this.right.generateCode(null, scope);
-    if (this.leftType instanceof StructType) {
-      return generateMemoryCopy(l, r, this.leftType.getSize());
-    }
-    return l + " " + this.operator + " " + r;
+    return generateAssignment(this, scope, this.left, this.operator, this.right, this.leftType);
   }
 };
 
+function generateAssignment(scope, node, left, operator, right, type) {
+  var l = left.generateCode(null, scope);
+  var r = right.generateCode(null, scope);
+  if (type instanceof StructType) {
+    check(node, operator === null || operator === "=");
+    return generateMemoryCopy(l, r, type.getSize());
+  }
+  return l + " " + operator + " " + r;
+}
 
 function log2(x) {
   return Math.log(x) / Math.LN2;

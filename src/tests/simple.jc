@@ -60,18 +60,16 @@ pk->x = 5;
 extern.trace(k.x);
 
 
-foo(&k, 10);
+foo(&k, 10, k);
 
-function int foo(Point *z, int depth) {
-  var Point a;
-  var Point b;
-  var Point c = *z;
-
-  extern.trace(a);
-
-  if (depth) {
-    foo(z, depth - 1, 2);
-  }
-
+function int foo(Point *z, int depth, Point pp) {
+  extern.trace(&pp);
   return 0;
 }
+
+
+var Point a, b, c;
+
+a = b = c;
+
+a += b;
