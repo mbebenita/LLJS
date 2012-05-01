@@ -48,3 +48,5 @@ var com = compile(source, false);
 print (com);
 
 var o = new Function (com)();
+
+print("RESULT: " + extern.malloc(10));

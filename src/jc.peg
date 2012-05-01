@@ -662,9 +662,16 @@ UnaryOperator
   / "*"
   / "&"
 
+
+CastExpression
+  = "(" __ type:TypeName __ ")" __ expression:CastExpression {
+      return savePosition(new CastExpression(type, expression));
+    }
+  / UnaryExpression
+
 MultiplicativeExpression
-  = head:UnaryExpression
-    tail:(__ MultiplicativeOperator __ UnaryExpression)* {
+  = head:CastExpression
+    tail:(__ MultiplicativeOperator __ CastExpression)* {
       var result = head;
       for (var i = 0; i < tail.length; i++) {
         result = savePosition(new BinaryExpression(tail[i][1], result, tail[i][3]));
@@ -674,6 +681,7 @@ MultiplicativeExpression
 
 MultiplicativeOperator
   = operator:("*" / "/" / "%") !"=" { return operator; }
+
 
 AdditiveExpression
   = head:MultiplicativeExpression
@@ -1121,10 +1129,7 @@ BreakStatement
         identifier:Identifier EOS { return identifier; }
       / EOSNoLineTerminator       { return ""; }
     ) {
-      return {
-        tag:   "BreakStatement",
-        label: label !== "" ? label : null
-      };
+      return savePosition(new BreakStatement(label !== "" ? label : null));
     }
 
 ReturnStatement

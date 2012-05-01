@@ -9,7 +9,7 @@ var Header * freep;
 
 function void * malloc(int nbytes) {
   var Header *prevp;
-  var int nunits = (nbytes + sizeof(Header) - 1) / sizeof(Header) + 1;
+  var uint nunits = (uint)((nbytes + sizeof(Header) - 1) / sizeof(Header) + 1);
   if ((prevp = freep) == 0) {
     base.next = freep = prevp = &base;
     base.size = 0;
@@ -24,52 +24,106 @@ function void * malloc(int nbytes) {
         p->size = nunits;
       }
       freep = prevp;
-      // return p + 1;
+      return p + 1;
     }
     if (p == freep) {
-      extern.trace("MALLOC FAIL");
+       return null;
+      // extern.trace("MALLOC FAIL");
     }
   }
 }
+
+// extern.trace(malloc(10));
+
+extern.malloc = malloc;
+
 */
 
-struct Point {
-  int x,
-  int y
+struct Header {
+  Header * next,
+  int size
 }
 
-var Point p;
+var Header base;
+var Header * free = null;
 
-p.x = 1;
-p.y = 2;
+function void * allocateHeap(int nBytes) {
+  var int p = $HP;
+  $HP += nBytes;
+  return (void *)p;
+}
 
-var Point k = p;
+function Header * allocateHeader(int nUnits) {
+  if (nUnits < 1024) {
+    nUnits = 1024;
+  }
+  var void * buffer = allocateHeap(nUnits * sizeof (Header));
+  if (buffer === 0) {
+    return null;
+  }
+  var Header * header = (Header *)buffer;
+  header->size = nUnits;
+  mfree(header + 1);
+  return free;
+}
 
-p.x = 3;
+function void * malloc(int nBytes) {
+  var Header *p, *prev;
+  var int nUnits = (int)(uint)((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
 
-extern.trace(p.x);
+  if ((prev = free) === null) {
+    extern.trace("Allocate Default List");
+    base.next = free = prev = &base;
+    base.size = 0;
+  }
 
+  for (p = prev->next; true; prev = p, p = p->next) {
+    if (p->size >= nUnits) {
+      if (p->size === nUnits) {
+        prev->next = p->next;
+      } else {
+        p->size -= nUnits;
+        p += p->size;
+        p->size = nUnits;
+      }
+      free = prev;
+      return p + 1;
+    }
+    if (p === free) {
+      if ((p = allocateHeader(nUnits)) == null) {
+        return null;
+      }
+    }
+  }
+  extern.trace("Allocate nBytes: " + nBytes + ", nUnits: " + nUnits);
+  return null;
+}
 
-extern.trace(k.x);
-extern.trace(k.y);
-
-var Point * pk = &k;
-
-pk->x = 5;
-
-extern.trace(k.x);
-
-
-foo(&k, 10, k);
-
-function int foo(Point *z, int depth, Point pp) {
-  extern.trace(&pp);
-  return 0;
+function void mfree(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = free; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp > p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  free = p;
 }
 
 
-var Point a, b, c;
+extern.malloc = malloc;
 
-a = b = c;
+var Header * k = (Header *) 0;
 
-a += b;
+k = k + 1;

@@ -368,6 +368,7 @@ Program.prototype = {
     var scope = this.scope = new Scope(null, "Program");
     scope.types = clone(types);
     scope.addVariable(new Variable("extern", types.dyn));
+    scope.addVariable(new Variable("$HP", types.int));
     computeDeclarations(this.elements, scope);
     walkComputeTypes(this.elements, scope);
     scope.close();
@@ -598,7 +599,7 @@ Literal.prototype = {
     switch (this.kind) {
       case "number": return types.int;
       case "boolean": return types.int;
-      case "null": return types.null;
+      case "null": return types.void;
       case "string": return types.dyn;
       default: return notImplemented();
     }
@@ -725,18 +726,29 @@ BinaryExpression.prototype = {
   computeType: function (scope) {
     var lt = this.left.computeType(scope);
     var rt =  this.right.computeType(scope);
+    if (lt instanceof PointerType && (this.operator === "+" || this.operator === "-")) {
+      check(this, rt === types.int, "Can't do pointer arithmetic with " + quote(rt) + " types.");
+    }
     return lt;
   },
   generateCode: function (writer, scope) {
     assert (!writer);
-    return "(" +
+    if (this.left.type instanceof PointerType && (this.operator === "+" || this.operator === "-")) {
+      var value;
+      if (this.right instanceof Literal) {
+        value = this.right.value * this.left.type.getSize();
+      } else {
+        value = this.right.generateCode(null, scope) + " << " + log2(this.left.type.getSize());
+      }
+      return paren(this.left.generateCode(null, scope) + " " + this.operator + " " + value);
+    }
+    return paren(
       this.left.generateCode(null, scope) + " " +
       this.operator + " " +
-      this.right.generateCode(null, scope) +
-    ")";
+      this.right.generateCode(null, scope)
+    );
   }
 };
-
 
 function UnaryExpression (operator, expression) {
   this.tag = "UnaryExpression";
@@ -782,6 +794,31 @@ UnaryExpression.prototype = {
   }
 };
 
+function CastExpression (type, expression) {
+  this.tag = "CastExpression";
+  this.type = type;
+  this.expression = expression;
+}
+
+CastExpression.prototype = {
+  computeType: function (scope) {
+    this.expression.computeType(scope);
+    return this.type = this.type.computeType(scope);
+  },
+  generateCode: function (writer, scope) {
+    var value = this.expression.generateCode(null, scope);
+    if (this.type === types.int) {
+      return paren(value + " | 0");
+    } else if (this.type === types.uint) {
+      return paren(value + " >>> 0");
+    } else if (this.type instanceof PointerType) {
+      return value;
+    } else {
+      return notImplemented(this.type.name);
+    }
+  }
+};
+
 function PostfixExpression (operator, expression) {
   this.tag = "PostfixExpression";
   this.operator = operator;
@@ -790,10 +827,31 @@ function PostfixExpression (operator, expression) {
 
 PostfixExpression.prototype = {
   computeType: function (scope) {
+    check(this, this.operator === "++" || this.operator === "--");
     this.expression.computeType(scope);
   },
   generateCode: function (writer, scope) {
+    if (this.expression.type instanceof PointerType) {
+      var value = this.expression.generateCode(null, scope);
+      var operator = this.operator === "++" ? " += " : " -= ";
+      return "($X = " + value + ", " + value + operator + this.expression.type.getSize() + ", $X)";
+    }
     return this.expression.generateCode(null, scope) + this.operator;
+  }
+};
+
+
+
+function BreakStatement (label) {
+  this.tag = "CastExpression";
+  this.label = label;
+}
+
+BreakStatement.prototype = {
+  computeType: function (scope) {
+  },
+  generateCode: function (writer, scope) {
+    writer.writeLn("break;");
   }
 };
 
@@ -884,10 +942,10 @@ function generateAssignment(scope, node, left, operator, right, type) {
   var l = left.generateCode(null, scope);
   var r = right.generateCode(null, scope);
   if (type instanceof StructType) {
-    check(node, operator === null || operator === "=");
+    check(node, operator === null || operator === "=", "Can't apply operator " + quote(operator) + " to structs.");
     return generateMemoryCopy(l, r, type.getSize());
   }
-  return l + " " + operator + " " + r;
+  return paren(l + " " + operator + " " + r);
 }
 
 function log2(x) {
@@ -1077,7 +1135,7 @@ function compile(source, generateExports) {
 
   var program = parser.parse(source);
 
-//  print (JSON.stringify(program, null, 2));
+  print (JSON.stringify(program, null, 2));
 
   program.computeType(types);
 

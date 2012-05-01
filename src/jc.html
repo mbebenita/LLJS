@@ -44,6 +44,11 @@
   };
   return constructor;
 })();
+
+  var extern = {trace: function (x) {
+    console.info(x);
+  }};
+
   var parser;
   new FileReader("jc.peg", "text").readAll(null, function (text) {
     parser = P.buildParser(text, { trackLineAndColumn: true});
@@ -52,7 +57,7 @@
       document.write("<pre>" + com + "</pre>");
 
       var o = new Function (com)();
-      document.write("<pre> Result: " + o.test() + "</pre>");
+//      document.write("<pre> Result: " + extern.malloc(12) + "</pre>");
     });
   });
     </script>

@@ -91,6 +91,10 @@ function quote(s) {
   return "\"" + s + "\"";
 }
 
+function paren(s) {
+  return "(" + s + ")";
+}
+
 (function () {
   function extendBuiltin(proto, prop, f) {
     if (!proto[prop]) {
