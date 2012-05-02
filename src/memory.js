@@ -8,19 +8,25 @@ var I32 = new Int32Array(M);
 var F32 = new Float32Array(M);
 var F64 = new Float64Array(M);
 
-var $HP = 4;
+var $HP = 0;
 var $SP = 0;
+var $HEAP_SIZE = 0;
+var $MAX_STACK_SIZE = 1024 * 1024;
 
 function ma(size) {
   return $HP += size;
 }
 
 function resetHeap() {
-  $HP = 4;
+  $HP = 8;
+  $HEAP_SIZE = M.byteLength - $MAX_STACK_SIZE;
   $SP = M.byteLength;
 }
 
 var mc = function memoryCopy(dst, src, len) {
+  if (src === null) {
+    return;
+  }
   var i = 0;
   if (len & 3 === 0) {
     len >>= 2;

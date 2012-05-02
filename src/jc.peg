@@ -132,6 +132,7 @@ ReservedWord
   / FutureReservedWord
   / TypeReservedWord
   / NullLiteral
+  / NULLLiteral
   / BooleanLiteral
 
 Keyword
@@ -198,12 +199,16 @@ TypeReservedWord
  */
 Literal
   = NullLiteral
+  / NULLLiteral
   / BooleanLiteral
   / value:NumericLiteral { return savePosition(new Literal("number", value)); }
   / value:StringLiteral { return savePosition(new Literal("string", value)); }
 
 NullLiteral
   = NullToken { return savePosition(new Literal("null")); }
+
+NULLLiteral
+  = NULLToken { return savePosition(new Literal("NULL")); }
 
 BooleanLiteral
   = TrueToken  { return savePosition(new Literal("boolean", true)); }
@@ -342,6 +347,7 @@ InstanceofToken = "instanceof"       !IdentifierPart { return "instanceof"; }
 InToken         = "in"               !IdentifierPart { return "in"; }
 NewToken        = "new"              !IdentifierPart
 NullToken       = "null"             !IdentifierPart
+NULLToken       = "NULL"             !IdentifierPart
 ReturnToken     = "return"           !IdentifierPart
 SetToken        = "set"              !IdentifierPart
 SwitchToken     = "switch"           !IdentifierPart
@@ -628,6 +634,9 @@ ArgumentList
 LeftHandSideExpression
   = CallExpression
   / NewExpression
+  / "*" __ expression:UnaryExpression {
+      return savePosition(new UnaryExpression("*", expression));
+    }
 
 PostfixExpression
   = expression:LeftHandSideExpression _ operator:PostfixOperator {

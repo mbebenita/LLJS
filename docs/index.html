@@ -1,127 +1,102 @@
 <html>
-  <head>
-    <title>JS*</title>
-    <link rel="stylesheet" type="text/css" href="css/docs.css" />
-    <link rel="stylesheet" type="text/css" href="css/idle.css" />
-  </head>
-  <script>
-    print = function (x) {
-      console.info(x);
-    }
-  </script>
-  <script src="vendor/jquery-1.6.4.js"></script>
-  <script src="jc/util.js"></script>
-  <script src="jc/parser.js"></script>
-  <script src="jc/compiler.js"></script>
-  <script src="jc/memory.js"></script>
-  <body>
-    <div class="container">
-      <h1>JS* : Low-Level JavaScript</h1>
+<head>
+  <title>JS*</title>
+  <link rel="stylesheet" type="text/css" href="css/docs.css" />
+  <link rel="stylesheet" type="text/css" href="css/idle.css" />
+</head>
+<script>
+print = function (x) {
+  console.info(x);
+}
+</script>
+<script src="vendor/jquery-1.6.4.js"></script>
+<script src="jc/util.js"></script>
+<script src="jc/parser.js"></script>
+<script src="jc/compiler.js"></script>
+<script src="jc/memory.js"></script>
+<body>
+  <div class="container">
+    <h1>JS* : Low-Level JavaScript</h1>
     <p>
-        <b>JS*</b> is a typed dialect of JavaScript that offers a
-        C-like type system with manual memory management. It compiles to operations on typed arrays and
-        lets you write memory-efficient and GC pause-free code less painfully, in short, JS* = JS + C.
+      <b>JS*</b> is a typed dialect of JavaScript that offers a
+      C-like type system with manual memory management. It compiles to operations on typed arrays and
+      lets you write memory-efficient and GC pause-free code less painfully, in short, JS* is the bastard child of JS and C.
+    </p>
+    <p>
+      JS* has 6 integral types: <tt>int -> i32</tt>, <tt>uint -> u32</tt>, <tt>i16</tt>, <tt>u16</tt>, <tt>i8</tt>, <tt>u8</tt>, which
+      behave as they do in C, and two additional types: <tt>num</tt> (the JavaScript number type) and <tt>dyn</tt> (any type) which are used to interoperate with the JS type system.
+      In addition, JS* lets you define struct and pointer types.
     </p>
 
+    <h4>Variables</h4>
+    <p>
+      Unlike JavaScript, JS* variable declarations are block scoped and require type annotations.
+    </p>
 
 <pre class="example">
+var int x;
+</pre>
+    <p>
+      For instance, declaring a variable with the same name is illegal and results in compilation error.
+    </p>
+<pre class="example">
+var int x, y, z, x;
+</pre>
 
-struct Header {
-  Header * next,
-  int size
+    <p>
+      JS* lets you use pointers, and take references to local variables.
+    </p>
+
+<pre class="example">
+var int x;
+var int *y = &x;
+var int **z = &y;
+*y = 1;
+**z = ***(&z);
+</pre>
+
+    <p>
+      For example, you can implement a <tt>swap</tt> function in JS* as follows:
+    </p>
+
+<pre class="example">
+var int x;
+var int y;
+
+function void swap(int *a, int *b) {
+  var int t = *a;
+  *a = *b;
+  *b = t;
 }
-
-var Header base;
-var Header * freep;
-
-function void * malloc(int nbytes) {
-  var Header *prevp;
-  var int nunits = (nbytes + sizeof(Header) - 1) / sizeof(Header) + 1;
-  if ((prevp = freep) == 0) {
-    base.next = freep = prevp = &base;
-    base.size = 0;
-  }
-  for (var Header *p = prevp->next; ; prevp = p, p = p->next) {
-    if (p->size >= nunits) {
-      if (p->size == nunits) {
-        prevp->next = p->next;
-      } else {
-        p->size -= 1;
-        p += p->size;
-        p->size = nunits;
-      }
-      freep = prevp;
-      // return p + 1;
-    }
-    if (p == freep) {
-      extern.trace("MALLOC FAIL");
-    }
-  }
-}
-
-
-
 </pre>
 
 
+<h4>Objects and Memory</h4>
 
-    <pre class="example">
-struct Point {
-  int x,
-  int y
-}
+    <p>
+      JS* has two object systems: C style structs using <tt>malloc</tt> and <tt>free</tt> if you can call that an object system, and the JS object model.
+      (JS* offers limited support for interoperability between the two, for now at least.)
+      
+      So, what's the point? Well imagine you wanted to write a linked list in JavaScript. You would probably chain a sequence of objects together, for example:
+    </p>
+<pre>
+ var head = {value: 0, next: null}, tail = head;
 
-struct Line {
-  Point s,
-  Point e
-}
-
-var Line l0;
-var Line l1;
-
-var Point p;
-
-var int foo = p.x;
-
-var Point z = p;
-
-z = p;
-
-for (var Point a, b, c;;) {}
-
+ function add(value) {
+   var next = {value: value, next: null};
+   tail.next = next;
+   tail = next;
+ }
 </pre>
-
-
-
-    <p>Unlike JS, JS* is block scoped and variable declarations can by typed.</p>
-
-    <pre class="example">
-var int x = 0;
-var int * y = null, z = 1;
-</pre>
-<p>Function types, and function pointers are also supported, so the statement <tt>var int *(x)(int, int*, int**)</tt> means
-"declare x as function with the parameters (int, pointer to int, pointer to pointer to int) that returns a pointer to int".
-</p>
-
-    <pre class="example">
-var int *(x)(int, int*, int**) = null;</pre>
-
-    <p>So, what's the point? Well imagine you wanted to write a linked list in JavaScript.
-You would probably chain a sequence of objects together, for example:
-
-    <pre>
-var head = {value: 0, next: null}, tail = head;
-
-function add(value) {
-  var next = {value: value, next: null};
-  tail.next = next;
-  tail = next;
-}
-    </pre>
-
-This is not as efficient as it could be, in JS* you could write. </p>
-
-    <pre class="example">
+    <p>
+      This is inefficient for several reasons. Objects in JavaScript are not cheap, they need to carry around lots of extra information and can be
+      many times larger than their C style counterparts, moreover property access is slow. In JS* you can write a much more efficient linked list 
+      using pointers and structs. The code below uses <tt>malloc</tt> to allocate memory, which is modeled using typed arrays.
+      (<tt>I32</tt> and <tt>U32</tt> are typed signed/unsigned views over one large array buffer.)
+      With great power comes great responsibility, so what is malloc'ed must be freed, even in JavaScript.
+    </p>
+    
+<pre class="example">
 struct Node {
   Node *next, int value
 }
@@ -135,87 +110,155 @@ function void add (int value) {
   tail = next;
 }
 </pre>
-
-
-
+    <p>
+      <tt>malloc</tt> and <tt>free</tt> are themselves implemented in JS*, see proof below:
+    </p>
 <pre class="example">
+  /* K&R Malloc */
 
-while (true) {
-
-}
-</pre>
-
-<!--
-function Node * find(int value) {
-  var Node * curr = head;
-  while (curr) {
-    if (curr->value === value) {
-       return curr;
-    }
-    curr = curr->next;
+  struct Header {
+    Header * next,
+    uint size
   }
-  return null;
-}
--->
 
+  var Header base;
+  var Header * freep = NULL;
 
+  function void * sbrk(int nBytes) {
+    if ($HP + nBytes > $HEAP_SIZE) {
+      extern.assert("Out of memory.");
+      return NULL;
+    }
+    var int p = $HP;
+    $HP += nBytes;
+    return (void *)p;
+  }
+
+  var int nUnitsMin = 1024 * 1024;
+
+  function Header * morecore(uint nUnits) {
+    if (nUnits < nUnitsMin) {
+      nUnits = nUnitsMin;
+    }
+    var void * buffer = sbrk(nUnits * sizeof (Header));
+
+    if (buffer === 0) {
+      return NULL;
+    }
+    var Header * header = (Header *)buffer;
+    header->size = nUnits;
+    free(header + 1);
+    return freep;
+  }
+
+  function void * malloc(int nBytes) {
+    var Header *p, *prevp;
+    var uint nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
+    if ((prevp = freep) === NULL) {
+      base.next = freep = prevp = &base;
+      base.size = 0;
+    }
+    for (p = prevp->next; true; prevp = p, p = p->next) {
+      if (p->size >= nUnits) {
+        if (p->size === nUnits) {
+          prevp->next = p->next;
+        } else {
+          p->size -= nUnits;
+          p += p->size;
+          p->size = nUnits;
+        }
+        freep = prevp;
+        return p + 1;
+      }
+      if (p === freep) {
+        if ((p = morecore(nUnits)) == NULL) {
+          return NULL;
+        }
+      }
+    }
+    return NULL;
+  }
+
+  function void free(void *ap) {
+    var Header *bp = (Header *)ap - 1, *p;
+    for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+      if (p >= p->next && (bp > p || bp < p->next)) {
+        break;
+      }
+    }
+    if (bp + bp->size === p->next) {
+      bp->size += p->next->size;
+      bp->next = p->next->next;
+    } else {
+      bp->next = p->next;
+    }
+    if (p + p->size == bp) {
+      p->size += bp->size;
+      p->next = bp->next;
+    } else {
+      p->next = bp;
+    }
+    freep = p;
+  }
+</pre>
+    
 </div>
-    <script>
-     var id = 0;
-     $('.example').replaceWith(function() {
-       var src = this.innerHTML;
-       var lineCount = src.split("\n").length + 1;
-       return '<table class="example"><tr><td><textarea id="ex:' + id + ':source" class="jcCode" rows="' + lineCount + '" spellcheck="false">' + src + '</textarea></td><td valign="top"><pre id="ex:' + id++ + ':result" class="jcResult"></pre></td></tr></table>'
-       // <div class="minibutton ok run" title="Ctrl-Enter">Run</div>
-     });
+<script>
+var id = 0;
+$('.example').replaceWith(function() {
+  var src = this.innerHTML;
+  var lineCount = src.split("\n").length;
+  return '<table class="example"><tr><td><textarea id="ex:' + id + ':source" class="jcCode" rows="' + lineCount + '" spellcheck="false">' + src + '</textarea></td><td valign="top"><pre id="ex:' + id++ + ':result" class="jcResult"></pre></td></tr></table>'
+  // <div class="minibutton ok run" title="Ctrl-Enter">Run</div>
+});
 
-     function compileExample() {
-        var number = this.id.split(":")[1];
-        var result = document.getElementById("ex:" + number + ":result");
-        try {
-          result.innerHTML = compile(this.value);
-        } catch (x) {
-          result.innerHTML = x.message;
-        }
-     }
+function compileExample() {
+  var number = this.id.split(":")[1];
+  var result = document.getElementById("ex:" + number + ":result");
+  try {
+    result.innerHTML = compile(this.value);
+  } catch (x) {
+    result.innerHTML = x.message;
+  }
+}
 
-     var extern = {};
+var extern = {};
 
-     function executeExample() {
-        var number = this.id.split(":")[1];
-        var result = document.getElementById("ex:" + number + ":result");
-        try {
-          resetMemory();
-          result.innerHTML = "";
-          extern.trace = function (x) {
-            result.innerHTML += x;
-          };
-          new Function (compile(this.value))();
-        } catch (x) {
-          result.innerHTML = x.message;
-        }
-     }
+function executeExample() {
+  var number = this.id.split(":")[1];
+  var result = document.getElementById("ex:" + number + ":result");
+  try {
+    resetMemory();
+    result.innerHTML = "";
+    extern.trace = function (x) {
+      result.innerHTML += x;
+    };
+    new Function (compile(this.value))();
+  } catch (x) {
+    result.innerHTML = x.message;
+  }
+}
 
-     $('.jcCode').each(compileExample);
-     $('.jcCode').keyup(function (e) {
-       if (e.which >= 37 && e.which <= 40) {
-         return;
-       }
-       if (e.which == 13 && (e.metaKey || e.ctrlKey) || e.which == 91) {
-         executeExample.call(this);
-       } else {
-         compileExample.call(this);
-       }
-     });
+$('.jcCode').each(compileExample);
+$('.jcCode').keyup(function (e) {
+  if (e.which >= 37 && e.which <= 40) {
+    return;
+  }
+  if (e.which == 13 && (e.metaKey || e.ctrlKey) || e.which == 91) {
+    executeExample.call(this);
+  } else {
+    compileExample.call(this);
+  }
+});
 
 
-     /*
-     $('.jcCode').keyup(function (e) {
-       var lines = this.value.split("\n").length;
-       this.rows = Math.min(lines, 10);
-     });
-     */
+/*
+$('.jcCode').keyup(function (e) {
+var lines = this.value.split("\n").length;
+this.rows = Math.min(lines, 10);
+});
+*/
 
-    </script>
-  </body>
+</script>
+</body>
 </html>

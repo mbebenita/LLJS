@@ -1,7 +1,8 @@
 var Type = (function () {
-  function type(name, size, defaultValue) {
+  function type(name, size, defaultValue, signed) {
     this.name = name;
     this.size = size;
+    this.signed = signed;
     this.defaultValue = defaultValue;
   };
 
@@ -19,11 +20,23 @@ var Type = (function () {
   };
 
   type.prototype.assignableFrom = function (other) {
+    if (this.size !== undefined) {
+      // Widening assignments are cool.
+      if (other.size <= this.size) {
+        return true;
+      }
+      // Narrowing assignments are also cool for now.
+      if (other.size >= this.size) {
+        return true;
+      }
+    }
+
     if (other === types.void) {
       return true;
     }
     return this === other;
   };
+
 
   return type;
 })();
@@ -144,19 +157,21 @@ var FunctionType = (function () {
 })();
 
 var types = {
-  int:  new Type("int",  4, 0),
-  uint: new Type("uint", 4, 0),
+  u8:   new Type("u8",   1, 0, false),
+  i8:   new Type("i8",   1, 0, true),
+  u16:  new Type("u16",  2, 0, false),
+  i16:  new Type("i16",  2, 0, true),
+  u32:  new Type("u32",  4, 0, false),
+  i32:  new Type("i32",  4, 0, true),
 
-  u8:   new Type("u8",   1, 0),
-  i8:   new Type("i8",   1, 0),
-  u16:  new Type("u16",  2, 0),
-  i16:  new Type("i16",  2, 0),
-  u32:  new Type("u32",  4, 0),
-  i32:  new Type("i32",  4, 0),
-
-  void: new Type("void", undefined, 0),
-  dyn:  new Type("dyn",  undefined, 0)
+  num:  new Type("num",  8, 0, undefined),
+  void: new Type("void", undefined, 0, undefined),
+  dyn:  new Type("dyn",  undefined, 0, undefined)
 };
+
+types.int = types.i32;
+types.uint = types.u32;
+types.voidPointer = new PointerType(types.void);
 
 function getType(name) {
   assert (name in types, "Type \"" + name + "\" is not found.");
@@ -165,11 +180,12 @@ function getType(name) {
 }
 
 var Scope = (function () {
-  function scope(parent, name) {
+  function scope(parent, name, global) {
     this.name = name;
     this.parent = parent;
     this.types = {};
     this.variables = {};
+    this.global = global;
     this.options = parent ? Object.create(parent.options) : {};
   }
 
@@ -188,7 +204,9 @@ var Scope = (function () {
 
   scope.prototype.addVariable = function addVariable(variable) {
     assert (variable);
+    assert (!variable.scope);
     print("Adding variable " + variable + " to scope " + this + ".");
+    variable.scope = this;
     this.variables[variable.name] = variable;
   };
 
@@ -222,7 +240,7 @@ var Scope = (function () {
       }
     }
     this.frameSize = offset;
-    print(JSON.stringify(this.variables));
+    // print(JSON.stringify(this.variables));
   };
 
   return scope;
@@ -317,6 +335,10 @@ var Variable = (function () {
     return this.name;
   };
   variable.prototype.frameOffset = function () {
+    assert (this.scope);
+    if (this.scope.global) {
+      return "$BP + " + this.offset;
+    }
     return "$SP + " + this.offset;
   };
   return variable;
@@ -330,7 +352,7 @@ function Program (elements) {
 function createFrame(writer, scope) {
   if (scope.frameSize) {
     // writer.writeLn("tracer.enter(" + quote(scope.name + " {") + ")");
-    writer.writeLn("$SP -= " + scope.frameSize + ";");
+    writer.writeLn((scope.global ? "$BP = " : "") + "$SP -= " + scope.frameSize + ";");
     for (var key in scope.variables) {
       var variable = scope.variables[key];
       if (variable.isParameter && variable.isStackAllocated) {
@@ -365,10 +387,12 @@ function computeDeclarations(elements, scope) {
 
 Program.prototype = {
   computeType: function (types) {
-    var scope = this.scope = new Scope(null, "Program");
+    var scope = this.scope = new Scope(null, "Program", true);
     scope.types = clone(types);
     scope.addVariable(new Variable("extern", types.dyn));
-    scope.addVariable(new Variable("$HP", types.int));
+    scope.addVariable(new Variable("$HP", types.i32));
+    scope.addVariable(new Variable("$SP", types.i32));
+    scope.addVariable(new Variable("$HEAP_SIZE", types.i32));
     computeDeclarations(this.elements, scope);
     walkComputeTypes(this.elements, scope);
     scope.close();
@@ -398,47 +422,15 @@ VariableStatement.prototype = {
   },
 
   generateCode: function (writer, scope) {
-    assert (scope);
-    var add;
-    var str = "";
-    if (this.inForStatement) {
-      var first = true;
-      add = function (name, value) {
-        name = name || "_";
-        if (first) {
-          str = "var ";
-        } else {
-          str += ", ";
-        }
-        str += name + " = " + value;
-        first = false;
-      };
-    } else {
-      add = function (name, value) {
-        name = name || "_";
-        writer.writeLn("var " + name + " = " + value + ";");
-      };
-    }
-
-    this.variableDeclarations.forEach(function (x) {
-      if (x.type instanceof StructType) {
-        var type = x.variable.type;
-        var size = type.getSize();
-        if (x.value) {
-          add(null, generateMemoryCopy(x.variable.frameOffset(), x.value.generateCode(null, scope), size));
-        }
-      } else {
-        var value = x.value ? x.value.generateCode(null, scope) : x.variable.type.defaultValue;
-        if (x.variable.isStackAllocated) {
-          add(x.variable.generateCode(),  value);
-        } else {
-          add(x.name, value);
-        }
-      }
+    var assignments = this.variableDeclarations.map(function (x) {
+      var lType = x.variable.type;
+      return generateAssignment(x, scope, x.variable, "=", x.value, lType, x.valueType, true);
     });
 
     if (this.inForStatement) {
-      return str;
+      return "var " + assignments.join(", ");
+    } else {
+      writer.writeLn("var " + assignments.join(", ") + ";");
     }
   }
 };
@@ -454,8 +446,8 @@ VariableDeclaration.prototype = {
     var result = {name: null, type: scope.getType(typeSpecifier)};
     this.declarator.createType(result);
     if (this.value) {
-      var vt = this.value.computeType(scope);
-      checkTypeAssignment(this, result.type, vt);
+      this.valueType = this.value.computeType(scope);
+      checkTypeAssignment(this, result.type, this.valueType);
     }
     delete this.declarator;
     this.name = result.name;
@@ -597,8 +589,9 @@ function Literal (kind, value) {
 Literal.prototype = {
   computeType: function () {
     switch (this.kind) {
-      case "number": return types.int;
-      case "boolean": return types.int;
+      case "number": return types.i32;
+      case "boolean": return types.i32;
+      case "NULL": return types.voidPointer;
       case "null": return types.void;
       case "string": return types.dyn;
       default: return notImplemented();
@@ -610,6 +603,7 @@ Literal.prototype = {
       case "number": return JSON.stringify(this.value);
       case "boolean": return JSON.stringify(this.value);
       case "null": return "null";
+      case "NULL": return "0";
       case "string": return JSON.stringify(this.value);
       default: return notImplemented();
     }
@@ -724,23 +718,25 @@ function BinaryExpression (operator, left, right) {
 
 BinaryExpression.prototype = {
   computeType: function (scope) {
-    var lt = this.left.computeType(scope);
-    var rt =  this.right.computeType(scope);
-    if (lt instanceof PointerType && (this.operator === "+" || this.operator === "-")) {
-      check(this, rt === types.int, "Can't do pointer arithmetic with " + quote(rt) + " types.");
+    this.lType = this.left.computeType(scope);
+    var rType =  this.right.computeType(scope);
+    if (this.lType instanceof PointerType && (this.operator === "+" || this.operator === "-")) {
+      check(this, rType === types.i32 || rType === types.u32, "Can't do pointer arithmetic with " + quote(rType) + " types.");
     }
-    return lt;
+    return this.lType;
   },
   generateCode: function (writer, scope) {
     assert (!writer);
-    if (this.left.type instanceof PointerType && (this.operator === "+" || this.operator === "-")) {
+    if (this.lType instanceof PointerType && (this.operator === "+" || this.operator === "-")) {
       var value;
       if (this.right instanceof Literal) {
-        value = this.right.value * this.left.type.getSize();
+        value = this.right.value;
       } else {
-        value = this.right.generateCode(null, scope) + " << " + log2(this.left.type.getSize());
+        value = this.right.generateCode(null, scope);
       }
-      return paren(this.left.generateCode(null, scope) + " " + this.operator + " " + value);
+      var size = this.lType.type.getSize();
+      value = value + (isPowerOfTwo(size) ? " << " + log2(size) : " * " + size);
+      return paren(this.left.generateCode(null, scope) + " " + this.operator + " " + paren(value));
     }
     return paren(
       this.left.generateCode(null, scope) + " " +
@@ -759,7 +755,7 @@ function UnaryExpression (operator, expression) {
 UnaryExpression.prototype = {
   computeType: function (scope) {
     if (this.operator === "sizeof") {
-      return types.int;
+      return types.i32;
     } else if (this.operator === "&") {
       var type = this.expression.computeType(scope);
       if (this.expression instanceof VariableIdentifier) {
@@ -769,7 +765,7 @@ UnaryExpression.prototype = {
     } else if (this.operator === "*") {
       var type = this.expression.computeType(scope);
       check(this, type instanceof PointerType, "Cannot dereference non pointer type.");
-      return type.type;
+      return this.type = type.type;
     }
     return this.expression.computeType(scope);
   },
@@ -785,12 +781,12 @@ UnaryExpression.prototype = {
         notImplemented();
       }
     } else if (this.operator === "*") {
-      if (this.expression.type.type instanceof StructType) {
+      if (this.type instanceof StructType) {
         return this.expression.generateCode(null, scope);
       }
-      return accessMemory(this.expression.generateCode(null, scope), this.expression.type);
+      return accessMemory(this.expression.generateCode(null, scope), this.type);
     }
-    return this.operator + " " + this.expression.generateCode(null, scope);
+    return this.operator + this.expression.generateCode(null, scope);
   }
 };
 
@@ -807,9 +803,9 @@ CastExpression.prototype = {
   },
   generateCode: function (writer, scope) {
     var value = this.expression.generateCode(null, scope);
-    if (this.type === types.int) {
+    if (this.type === types.i32) {
       return paren(value + " | 0");
-    } else if (this.type === types.uint) {
+    } else if (this.type === types.u32) {
       return paren(value + " >>> 0");
     } else if (this.type instanceof PointerType) {
       return value;
@@ -929,33 +925,93 @@ function generateMemoryZero(dst, size) {
 
 AssignmentExpression.prototype = {
   computeType: function (scope) {
-    var tl = this.leftType = this.left.computeType(scope);
-    var tr = this.right.computeType(scope);
-    return tl;
+    this.lType = this.left.computeType(scope);
+    this.rType = this.right.computeType(scope);
+
+    if (this.lType instanceof PointerType && (this.operator === "+=" || this.operator === "-=")) {
+      check(this, this.rType === types.i32 || this.rType === types.u32, "Can't do pointer arithmetic with " + quote(this.rType) + " types.");
+    }
+
+    return this.lType;
   },
   generateCode: function (writer, scope) {
-    return generateAssignment(this, scope, this.left, this.operator, this.right, this.leftType);
+    return generateAssignment(this, scope, this.left, this.operator, this.right, this.lType, this.rType);
   }
 };
 
-function generateAssignment(scope, node, left, operator, right, type) {
-  var l = left.generateCode(null, scope);
-  var r = right.generateCode(null, scope);
-  if (type instanceof StructType) {
-    check(node, operator === null || operator === "=", "Can't apply operator " + quote(operator) + " to structs.");
-    return generateMemoryCopy(l, r, type.getSize());
+function generateConversion (value, lType, rType) {
+  if (lType === rType) {
+    return value;
   }
-  return paren(l + " " + operator + " " + r);
+  if (lType instanceof PointerType && rType instanceof PointerType) {
+    return value;
+  }
+  if (lType instanceof Type && rType instanceof Type) {
+    if (lType === types.u32) {
+      return "(" + value + " >>> 0)";
+    } else if (lType === types.i32) {
+      return "(" + value + " | 0)";
+    } else if (lType === types.num) {
+      return value;
+    }
+  }
+  if (lType instanceof PointerType) {
+    if (rType === types.u32 || rType === types.i32) {
+      return value;
+    }
+  }
+  if (lType === types.dyn) {
+    return value;
+  }
+  return unexpected("Cannot convert types " + quote(rType) + " to " + quote(lType));
+}
+
+function generateAssignment(node, scope, left, operator, right, lType, rType, inVarStatement) {
+  var l = left.generateCode(null, scope);
+  var r = right ? right.generateCode(null, scope) : null;
+  if (lType instanceof StructType) {
+    check(node, operator === null || operator === "=", "Can't apply operator " + quote(operator) + " to structs.");
+    var value = generateMemoryCopy(l, r, lType.getSize());
+    if (inVarStatement) {
+      value = "_ = " + value;
+    }
+    return value;
+  }
+  var assignment = l + " " + operator + " ";
+  if (lType instanceof PointerType && (operator == "+=" || operator == "-=")) {
+    var size = lType.type.getSize();
+    var multiplier = isPowerOfTwo(size) ? " << " + log2(size) : " * " + size;
+    assignment += paren(generateConversion(r, types.u32, rType) + multiplier);
+  } else {
+    if (right && rType) {
+      assignment += generateConversion(r, lType, rType);
+    } else {
+      assignment += lType.defaultValue;
+    }
+  }
+
+  if (inVarStatement) {
+    if (left instanceof Variable && left.isStackAllocated) {
+      assignment = "_ = " + assignment;
+    }
+    return assignment;
+  }
+  return paren(assignment);
+}
+
+function isPowerOfTwo(x) {
+  return x && ((x & (x - 1)) === 0);
 }
 
 function log2(x) {
+  assert (isPowerOfTwo(x), "Value " + x + " is not a power of two.");
   return Math.log(x) / Math.LN2;
 }
 
 function accessMemory(address, type, offset) {
-  if (type === types.int) {
+  if (type === types.i32) {
     return "I32[" + address + (offset ? " + " + offset : "") + " >> " + log2(type.getSize()) + "]";
-  } else if (type === types.uint || type instanceof PointerType) {
+  } else if (type === types.u32 || type instanceof PointerType) {
     return "U32[" + address + (offset ? " + " + offset : "") + " >> " + log2(type.getSize()) + "]";
   }
   return notImplemented(type);
@@ -1020,7 +1076,7 @@ NewExpression.prototype = {
   },
   generateCode: function (writer, scope) {
     assert (!writer);
-    return "ma(" + this.type.type.getSize() + ")";
+    return "malloc(" + this.type.type.getSize() + ")";
   }
 };
 
