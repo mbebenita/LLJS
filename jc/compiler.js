@@ -1,7 +1,8 @@
 var Type = (function () {
-  function type(name, size, defaultValue) {
+  function type(name, size, defaultValue, signed) {
     this.name = name;
     this.size = size;
+    this.signed = signed;
     this.defaultValue = defaultValue;
   };
 
@@ -14,9 +15,42 @@ var Type = (function () {
   };
 
   type.prototype.getSize = function () {
-    if (this.size) {
-      return this.size;
+    assert (this.size);
+    return this.size;
+  };
+
+  type.prototype.assignableFrom = function (other) {
+    if (this.size !== undefined) {
+      // Widening assignments are cool.
+      if (other.size <= this.size) {
+        return true;
+      }
+      // Narrowing assignments are also cool for now.
+      if (other.size >= this.size) {
+        return true;
+      }
     }
+
+    if (other === types.void) {
+      return true;
+    }
+    return this === other;
+  };
+
+
+  return type;
+})();
+
+var StructType = (function () {
+  function structType(name) {
+    this.name = name;
+    this.fields = [];
+    this.offset = 0;
+  }
+
+  structType.prototype = Object.create(Type.prototype);
+
+  structType.prototype.getSize = function () {
     assert (this.fields);
     var size = 0;
     this.fields.forEach(function (field) {
@@ -26,23 +60,12 @@ var Type = (function () {
     return size;
   };
 
-  type.prototype.assignableFrom = function (other) {
-    if (other === types.void) {
-      return true;
-    }
-    return this === other;
-  };
-
-  type.prototype.addField = function addField(name, type) {
-    if (!this.fields) {
-      this.fields = [];
-      this.offset = 0;
-    }
+  structType.prototype.addField = function addField(name, type) {
     this.fields.push({name: name, type: type, offset: this.offset});
     this.offset += type.getSize();
   };
 
-  type.prototype.getField = function getField(name) {
+  structType.prototype.getField = function getField(name) {
     var fields = this.fields;
     for (var i = 0; i < fields.length; i++) {
       if (fields[i].name === name) {
@@ -52,7 +75,7 @@ var Type = (function () {
     return null;
   };
 
-  return type;
+  return structType;
 })();
 
 var PointerType = (function () {
@@ -73,6 +96,9 @@ var PointerType = (function () {
     }
     return str;
   }
+
+  pointerType.prototype.defaultValue = 0;
+
   pointerType.prototype.toString = function () {
     if (this.name) {
       return this.name;
@@ -91,6 +117,12 @@ var PointerType = (function () {
   };
   pointerType.prototype.assignableFrom = function (other) {
     if (other === types.void) {
+      return true;
+    }
+    if (other === types.null) {
+      return true;
+    }
+    if (this.base === types.void && other instanceof PointerType) {
       return true;
     }
     return other instanceof PointerType && this.base.assignableFrom(other.base) && this.pointers === other.pointers;
@@ -113,6 +145,9 @@ var FunctionType = (function () {
     if (other === types.void) {
       return true;
     }
+    if (other === types.null) {
+      return true;
+    }
     return other instanceof FunctionType;
   };
   functionType.prototype.getSize = function () {
@@ -122,19 +157,21 @@ var FunctionType = (function () {
 })();
 
 var types = {
-  int:  new Type("int",  4, 0),
-  uint: new Type("uint", 4, 0),
+  u8:   new Type("u8",   1, 0, false),
+  i8:   new Type("i8",   1, 0, true),
+  u16:  new Type("u16",  2, 0, false),
+  i16:  new Type("i16",  2, 0, true),
+  u32:  new Type("u32",  4, 0, false),
+  i32:  new Type("i32",  4, 0, true),
 
-  u8:   new Type("u8",   1, 0),
-  i8:   new Type("i8",   1, 0),
-  u16:  new Type("u16",  2, 0),
-  i16:  new Type("i16",  2, 0),
-  u32:  new Type("u32",  4, 0),
-  i32:  new Type("i32",  4, 0),
-
-  void: new Type("void", undefined, 0),
-  dyn:  new Type("dyn",  undefined, 0)
+  num:  new Type("num",  8, 0, undefined),
+  void: new Type("void", undefined, 0, undefined),
+  dyn:  new Type("dyn",  undefined, 0, undefined)
 };
+
+types.int = types.i32;
+types.uint = types.u32;
+types.voidPointer = new PointerType(types.void);
 
 function getType(name) {
   assert (name in types, "Type \"" + name + "\" is not found.");
@@ -143,47 +180,92 @@ function getType(name) {
 }
 
 var Scope = (function () {
-  function scope(parent, name) {
+  function scope(parent, name, global) {
     this.name = name;
     this.parent = parent;
-    this.symbols = {};
-    this.symbolList = [];
-    // Useful for 
+    this.types = {};
+    this.variables = {};
+    this.global = global;
     this.options = parent ? Object.create(parent.options) : {};
   }
 
-  scope.prototype.get = function get(name, strict) {
-    var symbol = this.symbols[name];
-    if (symbol) {
-      return symbol;
-    } else if (this.parent) {
-      return this.parent.get(name, strict);
+  scope.prototype.getVariable = function getVariable(name, strict, local) {
+    var variable = this.variables[name];
+    if (variable) {
+      return variable;
+    } else if (!local && this.parent) {
+      return this.parent.getVariable(name, strict);
     }
     if (strict) {
-      return unexpected ("Undefined symbol " + name);
+      return unexpected ("Undefined variable " + name);
     }
     return null;
   };
 
-  scope.prototype.add = function add(name, symbol) {
-    assert (name);
-    print("Adding name: " + name + ", symbol: " + symbol + " to scope " + this + ".");
-    this.symbols[name] = symbol;
-    this.symbolList.push({name: name, symbol: symbol});
+  scope.prototype.addVariable = function addVariable(variable) {
+    assert (variable);
+    assert (!variable.scope);
+    print("Adding variable " + variable + " to scope " + this + ".");
+    variable.scope = this;
+    this.variables[variable.name] = variable;
+  };
+
+  scope.prototype.getType = function getType(name) {
+    var type = this.types[name];
+    if (type) {
+      return type;
+    } else if (this.parent) {
+      return this.parent.getType(name);
+    }
+    return unexpected ("Undefined type " + name);
+  };
+
+  scope.prototype.addType = function addType(type) {
+    assert (type);
+    print("Adding type " + type + " to scope " + this + ".");
+    this.types[type.name] = type;
   };
 
   scope.prototype.toString = function toString() {
     return this.name;
   };
 
+  scope.prototype.close = function close() {
+    var offset = 0;
+    for (var key in this.variables) {
+      var x = this.variables[key];
+      if (x.isStackAllocated || x.type instanceof StructType) {
+        x.offset = offset;
+        offset += x.type.getSize();
+      }
+    }
+    this.frameSize = offset;
+    // print(JSON.stringify(this.variables));
+  };
+
   return scope;
 })();
 
 
-function walkComputeTypes(nodes, o) {
+var Frame = (function () {
+  function frame() {
+    this.variables = [];
+    this.size = 0;
+  }
+  frame.prototype.add = function add (variable) {
+    assert (variable instanceof Variable);
+    this.variables.push(variable);
+    variable.offset = this.size;
+    this.size += variable.type.getSize();
+  };
+  return frame;
+})();
+
+
+function walkComputeTypes(nodes, scope, a) {
   return nodes.map(function (x) {
     assert ("computeType" in x, "Node: " + x.tag + " doesn't have a computeType function.");
-    return x.computeType(o);
+    return x.computeType(scope, a);
   });
 }
 
@@ -222,6 +304,7 @@ function reportError(node, message) {
 }
 
 function checkTypeAssignment(node, a, b, message) {
+  assert (a && b);
   if (!a.assignableFrom(b)) {
     reportError(node, "Unassignable types " + a + " <= " + b + (message ? " " + message : ""));
   }
@@ -234,15 +317,29 @@ function check(node, condition, message) {
 }
 
 var Variable = (function () {
-  function variable(name, type, address, isLocal) {
+  function variable(name, type, offset) {
     assert (name && type);
     this.name = name;
     this.type = type;
-    this.address = address;
-    this.isLocal = isLocal;
+    this.offset = offset;
   }
   variable.prototype.toString = function () {
     return "variable " + this.name;
+  };
+  variable.prototype.generateCode = function () {
+    if (this.type instanceof StructType) {
+      return this.frameOffset();
+    } else if (this.isStackAllocated) {
+      return accessMemory(this.frameOffset(), this.type);
+    }
+    return this.name;
+  };
+  variable.prototype.frameOffset = function () {
+    assert (this.scope);
+    if (this.scope.global) {
+      return "$BP + " + this.offset;
+    }
+    return "$SP + " + this.offset;
   };
   return variable;
 })();
@@ -252,26 +349,65 @@ function Program (elements) {
   this.elements = elements;
 }
 
-Program.prototype = {
-  computeType: function () {
-    for (var i = 0; i < this.elements.length; i++) {
-      var node = this.elements[i];
-      if (node instanceof StructDeclaration) {
-        assert (!(node.name in types), "Type " + node.name + " is already defined.");
-        types[node.name] = new Type(node.name);
+function createFrame(writer, scope) {
+  if (scope.frameSize) {
+    // writer.writeLn("tracer.enter(" + quote(scope.name + " {") + ")");
+    writer.writeLn((scope.global ? "$BP = " : "") + "$SP -= " + scope.frameSize + ";");
+    for (var key in scope.variables) {
+      var variable = scope.variables[key];
+      if (variable.isParameter && variable.isStackAllocated) {
+        if (variable.type instanceof StructType) {
+          writer.writeLn(generateMemoryCopy(variable.generateCode(null, scope), variable.name, variable.type.getSize()) + ";");
+        } else {
+          writer.writeLn(variable.generateCode(null, scope) + " = " + variable.name + ";");
+        }
       }
     }
-    walkComputeTypes(this.elements, new Scope(null, "Program"));
-  },
-  generateCode: function (writer) {
-    walkGenerateCode(this.elements, writer, new Scope(null, "Program"));
   }
 };
 
-function VariableStatement (typeSpecifier, variableDeclarations) {
+function destroyFrame(writer, scope) {
+  if (scope.frameSize) {
+    writer.writeLn("$SP += " + scope.frameSize + ";");
+    // writer.writeLn("tracer.leave(\"}\");");
+  }
+};
+
+function computeDeclarations(elements, scope) {
+  for (var i = 0; i < elements.length; i++) {
+    var node = elements[i];
+    if (node instanceof StructDeclaration) {
+      assert (!(node.name in types), "Type " + node.name + " is already defined.");
+      scope.addType(new StructType(node.name));
+    } else if (node instanceof FunctionDeclaration) {
+      scope.addVariable(new Variable(node.name, node.computeTypeAndDeclarations(scope)));
+    }
+  }
+}
+
+Program.prototype = {
+  computeType: function (types) {
+    var scope = this.scope = new Scope(null, "Program", true);
+    scope.types = clone(types);
+    scope.addVariable(new Variable("extern", types.dyn));
+    scope.addVariable(new Variable("$HP", types.i32));
+    scope.addVariable(new Variable("$SP", types.i32));
+    scope.addVariable(new Variable("$HEAP_SIZE", types.i32));
+    computeDeclarations(this.elements, scope);
+    walkComputeTypes(this.elements, scope);
+    scope.close();
+  },
+  generateCode: function (writer) {
+    createFrame(writer, this.scope);
+    walkGenerateCode(this.elements, writer, this.scope);
+  }
+};
+
+function VariableStatement (typeSpecifier, variableDeclarations, inForStatement) {
   this.tag = "VariableStatement";
   this.typeSpecifier = typeSpecifier;
   this.variableDeclarations = variableDeclarations;
+  this.inForStatement = inForStatement;
 }
 
 VariableStatement.prototype = {
@@ -279,23 +415,23 @@ VariableStatement.prototype = {
     var typeSpecifier = this.typeSpecifier;
     this.variableDeclarations.forEach(function (x) {
       x.computeType(typeSpecifier, scope);
-      scope.add(x.name, x.type);
+      check(x, !scope.getVariable(x.name, false, true), "Variable " + quote(x.name) + " is already declared.");
+      scope.addVariable(x.variable = new Variable(x.name, x.type));
     });
     delete this.typeSpecifier;
   },
-  generateCode: function (writer, scope) {
-    assert (scope);
-    var str = "var " +
-      this.variableDeclarations.map(function (x) {
-        scope.add(x.name, new Variable(x.name, x.type, 0));
-        return x.name + " = " + x.value.generateCode(null, scope);
-      }).join(", ");
 
-    if (this.inForInitializer) {
-      return str;
+  generateCode: function (writer, scope) {
+    var assignments = this.variableDeclarations.map(function (x) {
+      var lType = x.variable.type;
+      return generateAssignment(x, scope, x.variable, "=", x.value, lType, x.valueType, true);
+    });
+
+    if (this.inForStatement) {
+      return "var " + assignments.join(", ");
+    } else {
+      writer.writeLn("var " + assignments.join(", ") + ";");
     }
-    writer.writeLn(str + ";");
-    return null;
   }
 };
 
@@ -307,10 +443,11 @@ function VariableDeclaration (declarator, value) {
 
 VariableDeclaration.prototype = {
   computeType: function (typeSpecifier, scope) {
-    var result = {name: null, type: getType(typeSpecifier)};
+    var result = {name: null, type: scope.getType(typeSpecifier)};
     this.declarator.createType(result);
     if (this.value) {
-      this.value.computeType(scope);
+      this.valueType = this.value.computeType(scope);
+      checkTypeAssignment(this, result.type, this.valueType);
     }
     delete this.declarator;
     this.name = result.name;
@@ -369,7 +506,7 @@ FunctionDeclarator.prototype = {
     return new FunctionType(returnType, walkCreateTypes(this.parameters));
   },
   generateCode: function (writer, scope) {
-  
+
   }
 };
 
@@ -380,11 +517,12 @@ function ParameterDeclaration (typeSpecifier, declarator) {
 }
 
 ParameterDeclaration.prototype = {
-  createType: function () {
-    return this.createParameter().type;
+  createType: function (scope) {
+    return this.createParameter(scope).type;
   },
-  createParameter: function () {
-    var result = {name: null, type: getType(this.typeSpecifier)};
+  createParameter: function (scope) {
+    assert (scope);
+    var result = {name: null, type: scope.getType(this.typeSpecifier)};
     if (this.declarator) {
       this.declarator.createType(result);
     }
@@ -400,9 +538,10 @@ function StructDeclaration (name, fields) {
 }
 
 StructDeclaration.prototype = {
-  computeType: function () {
-    this.type = getType(this.name);
-    walkComputeTypes(this.fields, this.type);
+  computeType: function (scope) {
+    this.type = scope.getType(this.name);
+    check(this, this.fields, "Struct " + quote(this.name) + " must have at least one field declaration.");
+    walkComputeTypes(this.fields, scope, this.type);
   },
   generateCode: function (writer, scope) {}
 };
@@ -414,8 +553,8 @@ function FieldDeclaration (typeSpecifier, declarator) {
 }
 
 FieldDeclaration.prototype = {
-  computeType: function (type) {
-    var result = {name: null, type: getType(this.typeSpecifier)};
+  computeType: function (scope, type) {
+    var result = {name: null, type: scope.getType(this.typeSpecifier)};
     this.declarator.createType(result);
     type.addField(result.name, result.type);
   }
@@ -428,12 +567,16 @@ function TypeName (typeSpecifier, declarator) {
 }
 
 TypeName.prototype = {
-  createType: function () {
-    var result = {name: null, type: getType(this.typeSpecifier)};
+  createType: function (scope) {
+    assert (scope);
+    var result = {name: null, type: scope.getType(this.typeSpecifier)};
     if (this.declarator) {
       this.declarator.createType(result);
     }
     return result.type;
+  },
+  computeType: function (scope) {
+    return this.createType(scope);
   }
 };
 
@@ -446,18 +589,24 @@ function Literal (kind, value) {
 Literal.prototype = {
   computeType: function () {
     switch (this.kind) {
-      case "number": return types.int;
-      case "boolean": return types.int;
-      case "null": return types.int;
+      case "number": return types.i32;
+      case "boolean": return types.i32;
+      case "NULL": return types.voidPointer;
+      case "null": return types.void;
+      case "string": return types.dyn;
       default: return notImplemented();
     }
   },
   generateCode: function (writer, scope) {
     assert(!writer);
-    if (this.kind === "null") {
-      return "0";
+     switch (this.kind) {
+      case "number": return JSON.stringify(this.value);
+      case "boolean": return JSON.stringify(this.value);
+      case "null": return "null";
+      case "NULL": return "0";
+      case "string": return JSON.stringify(this.value);
+      default: return notImplemented();
     }
-    return String(this.value);
   }
 };
 
@@ -470,45 +619,48 @@ function FunctionDeclaration (name, returnType, parameters, elements) {
 }
 
 FunctionDeclaration.prototype = {
-  computeType: function (scope) {
+  computeTypeAndDeclarations: function (scope) {
     this.parameters = this.parameters.map(function (x) {
-      return x.createParameter();
+      return x.createParameter(scope);
     });
+
     var parameterTypes = this.parameters.map(function (x) {
       return x.type;
     });
-    this.returnType = this.returnType.createType();
-    this.type = new FunctionType(this.returnType, parameterTypes);
 
-    scope = new Scope(scope, "type function " + this.name);
-    scope.options.returnType = this.type.returnType;
+    this.returnType = this.returnType.createType(scope);
+    this.type = new FunctionType(this.returnType, parameterTypes);
+    computeDeclarations(this.elements, scope);
+    return this.type;
+  },
+  computeType: function (scope, signatureOnly) {
+    this.scope = scope = new Scope(scope, "Function " + this.name);
+    scope.options.enclosingFunction = this;
     this.parameters.forEach(function (x) {
-      scope.add(x.name, x.type);
+      var variable = new Variable(x.name, x.type);
+      variable.isParameter = true;
+      scope.addVariable(variable);
     });
 
     walkComputeTypes(this.elements, scope);
+
+    scope.close();
+
+    if (this.type.returnType !== types.void) {
+      check(this, this.hasReturn, "Function must return a value of type " + quote(this.type.returnType) + ".");
+    }
+    return this.type;
   },
-  generateCode: function (writer, scope) {
-    scope = new Scope(scope, "code gen function " + this.name);
+  generateCode: function (writer) {
+    var scope = this.scope;
+    scope.options.frame = new Frame();
     writer.enter("function " + this.name + "(" +
       this.parameters.map(function (x) {
-        scope.add(x.name, new Variable(x.name, x.type, 0));
         return x.name;
       }).join(", ") + ") {");
+    createFrame(writer, scope);
     walkGenerateCode(this.elements, writer, scope);
     writer.leave("}");
-/*
-    o.scope.add(this.name, this.type);
-    o = {scope: new Scope(o.scope, "function scope for " + this.name)};
-    walk(this.parameters, match, o);
-    writer.enter("function " + this.name + "(" +
-                 this.parameters.map(function (x) {
-                   o.scope.add(x.name, new Variable(x.name, x.type, 0));
-                   return x.name;
-                 }).join(", ") + ") {");
-    walk(this.elements, match, o);
-    writer.leave("}");
-*/
   }
 };
 
@@ -520,10 +672,18 @@ function ReturnStatement (value) {
 ReturnStatement.prototype = {
   computeType: function (scope) {
     var type = this.value.computeType(scope);
-    checkTypeAssignment(this, scope.options.returnType, type);
+    checkTypeAssignment(this, scope.options.enclosingFunction.type.returnType, type);
+    scope.options.enclosingFunction.hasReturn = true;
   },
   generateCode: function (writer, scope) {
-    writer.writeLn("return" + (this.value ? " " + this.value.generateCode(null, scope) : "") + ";");
+    var value = (this.value ? " " + this.value.generateCode(null, scope) : "");
+    if  (scope.frameSize) {
+      writer.writeLn("var $T =" + value + ";");
+      destroyFrame(writer, scope);
+      writer.writeLn("return $T;");
+    } else {
+      writer.writeLn("return" + value + ";");
+    }
   }
 };
 
@@ -558,17 +718,164 @@ function BinaryExpression (operator, left, right) {
 
 BinaryExpression.prototype = {
   computeType: function (scope) {
-    var lt = this.left.computeType(scope);
-    var rt =  this.right.computeType(scope);
-    return lt;
+    this.lType = this.left.computeType(scope);
+    var rType =  this.right.computeType(scope);
+    if (this.lType instanceof PointerType && (this.operator === "+" || this.operator === "-")) {
+      check(this, rType === types.i32 || rType === types.u32, "Can't do pointer arithmetic with " + quote(rType) + " types.");
+    }
+    return this.lType;
   },
   generateCode: function (writer, scope) {
     assert (!writer);
-    return "(" +
+    if (this.lType instanceof PointerType && (this.operator === "+" || this.operator === "-")) {
+      var value;
+      if (this.right instanceof Literal) {
+        value = this.right.value;
+      } else {
+        value = this.right.generateCode(null, scope);
+      }
+      var size = this.lType.type.getSize();
+      value = value + (isPowerOfTwo(size) ? " << " + log2(size) : " * " + size);
+      return paren(this.left.generateCode(null, scope) + " " + this.operator + " " + paren(value));
+    }
+    return paren(
       this.left.generateCode(null, scope) + " " +
       this.operator + " " +
-      this.right.generateCode(null, scope) +
-    ")";
+      this.right.generateCode(null, scope)
+    );
+  }
+};
+
+function UnaryExpression (operator, expression) {
+  this.tag = "UnaryExpression";
+  this.operator = operator;
+  this.expression = expression;
+}
+
+UnaryExpression.prototype = {
+  computeType: function (scope) {
+    if (this.operator === "sizeof") {
+      return types.i32;
+    } else if (this.operator === "&") {
+      var type = this.expression.computeType(scope);
+      if (this.expression instanceof VariableIdentifier) {
+        this.expression.variable.isStackAllocated = true;
+      }
+      return this.type = new PointerType(type);
+    } else if (this.operator === "*") {
+      var type = this.expression.computeType(scope);
+      check(this, type instanceof PointerType, "Cannot dereference non pointer type.");
+      return this.type = type.type;
+    }
+    return this.expression.computeType(scope);
+  },
+  generateCode: function (writer, scope) {
+    if (this.expression instanceof TypeName) {
+      return this.expression.computeType(scope).getSize();
+    } else if (this.operator === "&") {
+      if (this.expression instanceof VariableIdentifier) {
+        var variable = this.expression.variable;
+        assert (variable.isStackAllocated);
+        return variable.frameOffset();
+      } else {
+        notImplemented();
+      }
+    } else if (this.operator === "*") {
+      if (this.type instanceof StructType) {
+        return this.expression.generateCode(null, scope);
+      }
+      return accessMemory(this.expression.generateCode(null, scope), this.type);
+    }
+    return this.operator + this.expression.generateCode(null, scope);
+  }
+};
+
+function CastExpression (type, expression) {
+  this.tag = "CastExpression";
+  this.type = type;
+  this.expression = expression;
+}
+
+CastExpression.prototype = {
+  computeType: function (scope) {
+    this.expression.computeType(scope);
+    return this.type = this.type.computeType(scope);
+  },
+  generateCode: function (writer, scope) {
+    var value = this.expression.generateCode(null, scope);
+    if (this.type === types.i32) {
+      return paren(value + " | 0");
+    } else if (this.type === types.u32) {
+      return paren(value + " >>> 0");
+    } else if (this.type instanceof PointerType) {
+      return value;
+    } else {
+      return notImplemented(this.type.name);
+    }
+  }
+};
+
+function PostfixExpression (operator, expression) {
+  this.tag = "PostfixExpression";
+  this.operator = operator;
+  this.expression = expression;
+}
+
+PostfixExpression.prototype = {
+  computeType: function (scope) {
+    check(this, this.operator === "++" || this.operator === "--");
+    this.expression.computeType(scope);
+  },
+  generateCode: function (writer, scope) {
+    if (this.expression.type instanceof PointerType) {
+      var value = this.expression.generateCode(null, scope);
+      var operator = this.operator === "++" ? " += " : " -= ";
+      return "($X = " + value + ", " + value + operator + this.expression.type.getSize() + ", $X)";
+    }
+    return this.expression.generateCode(null, scope) + this.operator;
+  }
+};
+
+
+
+function BreakStatement (label) {
+  this.tag = "CastExpression";
+  this.label = label;
+}
+
+BreakStatement.prototype = {
+  computeType: function (scope) {
+  },
+  generateCode: function (writer, scope) {
+    writer.writeLn("break;");
+  }
+};
+
+function FunctionCall (name, arguments) {
+  this.tag = "FunctionCall";
+  this.name = name;
+  this.arguments = arguments;
+}
+
+FunctionCall.prototype = {
+  computeType: function (scope) {
+    var type = this.name.computeType(scope);
+    var argumentTypes = walkComputeTypes(this.arguments, scope);
+    if (type !== types.dyn) {
+      assert (type instanceof FunctionType);
+      check(this, argumentTypes.length === type.parameterTypes.length, "Argument / parameter mismatch.");
+      for (var i = 0; i < this.arguments.length; i++) {
+        var aType = argumentTypes[i];
+        var pType = type.parameterTypes[i];
+        checkTypeAssignment(this, aType, pType);
+      }
+      return type.returnType;
+    }
+    return type;
+  },
+  generateCode: function (writer, scope) {
+    // TODO: Apply scoping rules.
+    return this.name.generateCode(null, scope) + "(" + walkGenerateCode(this.arguments, null, scope).join(", ") + ")";
   }
 };
 
@@ -579,11 +886,11 @@ function VariableIdentifier (name) {
 
 VariableIdentifier.prototype = {
   computeType: function (scope) {
-    check (this, scope.get(this.name), "variable " + this.name + " is not defined in scope " + scope);
-    return scope.get(this.name, true);
+    this.variable = scope.getVariable(this.name, true);
+    return this.type = this.variable.type;
   },
   generateCode: function (writer, scope) {
-    return scope.get(this.name).name;
+    return this.variable.generateCode();
   }
 };
 
@@ -608,26 +915,103 @@ function AssignmentExpression (operator, left, right) {
   this.right = right;
 }
 
+function generateMemoryCopy(dst, src, size) {
+  return "mc(" + dst + ", " + src + ", " + size + ")";
+}
+
+function generateMemoryZero(dst, size) {
+  return "mz(" + dst + ", " + size + ")";
+}
+
 AssignmentExpression.prototype = {
   computeType: function (scope) {
-    var tl = this.left.computeType(scope);
-    var tr = this.right.computeType(scope);
-    return tl;
+    this.lType = this.left.computeType(scope);
+    this.rType = this.right.computeType(scope);
+
+    if (this.lType instanceof PointerType && (this.operator === "+=" || this.operator === "-=")) {
+      check(this, this.rType === types.i32 || this.rType === types.u32, "Can't do pointer arithmetic with " + quote(this.rType) + " types.");
+    }
+
+    return this.lType;
   },
   generateCode: function (writer, scope) {
-    return this.left.generateCode(null, scope) + " = " + this.right.generateCode(null, scope);
+    return generateAssignment(this, scope, this.left, this.operator, this.right, this.lType, this.rType);
   }
 };
 
+function generateConversion (value, lType, rType) {
+  if (lType === rType) {
+    return value;
+  }
+  if (lType instanceof PointerType && rType instanceof PointerType) {
+    return value;
+  }
+  if (lType instanceof Type && rType instanceof Type) {
+    if (lType === types.u32) {
+      return "(" + value + " >>> 0)";
+    } else if (lType === types.i32) {
+      return "(" + value + " | 0)";
+    } else if (lType === types.num) {
+      return value;
+    }
+  }
+  if (lType instanceof PointerType) {
+    if (rType === types.u32 || rType === types.i32) {
+      return value;
+    }
+  }
+  if (lType === types.dyn) {
+    return value;
+  }
+  return unexpected("Cannot convert types " + quote(rType) + " to " + quote(lType));
+}
+
+function generateAssignment(node, scope, left, operator, right, lType, rType, inVarStatement) {
+  var l = left.generateCode(null, scope);
+  var r = right ? right.generateCode(null, scope) : null;
+  if (lType instanceof StructType) {
+    check(node, operator === null || operator === "=", "Can't apply operator " + quote(operator) + " to structs.");
+    var value = generateMemoryCopy(l, r, lType.getSize());
+    if (inVarStatement) {
+      value = "_ = " + value;
+    }
+    return value;
+  }
+  var assignment = l + " " + operator + " ";
+  if (lType instanceof PointerType && (operator == "+=" || operator == "-=")) {
+    var size = lType.type.getSize();
+    var multiplier = isPowerOfTwo(size) ? " << " + log2(size) : " * " + size;
+    assignment += paren(generateConversion(r, types.u32, rType) + multiplier);
+  } else {
+    if (right && rType) {
+      assignment += generateConversion(r, lType, rType);
+    } else {
+      assignment += lType.defaultValue;
+    }
+  }
+
+  if (inVarStatement) {
+    if (left instanceof Variable && left.isStackAllocated) {
+      assignment = "_ = " + assignment;
+    }
+    return assignment;
+  }
+  return paren(assignment);
+}
+
+function isPowerOfTwo(x) {
+  return x && ((x & (x - 1)) === 0);
+}
 
 function log2(x) {
+  assert (isPowerOfTwo(x), "Value " + x + " is not a power of two.");
   return Math.log(x) / Math.LN2;
 }
 
 function accessMemory(address, type, offset) {
-  if (type === types.int) {
+  if (type === types.i32) {
     return "I32[" + address + (offset ? " + " + offset : "") + " >> " + log2(type.getSize()) + "]";
-  } else if (type === types.uint || type instanceof PointerType) {
+  } else if (type === types.u32 || type instanceof PointerType) {
     return "U32[" + address + (offset ? " + " + offset : "") + " >> " + log2(type.getSize()) + "]";
   }
   return notImplemented(type);
@@ -645,7 +1029,7 @@ PropertyAccess.prototype = {
     if (this.accessor.tag === "expression") {
       this.accessor.expression.computeType(scope);
       if (type instanceof PointerType) {
-        return type.type;
+        return this.type = type.type;
       }
       assert (false);
     } else if (this.accessor.tag === "arrow") {
@@ -655,15 +1039,25 @@ PropertyAccess.prototype = {
     } else {
       check(this, !(type instanceof PointerType), "Cannot use . operator on pointer types.");
     }
-    check(this, type.fields, "Property access on non structs is not possible.");
-    var field = type.getField(this.accessor.name);
-    check(this, field, "Field \"" + this.accessor.name + "\" does not exist in type " + type + ".");
-    this.field = field;
-    return field.type;
+    if (type instanceof StructType) {
+      check(this, type instanceof StructType, "Property access on non structs is not possible.");
+      var field = type.getField(this.accessor.name);
+      check(this, field, "Field \"" + this.accessor.name + "\" does not exist in type " + type + ".");
+      this.field = field;
+      return this.type = field.type;
+    } else {
+      return this.type = types.dyn;
+    }
   },
   generateCode: function (writer, scope) {
     if (this.accessor.tag === "arrow") {
       return accessMemory(this.base.generateCode(null, scope), this.field.type, this.field.offset);
+    } else if (this.accessor.tag === "dot") {
+      if (this.base.type === types.dyn) {
+        return this.base.generateCode(null, scope) + "." + this.accessor.name;
+      } else {
+        return accessMemory(this.base.generateCode(null, scope), this.field.type, this.field.offset);
+      }
     }
     throw notImplemented();
   }
@@ -677,38 +1071,131 @@ function NewExpression (constructor, arguments) {
 
 NewExpression.prototype = {
   computeType: function (scope) {
-    var ct = getType(this.constructor.name);
+    var ct = scope.getType(this.constructor.name);
     return this.type = new PointerType(ct);
   },
   generateCode: function (writer, scope) {
     assert (!writer);
-    return "malloc (" + this.type.type.getSize() + ")";
+    return "malloc(" + this.type.type.getSize() + ")";
   }
 };
 
+function Block (statements) {
+  this.tag = "Block";
+  this.statements = statements;
+}
+
+Block.prototype = {
+  computeType: function (scope) {
+    walkComputeTypes(this.statements, scope);
+  },
+  generateCode: function (writer, scope) {
+    walkGenerateCode(this.statements, writer, scope);
+  }
+};
+
+function WhileStatement (condition, statement, isDoWhile) {
+  this.tag = "WhileStatement";
+  this.condition = condition;
+  this.statement = statement;
+  this.isDoWhile = isDoWhile;
+}
+
+WhileStatement.prototype = {
+  computeType: function (scope) {
+    this.condition.computeType(scope);
+    this.statement.computeType(scope);
+  },
+  generateCode: function (writer, scope) {
+    if (this.isDoWhile) {
+      writer.enter("do {");
+    } else {
+      writer.enter("while (" + this.condition.generateCode(null, scope) + ") {");
+    }
+    this.statement.generateCode(writer, scope);
+    if (this.isDoWhile) {
+      writer.leave("} while (" + this.condition.generateCode(null, scope) + ")");
+    } else {
+      writer.leave("}");
+    }
+  }
+};
+
+function IfStatement (condition, ifStatement, elseStatement) {
+  this.tag = "IfStatement";
+  this.condition = condition;
+  this.ifStatement = ifStatement;
+  this.elseStatement = elseStatement;
+}
+
+IfStatement.prototype = {
+  computeType: function (scope) {
+    this.condition.computeType(scope);
+    this.ifStatement.computeType(scope);
+    if (this.elseStatement) {
+      this.elseStatement.computeType(scope);
+    }
+  },
+  generateCode: function (writer, scope) {
+    writer.enter("if (" + this.condition.generateCode(null, scope) + ") {");
+    this.ifStatement.generateCode(writer, scope);
+    if (this.elseStatement) {
+      if (this.elseStatement instanceof Block) {
+        writer.leaveAndEnter("} else {");
+        this.elseStatement.generateCode(writer, scope);
+      } else if (this.elseStatement instanceof IfStatement) {
+        writer.leaveAndEnter("} else if (" + this.elseStatement.condition.generateCode(null, scope) + ") {");
+        this.elseStatement.ifStatement.generateCode(writer, scope);
+      }
+    }
+    writer.leave("}");
+  }
+};
+
+function ForStatement (initializer, test, counter, statement) {
+  this.tag = "ForStatement";
+  this.initializer = initializer;
+  this.test = test;
+  this.counter = counter;
+  this.statement = statement;
+}
+
+ForStatement.prototype = {
+  computeType: function (scope) {
+    if (this.initializer) {
+      this.initializer.computeType(scope);
+    }
+    if (this.test) {
+      this.test.computeType(scope);
+    }
+    if (this.counter) {
+      this.counter.computeType(scope);
+    }
+    this.statement.computeType(scope);
+  },
+  generateCode: function (writer, scope) {
+    scope = new Scope(scope, "For");
+    var str = "for (";
+    str += (this.initializer ? this.initializer.generateCode(null, scope) : "") + ";";
+    str += (this.test ? this.test.generateCode(null, scope) : "") + ";";
+    str += (this.counter ? this.counter.generateCode(null, scope) : "");
+    str += ") {";
+    writer.enter(str);
+    this.statement.generateCode(writer, scope);
+    writer.leave("}");
+  }
+};
+
+
 function compile(source, generateExports) {
-  types = {
-    int:  new Type("int",  4, 0),
-    uint: new Type("uint", 4, 0),
-
-    u8:   new Type("u8",   1, 0),
-    i8:   new Type("i8",   1, 0),
-    u16:  new Type("u16",  2, 0),
-    i16:  new Type("i16",  2, 0),
-    u32:  new Type("u32",  4, 0),
-    i32:  new Type("i32",  4, 0),
-
-    void: new Type("void", undefined, 0),
-    dyn:  new Type("dyn",  undefined, 0)
-  };
 
   var program = parser.parse(source);
 
   print (JSON.stringify(program, null, 2));
 
-  program.computeType();
+  program.computeType(types);
 
-  print (JSON.stringify(program, null, 2));
+//  print (JSON.stringify(program, null, 2));
 
   var str = "";
   var writer = new IndentingWriter(false, {writeLn: function (x) {
@@ -717,215 +1204,8 @@ function compile(source, generateExports) {
 
   program.generateCode(writer);
 
-  print (str);
   return str;
 
-}
-
-function compile2(source, generateExports) {
-  var program = parser.parse(source);
-
-
-
-  function walk(node, match, options) {
-    assert (node);
-    var nodes = node;
-    if (typeof nodes.length === "undefined") {
-      nodes = [nodes];
-    }
-    var results = [];
-    for (var i = 0; i < nodes.length; i++) {
-      node = nodes[i];
-      if (node.tag in match) {
-        results.push(match[node.tag].call(node, options));
-      }
-    }
-    return results;
-  }
-
-  function walkExpression(node, match, options) {
-    if (node === null) {
-      node = {tag: "Void"};
-    } else if (node === undefined) {
-      node = {tag: "Void"};
-    }
-    assert (node.tag in match, "Tag " + node.tag + " not implemented.");
-    return match[node.tag].call(node, options);
-  }
-
-
-  function createType(node) {
-    assert (node);
-    assert (node.tag === "Type", "Invalid node type : " + node.tag);
-    assert (node.name in types, "Type " + node.name + " is not defined.");
-    var type = types[node.name];
-    var pointers = node.pointers;
-    while(pointers--) {
-      type = new PointerType(type);
-    }
-    return type;
-  }
-
-  print (JSON.stringify(program, null, 2));
-
-  var str = "";
-  var writer = new IndentingWriter(false, {writeLn: function (x) {
-    str += x + "\n";
-  }});
-
-  (function generateCode(program) {
-
-
-    var global = new Scope(null, "global");
-
-
-    var match = {
-      Program: function Program() {
-        walk(this.elements, match, {scope: global});
-      },
-      StructDeclaration: function () {},
-      VariableStatement: function VariableStatement(o) {
-        assert (o.scope);
-        var str = "var " +
-          this.declarations.map(function (x) {
-            o.scope.add(x.name, new Variable(x.name, x.type, 0));
-            return x.name + " = " + walkExpression(x.value, match, o);
-          }).join(", ");
-        if (this.inForInitializer) {
-          return str;
-        }
-        writer.writeLn(str + ";");
-      },
-      VariableDeclaration: function VariableDeclaration(o) {
-        return walkExpression(this.value, match, o);
-      },
-      Void: function Void() {
-        return types.void.defaultValue;
-      },
-      BinaryExpression: function BinaryExpression(o) {
-        var l = walkExpression(this.left, match, o);
-        var r = walkExpression(this.right, match, o);
-        if (this.left.type instanceof PointerType) {
-          r = "(" + r + " * " + this.left.type.type.getSize() + ")";
-        }
-        return "(" + l + " " + this.operator + " " + r + ")";
-      },
-      UnaryExpression: function UnaryExpression(o) {
-        if (this.operator === "*") {
-          return accessMemory(walkExpression(this.expression, match, o), this.expression.type);
-        } else {
-          return this.operator + walkExpression(this.expression, match, o);
-        }
-      },
-      AssignmentExpression: function AssignmentExpression(o) {
-        var l = walkExpression(this.left, match, o);
-        var r = walkExpression(this.right, match, o);
-        return l + " " + this.operator + " " + r;
-      },
-      ExpressionStatement: function ExpressionStatement(o) {
-        writer.writeLn(walkExpression(this.expression, match, o) + ";");
-      },
-      NumericLiteral: function NumericLiteral(o) {
-        return this.value;
-      },
-      Function: function Function(o) {
-        o.scope.add(this.name, this.type);
-        o = {scope: new Scope(o.scope, "function scope for " + this.name)};
-        walk(this.parameters, match, o);
-        writer.enter("function " + this.name + "(" +
-          this.parameters.map(function (x) {
-            o.scope.add(x.name, new Variable(x.name, x.type, 0));
-            return x.name;
-          }).join(", ") + ") {");
-        walk(this.elements, match, o);
-        writer.leave("}");
-      },
-      Parameter: function Parameter(o) {
-        o.scope.add(this.name, new Variable(this.name, this.type, 0));
-      },
-      NewOperator: function () {
-        return "malloc(" + this.type.type.getSize() + ")";
-      },
-      NullLiteral: function NullLiteral() {
-        return types.void.defaultValue;
-      },
-      PropertyAccess: function PropertyAccess(o) {
-        var base = walkExpression(this.base, match, o);
-        if (this.name.dereference) {
-          var field = this.base.type.type.getField(this.name.name);
-          return accessMemory(base, field.type, field.offset);
-        }
-        return notImplemented();
-      },
-      Variable: function Variable(o) {
-        var v = o.scope.get(this.name);
-        assert (v);
-        return v.name;
-      },
-      WhileStatement: function WhileStatement(o) {
-        writer.enter("while (" + walkExpression(this.condition, match, o) + ") {");
-        walk(this.statement, match, o);
-        writer.leave("}");
-      },
-      Block: function Block(o) {
-        o = {scope: new Scope(o.scope, "block scope")};
-        walk(this.statements, match, o);
-      },
-      ReturnStatement: function ReturnStatement(o) {
-        writer.writeLn("return " + walkExpression(this.value, match, o) + ";");
-      },
-      ForStatement: function ForStatement(o) {
-        o = {scope: new Scope(o.scope), isExpression: true};
-        writer.enter("for (" +
-          walkExpression(this.initializer, match, o) + "; " +
-          walkExpression(this.test, match, o) + "; " +
-          walkExpression(this.counter, match, o) + ") {"
-        );
-        walk(this.statement, match, o);
-        writer.leave("}");
-      },
-      IfStatement: function IfStatement(o) {
-        writer.enter("if (" + walkExpression(this.condition, match, o) + ") {");
-        walk(this.ifStatement, match, o);
-        if (this.elseStatement) {
-          if (this.elseStatement.tag === "Block") {
-            writer.leaveAndEnter("} else {");
-            walk(this.elseStatement, match, o);
-          } else if (this.elseStatement.tag === "IfStatement") {
-            writer.leaveAndEnter("} else if (" + walkExpression(this.elseStatement.condition, match, o) + ") {");
-            walk(this.elseStatement.ifStatement, match, o);
-          }
-        }
-        writer.leave("}");
-      },
-      ConditionalExpression: function ConditionalExpression(o) {
-        return "((" + walkExpression(this.condition, match, o) + ") ? " +
-          walkExpression(this.trueExpression, match, o) + " : " +
-          walkExpression(this.falseExpression, match, o) + ")";
-      },
-      PostfixExpression: function PostfixExpression(o) {
-        return walkExpression(this.expression, match, o) + this.operator;
-      },
-      FunctionCall: function FunctionCall(o) {
-        return this.name.name + "(" +
-          this.arguments.map(function (x) {
-            return walkExpression(x, match, o);
-          }).join(", ") + ")";
-      }
-    };
-    walk(program, match);
-
-    if (generateExports) {
-      writer.writeLn("return {" + global.symbolList.filter(function (x) {
-        return x.symbol instanceof FunctionType;
-      }).map(function (x) {
-        return "\"" + x.name + "\": " + x.name;
-      }).join(", ") + "};");
-    }
-
-  })(program);
-
-  return str;
 }
 
 

@@ -79,6 +79,22 @@ function defineNonEnumerableProperty(obj, name, value) {
                                      enumerable: false });
 }
 
+function clone(obj) {
+  var o = {};
+  for (var key in obj) {
+    o[key] = obj[key];
+  }
+  return o;
+}
+
+function quote(s) {
+  return "\"" + s + "\"";
+}
+
+function paren(s) {
+  return "(" + s + ")";
+}
+
 (function () {
   function extendBuiltin(proto, prop, f) {
     if (!proto[prop]) {
