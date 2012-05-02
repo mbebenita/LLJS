@@ -189,15 +189,12 @@ var Scope = (function () {
     this.options = parent ? Object.create(parent.options) : {};
   }
 
-  scope.prototype.getVariable = function getVariable(name, strict, local) {
+  scope.prototype.getVariable = function getVariable(name, local) {
     var variable = this.variables[name];
     if (variable) {
       return variable;
     } else if (!local && this.parent) {
-      return this.parent.getVariable(name, strict);
-    }
-    if (strict) {
-      return unexpected ("Undefined variable " + name);
+      return this.parent.getVariable(name);
     }
     return null;
   };
@@ -415,7 +412,7 @@ VariableStatement.prototype = {
     var typeSpecifier = this.typeSpecifier;
     this.variableDeclarations.forEach(function (x) {
       x.computeType(typeSpecifier, scope);
-      check(x, !scope.getVariable(x.name, false, true), "Variable " + quote(x.name) + " is already declared.");
+      check(x, !scope.getVariable(x.name, true), "Variable " + quote(x.name) + " is already declared.");
       scope.addVariable(x.variable = new Variable(x.name, x.type));
     });
     delete this.typeSpecifier;
@@ -886,7 +883,8 @@ function VariableIdentifier (name) {
 
 VariableIdentifier.prototype = {
   computeType: function (scope) {
-    this.variable = scope.getVariable(this.name, true);
+    this.variable = scope.getVariable(this.name);
+    check(this, this.variable, "Variable " + quote(this.name) + " not found in current scope.");
     return this.type = this.variable.type;
   },
   generateCode: function (writer, scope) {
