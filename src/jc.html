@@ -52,14 +52,14 @@
   var parser;
   new FileReader("jc.peg", "text").readAll(null, function (text) {
     parser = P.buildParser(text, { trackLineAndColumn: true});
-    new FileReader("tests/simple.jc", "text").readAll(null, function (source) {
+    new FileReader("tests/krmalloc.jc", "text").readAll(null, function (source) {
       var com = compile(source);
       document.write("<pre>" + com + "</pre>");
 
-      var o = new Function (com)();
-      document.write("<pre> Result: " + extern.malloc(10) + "</pre>");
-      document.write("<pre> Result: " + extern.malloc(10) + "</pre>");
-      document.write("<pre> Result: " + extern.malloc(10) + "</pre>");
+//      var o = new Function (com)();
+//      document.write("<pre> Result: " + extern.malloc(10) + "</pre>");
+//      document.write("<pre> Result: " + extern.malloc(10) + "</pre>");
+//      document.write("<pre> Result: " + extern.malloc(10) + "</pre>");
 
     });
   });

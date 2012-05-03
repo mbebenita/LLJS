@@ -40,10 +40,16 @@ if (generateParser.value) {
   load("parser.js");
 }
 
-var extern = {trace: function (x) { print(x); }};
+var extern = {
+  trace: function (x) { print(x); },
+  toHex: function (x) {
+    return "0x" + Number(x).toString(16);
+  }
+};
 
 var source = snarf(file, "text");
 
+print ("Compiling");
 var com = compile(source, false);
 print (com);
 
@@ -63,18 +69,17 @@ function time (fn) {
 var mTotal = 0, fTotal = 0;
 
 var sum = 0;
-for (var i = 0; i < 100; i++) {
+for (var i = 0; i < 1000; i++) {
   var ptrs = [];
-
   mTotal += time(function () {
-    for (var j = 0; j < 100000; j++) {
-      ptrs[j] = malloc(4 + 16);
+    for (var j = 0; j < 10000; j++) {
+      ptrs[j] = malloc(4 + j % 20);
     }
   });
 
   fTotal += time(function () {
-    for (var j = 0; j < 100000; j++) {
-      sum += (U32[ptrs[j] - 8 + 4 >> 2]);
+    for (var j = 0; j < 10000; j++) {
+      sum += (U4[ptrs[j] - 8 + 4 >> 2]);
       free(ptrs[j]);
     }
   });

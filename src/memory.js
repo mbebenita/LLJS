@@ -1,29 +1,40 @@
 var M = new ArrayBuffer(1024 * 1024 * 32);
-var U8 = new Uint8Array(M);
-var I8 = new Int16Array(M);
-var U16 = new Uint16Array(M);
-var I16 = new Int16Array(M);
-var U32 = new Uint32Array(M);
-var I32 = new Int32Array(M);
-var F32 = new Float32Array(M);
-var F64 = new Float64Array(M);
+var U1 = new Uint8Array(M);
+var I1 = new Int16Array(M);
+var U2 = new Uint16Array(M);
+var I2 = new Int16Array(M);
+var U4 = new Uint32Array(M);
+var I4 = new Int32Array(M);
+var F4 = new Float32Array(M);
+var F8 = new Float64Array(M);
 
-var $HP = 0;
-var $SP = 0;
-var $HEAP_SIZE = 0;
-var $MAX_STACK_SIZE = 1024 * 1024;
+var $HP;
+var $SP;
+var $HP_END;
+var $MAX_STACK_SIZE = 1024 * 1024 / 4;
 
 function ma(size) {
   return $HP += size;
 }
 
 function resetHeap() {
-  $HP = 8;
-  $HEAP_SIZE = M.byteLength - $MAX_STACK_SIZE;
-  $SP = M.byteLength;
+  $HP = 2;
+  $HP_END = U4.length - $MAX_STACK_SIZE;
+  $SP = U4.length;
+
+  print("$SP = " + $SP);
 }
 
-var mc = function memoryCopy(dst, src, len) {
+var mc = function memoryCopyWords(dst, src, len) {
+  if (src === null) {
+    return;
+  }
+  for (var i = 0; i < len; i++) {
+    U4[dst++] = U4[src++];
+  }
+};
+
+function memoryCopyBytes(dst, src, len) {
   if (src === null) {
     return;
   }
@@ -31,16 +42,16 @@ var mc = function memoryCopy(dst, src, len) {
   if (len & 3 === 0) {
     len >>= 2;
     for (; i < len; i++) {
-      U32[dst++] = U32[src++];
+      U4[dst++] = U4[src++];
     }
   } else if (len & 1 === 0) {
     len >>= 1;
     for (; i < len; i++) {
-      U16[dst++] = U16[src++];
+      U2[dst++] = U2[src++];
     }
   } else {
     for (; i < len; i++) {
-      U8[dst++] = U8[src++];
+      U1[dst++] = U1[src++];
     }
   }
 };

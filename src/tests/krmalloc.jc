@@ -7,16 +7,17 @@ var Header base;
 var Header * freep = NULL;
 
 function void * sbrk(int nBytes) {
-  if ($HP + nBytes > $HEAP_SIZE) {
+  var int nWords = nBytes / sizeof (u32);
+  if ($HP + nWords > $HP_END) {
     extern.assert("Out of memory.");
     return NULL;
   }
-  var int p = $HP;
-  $HP += nBytes;
-  return (void *)p;
+  var void * address = $HP;
+  $HP += nWords;
+  return address;
 }
 
-var int nUnitsMin = 1024 * 1024;
+var uint nUnitsMin = 1024 * 256;
 
 function Header * morecore(uint nUnits) {
   if (nUnits < nUnitsMin) {

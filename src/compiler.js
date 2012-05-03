@@ -81,6 +81,7 @@ var StructType = (function () {
 var PointerType = (function () {
   function pointerType(type) {
     this.type = type;
+    this.size = 4;
     if (type instanceof pointerType) {
       this.base = type.base;
       this.pointers = type.pointers + 1;
@@ -163,14 +164,21 @@ var types = {
   i16:  new Type("i16",  2, 0, true),
   u32:  new Type("u32",  4, 0, false),
   i32:  new Type("i32",  4, 0, true),
+  f32:  new Type("f32",  4, 0, undefined),
+  f64:  new Type("f64",  8, 0, undefined),
 
   num:  new Type("num",  8, 0, undefined),
-  void: new Type("void", undefined, 0, undefined),
+  void: new Type("void", 1, 0, undefined),
   dyn:  new Type("dyn",  undefined, 0, undefined)
 };
 
 types.int = types.i32;
+types.word = types.u32;
 types.uint = types.u32;
+types.float = types.f32;
+types.double = types.f64;
+types.u8Pointer = new PointerType(types.u8);
+types.i32Pointer = new PointerType(types.i32);
 types.voidPointer = new PointerType(types.void);
 
 function getType(name) {
@@ -228,16 +236,15 @@ var Scope = (function () {
   };
 
   scope.prototype.close = function close() {
-    var offset = 0;
+    var wordOffset = 0;
     for (var key in this.variables) {
       var x = this.variables[key];
       if (x.isStackAllocated || x.type instanceof StructType) {
-        x.offset = offset;
-        offset += x.type.getSize();
+        x.wordOffset = wordOffset;
+        wordOffset += wordAlignment(x.type.getSize()) / 4;
       }
     }
-    this.frameSize = offset;
-    // print(JSON.stringify(this.variables));
+    this.frameSizeInWords = wordOffset;
   };
 
   return scope;
@@ -314,11 +321,10 @@ function check(node, condition, message) {
 }
 
 var Variable = (function () {
-  function variable(name, type, offset) {
+  function variable(name, type) {
     assert (name && type);
     this.name = name;
     this.type = type;
-    this.offset = offset;
   }
   variable.prototype.toString = function () {
     return "variable " + this.name;
@@ -327,16 +333,32 @@ var Variable = (function () {
     if (this.type instanceof StructType) {
       return this.frameOffset();
     } else if (this.isStackAllocated) {
-      return accessMemory(this.frameOffset(), this.type);
+      return generateMemoryAccess(null, this.getPointer(), this.type);
     }
     return this.name;
   };
   variable.prototype.frameOffset = function () {
     assert (this.scope);
-    if (this.scope.global) {
-      return "$BP + " + this.offset;
+    var address = this.scope.global ? "$BP" : "$SP";
+    if (this.wordOffset) {
+      address += " + " + this.wordOffset;
     }
-    return "$SP + " + this.offset;
+    var shift = 2 - log2(min(this.type.size, 4));
+    if (shift) {
+      address += " << " + shift;
+    }
+    return address;
+  };
+  variable.prototype.getPointer = function () {
+    if (this.pointer) {
+      return this.pointer;
+    }
+    return this.pointer = {
+      type: new PointerType(this.type),
+      generateCode: function () {
+        return this.frameOffset();
+      }.bind(this)
+    };
   };
   return variable;
 })();
@@ -347,9 +369,8 @@ function Program (elements) {
 }
 
 function createFrame(writer, scope) {
-  if (scope.frameSize) {
-    // writer.writeLn("tracer.enter(" + quote(scope.name + " {") + ")");
-    writer.writeLn((scope.global ? "$BP = " : "") + "$SP -= " + scope.frameSize + ";");
+  if (scope.frameSizeInWords) {
+    writer.writeLn((scope.global ? "$BP = " : "") + "$SP -= " + scope.frameSizeInWords + ";");
     for (var key in scope.variables) {
       var variable = scope.variables[key];
       if (variable.isParameter && variable.isStackAllocated) {
@@ -364,9 +385,8 @@ function createFrame(writer, scope) {
 };
 
 function destroyFrame(writer, scope) {
-  if (scope.frameSize) {
-    writer.writeLn("$SP += " + scope.frameSize + ";");
-    // writer.writeLn("tracer.leave(\"}\");");
+  if (scope.frameSizeInWords) {
+    writer.writeLn("$SP += " + scope.frameSizeInWords + ";");
   }
 };
 
@@ -387,9 +407,11 @@ Program.prototype = {
     var scope = this.scope = new Scope(null, "Program", true);
     scope.types = clone(types);
     scope.addVariable(new Variable("extern", types.dyn));
-    scope.addVariable(new Variable("$HP", types.i32));
-    scope.addVariable(new Variable("$SP", types.i32));
-    scope.addVariable(new Variable("$HEAP_SIZE", types.i32));
+    scope.addVariable(new Variable("$HP", types.i32Pointer));
+    scope.addVariable(new Variable("$SP", types.i32Pointer));
+    scope.addVariable(new Variable("$HP_END", types.i32Pointer));
+    scope.addVariable(new Variable("malloc", new FunctionType(types.u8Pointer, [types.u32])));
+
     computeDeclarations(this.elements, scope);
     walkComputeTypes(this.elements, scope);
     scope.close();
@@ -586,7 +608,7 @@ function Literal (kind, value) {
 Literal.prototype = {
   computeType: function () {
     switch (this.kind) {
-      case "number": return types.i32;
+      case "number": return isInteger(this.value) ? types.i32 : types.f64;
       case "boolean": return types.i32;
       case "NULL": return types.voidPointer;
       case "null": return types.void;
@@ -668,13 +690,15 @@ function ReturnStatement (value) {
 
 ReturnStatement.prototype = {
   computeType: function (scope) {
-    var type = this.value.computeType(scope);
-    checkTypeAssignment(this, scope.options.enclosingFunction.type.returnType, type);
+    this.type = this.value.computeType(scope);
+    checkTypeAssignment(this, scope.options.enclosingFunction.type.returnType, this.type);
     scope.options.enclosingFunction.hasReturn = true;
+    this.returnType = scope.options.enclosingFunction.type.returnType;
   },
   generateCode: function (writer, scope) {
     var value = (this.value ? " " + this.value.generateCode(null, scope) : "");
-    if  (scope.frameSize) {
+    value = generateConversion(value, this.returnType, this.type);
+    if (scope.frameSizeInWords) {
       writer.writeLn("var $T =" + value + ";");
       destroyFrame(writer, scope);
       writer.writeLn("return $T;");
@@ -716,9 +740,9 @@ function BinaryExpression (operator, left, right) {
 BinaryExpression.prototype = {
   computeType: function (scope) {
     this.lType = this.left.computeType(scope);
-    var rType =  this.right.computeType(scope);
+    this.rType =  this.right.computeType(scope);
     if (this.lType instanceof PointerType && (this.operator === "+" || this.operator === "-")) {
-      check(this, rType === types.i32 || rType === types.u32, "Can't do pointer arithmetic with " + quote(rType) + " types.");
+      check(this, this.rType === types.i32 || this.rType === types.u32, "Can't do pointer arithmetic with " + quote(this.rType) + " types.");
     }
     return this.lType;
   },
@@ -731,9 +755,12 @@ BinaryExpression.prototype = {
       } else {
         value = this.right.generateCode(null, scope);
       }
-      var size = this.lType.type.getSize();
-      value = value + (isPowerOfTwo(size) ? " << " + log2(size) : " * " + size);
-      return paren(this.left.generateCode(null, scope) + " " + this.operator + " " + paren(value));
+      var scale = this.lType.type.size / types.word.size;
+      assert (scale);
+      if (scale > 1) {
+        value = paren(value + " * " + scale);
+      }
+      return paren(this.left.generateCode(null, scope) + " " + this.operator + " " + value);
     }
     return paren(
       this.left.generateCode(null, scope) + " " +
@@ -781,7 +808,7 @@ UnaryExpression.prototype = {
       if (this.type instanceof StructType) {
         return this.expression.generateCode(null, scope);
       }
-      return accessMemory(this.expression.generateCode(null, scope), this.type);
+      return generateMemoryAccess(scope, this.expression, this.type);
     }
     return this.operator + this.expression.generateCode(null, scope);
   }
@@ -795,20 +822,12 @@ function CastExpression (type, expression) {
 
 CastExpression.prototype = {
   computeType: function (scope) {
-    this.expression.computeType(scope);
+    this.rType = this.expression.computeType(scope);
     return this.type = this.type.computeType(scope);
   },
   generateCode: function (writer, scope) {
     var value = this.expression.generateCode(null, scope);
-    if (this.type === types.i32) {
-      return paren(value + " | 0");
-    } else if (this.type === types.u32) {
-      return paren(value + " >>> 0");
-    } else if (this.type instanceof PointerType) {
-      return value;
-    } else {
-      return notImplemented(this.type.name);
-    }
+    return generateConversion(value, this.type, this.rType);
   }
 };
 
@@ -857,12 +876,13 @@ function FunctionCall (name, arguments) {
 FunctionCall.prototype = {
   computeType: function (scope) {
     var type = this.name.computeType(scope);
-    var argumentTypes = walkComputeTypes(this.arguments, scope);
+    this.argumentTypes = walkComputeTypes(this.arguments, scope);
     if (type !== types.dyn) {
+      this.parameterTypes = type.parameterTypes;
       assert (type instanceof FunctionType);
-      check(this, argumentTypes.length === type.parameterTypes.length, "Argument / parameter mismatch.");
+      check(this, this.argumentTypes.length === type.parameterTypes.length, "Argument / parameter mismatch.");
       for (var i = 0; i < this.arguments.length; i++) {
-        var aType = argumentTypes[i];
+        var aType = this.argumentTypes[i];
         var pType = type.parameterTypes[i];
         checkTypeAssignment(this, aType, pType);
       }
@@ -871,8 +891,17 @@ FunctionCall.prototype = {
     return type;
   },
   generateCode: function (writer, scope) {
-    // TODO: Apply scoping rules.
-    return this.name.generateCode(null, scope) + "(" + walkGenerateCode(this.arguments, null, scope).join(", ") + ")";
+    var arguments = [];
+    for (var i = 0; i < this.arguments.length; i++) {
+      var argument = this.arguments[i].generateCode(null, scope);
+      if (this.parameterTypes) {
+      var aType = this.argumentTypes[i];
+      var pType = this.parameterTypes[i];
+        argument = generateConversion(argument, pType, aType);
+      }
+      arguments[i] = argument;
+    }
+    return this.name.generateCode(null, scope) + "(" + arguments.join(", ") + ")";
   }
 };
 
@@ -914,11 +943,11 @@ function AssignmentExpression (operator, left, right) {
 }
 
 function generateMemoryCopy(dst, src, size) {
-  return "mc(" + dst + ", " + src + ", " + size + ")";
+  return "mc(" + dst + ", " + src + ", " + div4(size) + ")";
 }
 
 function generateMemoryZero(dst, size) {
-  return "mz(" + dst + ", " + size + ")";
+  return "mz(" + dst + ", " + div4(size) + ")";
 }
 
 AssignmentExpression.prototype = {
@@ -937,11 +966,19 @@ AssignmentExpression.prototype = {
   }
 };
 
+var min = Math.min;
+
 function generateConversion (value, lType, rType) {
   if (lType === rType) {
     return value;
   }
   if (lType instanceof PointerType && rType instanceof PointerType) {
+    var shift = log2(min(rType.type.size, types.word.size)) -
+                log2(min(lType.type.size, types.word.size));
+
+    if (shift) {
+      value = paren(value + (shift > 0 ? " << " : " >> ") + Math.abs(shift));
+    }
     return value;
   }
   if (lType instanceof Type && rType instanceof Type) {
@@ -977,9 +1014,13 @@ function generateAssignment(node, scope, left, operator, right, lType, rType, in
   }
   var assignment = l + " " + operator + " ";
   if (lType instanceof PointerType && (operator == "+=" || operator == "-=")) {
-    var size = lType.type.getSize();
-    var multiplier = isPowerOfTwo(size) ? " << " + log2(size) : " * " + size;
-    assignment += paren(generateConversion(r, types.u32, rType) + multiplier);
+    value = generateConversion(r, types.i32, rType);
+    var scale = lType.type.size / types.word.size;
+    assert (scale);
+    if (scale > 1) {
+      value = paren(value + " * " + scale);
+    }
+    assignment += value;
   } else {
     if (right && rType) {
       assignment += generateConversion(r, lType, rType);
@@ -997,8 +1038,16 @@ function generateAssignment(node, scope, left, operator, right, lType, rType, in
   return paren(assignment);
 }
 
+function isInteger(x) {
+  return parseInt(x) === Number(x);
+}
+
 function isPowerOfTwo(x) {
   return x && ((x & (x - 1)) === 0);
+}
+
+function wordAlignment(x) {
+  return (x + 3) & ~0x3;
 }
 
 function log2(x) {
@@ -1006,14 +1055,38 @@ function log2(x) {
   return Math.log(x) / Math.LN2;
 }
 
-function accessMemory(address, type, offset) {
+function div4(x) {
+  assert (x % 4 === 0, "Value " + x + " is not divisible by four.");
+  return x / 4;
+}
+
+function generateMemoryAccess(scope, address, type, byteOffset) {
+  byteOffset = byteOffset || 0;
+  var pType = address.type;
+  assert (pType instanceof PointerType);
+  var bType = pType.type;
+  type = type instanceof PointerType ? types.u32 : type;
+  var view = (type.signed ? "I" : "U") + type.size;
+
+  address = address.generateCode(null, scope);
+  address = generateConversion(address, pType, new PointerType(bType));
+  var offset = byteOffset / min(bType.size, types.word.size);
+  if (offset) {
+    address += " + " + offset;
+  }
+  return view + "[" + address + "]";
+
+  /*
   if (type === types.i32) {
     return "I32[" + address + (offset ? " + " + offset : "") + " >> " + log2(type.getSize()) + "]";
   } else if (type === types.u32 || type instanceof PointerType) {
     return "U32[" + address + (offset ? " + " + offset : "") + " >> " + log2(type.getSize()) + "]";
   }
+  */
+
   return notImplemented(type);
 };
+
 
 function PropertyAccess (base, accessor) {
   this.tag = "PropertyAccess";
@@ -1049,12 +1122,17 @@ PropertyAccess.prototype = {
   },
   generateCode: function (writer, scope) {
     if (this.accessor.tag === "arrow") {
-      return accessMemory(this.base.generateCode(null, scope), this.field.type, this.field.offset);
+      return generateMemoryAccess(scope, this.base, this.field.type, this.field.offset);
     } else if (this.accessor.tag === "dot") {
       if (this.base.type === types.dyn) {
         return this.base.generateCode(null, scope) + "." + this.accessor.name;
       } else {
-        return accessMemory(this.base.generateCode(null, scope), this.field.type, this.field.offset);
+        var base = this.base;
+        if (base instanceof VariableIdentifier) {
+          assert (base.variable.isStackAllocated);
+          base = base.variable.getPointer();
+        }
+        return generateMemoryAccess(scope, base, this.field.type, this.field.offset);
       }
     }
     throw notImplemented();
@@ -1189,7 +1267,7 @@ function compile(source, generateExports) {
 
   var program = parser.parse(source);
 
-  print (JSON.stringify(program, null, 2));
+//  print (JSON.stringify(program, null, 2));
 
   program.computeType(types);
 
