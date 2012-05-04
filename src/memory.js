@@ -1,4 +1,5 @@
 var M = new ArrayBuffer(1024 * 1024 * 32);
+
 var U1 = new Uint8Array(M);
 var I1 = new Int16Array(M);
 var U2 = new Uint16Array(M);
@@ -18,11 +19,9 @@ function ma(size) {
 }
 
 function resetHeap() {
-  $HP = 2;
+  $HP = 10;
   $HP_END = U4.length - $MAX_STACK_SIZE;
   $SP = U4.length;
-
-  print("$SP = " + $SP);
 }
 
 var mc = function memoryCopyWords(dst, src, len) {
@@ -56,6 +55,11 @@ function memoryCopyBytes(dst, src, len) {
   }
 };
 
-var tracer = new IndentingWriter();
-
 resetHeap();
+
+var extern = {
+  trace: function (x) { print(x); },
+  toHex: function (x) {
+    return "0x" + Number(x).toString(16);
+  }
+};

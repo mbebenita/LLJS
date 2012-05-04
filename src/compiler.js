@@ -210,7 +210,7 @@ var Scope = (function () {
   scope.prototype.addVariable = function addVariable(variable) {
     assert (variable);
     assert (!variable.scope);
-    print("Adding variable " + variable + " to scope " + this + ".");
+    // print("Adding variable " + variable + " to scope " + this + ".");
     variable.scope = this;
     this.variables[variable.name] = variable;
   };
@@ -227,7 +227,7 @@ var Scope = (function () {
 
   scope.prototype.addType = function addType(type) {
     assert (type);
-    print("Adding type " + type + " to scope " + this + ".");
+    // print("Adding type " + type + " to scope " + this + ".");
     this.types[type.name] = type;
   };
 
@@ -245,6 +245,15 @@ var Scope = (function () {
       }
     }
     this.frameSizeInWords = wordOffset;
+  };
+
+  scope.prototype.cacheView = function cacheView(type) {
+    if (this.global) {
+      // Don't cache views in the global scope.
+      return;
+    }
+    var viewName = getViewName(type);
+    this.options.cachedViews[viewName] = "$" + viewName;
   };
 
   return scope;
@@ -329,11 +338,11 @@ var Variable = (function () {
   variable.prototype.toString = function () {
     return "variable " + this.name;
   };
-  variable.prototype.generateCode = function () {
+  variable.prototype.generateCode = function (writer, scope) {
     if (this.type instanceof StructType) {
       return this.frameOffset();
     } else if (this.isStackAllocated) {
-      return generateMemoryAccess(null, this.getPointer(), this.type);
+      return generateMemoryAccess(scope, this.getPointer(), this.type);
     }
     return this.name;
   };
@@ -363,12 +372,16 @@ var Variable = (function () {
   return variable;
 })();
 
-function Program (elements) {
-  this.tag = "Program";
-  this.elements = elements;
-}
 
 function createFrame(writer, scope) {
+  var cache = mapObject(scope.options.cachedViews, function (k, v) {
+    return v + " = " + k;
+  });
+
+  if (cache.length) {
+    writer.writeLn("var " + cache.join(", ") + ";");
+  }
+
   if (scope.frameSizeInWords) {
     writer.writeLn((scope.global ? "$BP = " : "") + "$SP -= " + scope.frameSizeInWords + ";");
     for (var key in scope.variables) {
@@ -402,10 +415,16 @@ function computeDeclarations(elements, scope) {
   }
 }
 
+function Program (elements) {
+  this.tag = "Program";
+  this.elements = elements;
+}
+
 Program.prototype = {
   computeType: function (types) {
     var scope = this.scope = new Scope(null, "Program", true);
     scope.types = clone(types);
+    scope.options.cachedViews = {};
     scope.addVariable(new Variable("extern", types.dyn));
     scope.addVariable(new Variable("$HP", types.i32Pointer));
     scope.addVariable(new Variable("$SP", types.i32Pointer));
@@ -655,6 +674,7 @@ FunctionDeclaration.prototype = {
   computeType: function (scope, signatureOnly) {
     this.scope = scope = new Scope(scope, "Function " + this.name);
     scope.options.enclosingFunction = this;
+    scope.options.cachedViews = {};
     this.parameters.forEach(function (x) {
       var variable = new Variable(x.name, x.type);
       variable.isParameter = true;
@@ -789,6 +809,7 @@ UnaryExpression.prototype = {
     } else if (this.operator === "*") {
       var type = this.expression.computeType(scope);
       check(this, type instanceof PointerType, "Cannot dereference non pointer type.");
+      scope.cacheView(type.type);
       return this.type = type.type;
     }
     return this.expression.computeType(scope);
@@ -917,7 +938,7 @@ VariableIdentifier.prototype = {
     return this.type = this.variable.type;
   },
   generateCode: function (writer, scope) {
-    return this.variable.generateCode();
+    return this.variable.generateCode(writer, scope);
   }
 };
 
@@ -931,7 +952,7 @@ ExpressionStatement.prototype = {
     return this.expression.computeType(scope);
   },
   generateCode: function (writer, scope) {
-    writer.writeLn(this.expression.generateCode(null, scope) + ";");
+    writer.writeLn(unparen(this.expression.generateCode(null, scope)) + ";");
   }
 };
 
@@ -1060,14 +1081,20 @@ function div4(x) {
   return x / 4;
 }
 
+function getViewName(type) {
+  return (type.signed ? "I" : "U") + type.size;
+}
+
 function generateMemoryAccess(scope, address, type, byteOffset) {
   byteOffset = byteOffset || 0;
   var pType = address.type;
   assert (pType instanceof PointerType);
   var bType = pType.type;
   type = type instanceof PointerType ? types.u32 : type;
-  var view = (type.signed ? "I" : "U") + type.size;
-
+  var view = getViewName(type);
+  if (view in scope.options.cachedViews) {
+    view = scope.options.cachedViews[view];
+  }
   address = address.generateCode(null, scope);
   address = generateConversion(address, pType, new PointerType(bType));
   var offset = byteOffset / min(bType.size, types.word.size);
@@ -1106,6 +1133,7 @@ PropertyAccess.prototype = {
     } else if (this.accessor.tag === "arrow") {
       check(this, type instanceof PointerType, "Cannot dereference non pointer type.");
       check(this, type.pointers === 0, "Cannot dereference pointers to pointers type.");
+      scope.cacheView(type);
       type = type.base;
     } else {
       check(this, !(type instanceof PointerType), "Cannot use . operator on pointer types.");
@@ -1115,6 +1143,7 @@ PropertyAccess.prototype = {
       var field = type.getField(this.accessor.name);
       check(this, field, "Field \"" + this.accessor.name + "\" does not exist in type " + type + ".");
       this.field = field;
+      scope.cacheView(field.type);
       return this.type = field.type;
     } else {
       return this.type = types.dyn;
@@ -1252,8 +1281,8 @@ ForStatement.prototype = {
   generateCode: function (writer, scope) {
     scope = new Scope(scope, "For");
     var str = "for (";
-    str += (this.initializer ? this.initializer.generateCode(null, scope) : "") + ";";
-    str += (this.test ? this.test.generateCode(null, scope) : "") + ";";
+    str += (this.initializer ? this.initializer.generateCode(null, scope) : "") + "; ";
+    str += (this.test ? this.test.generateCode(null, scope) : "") + "; ";
     str += (this.counter ? this.counter.generateCode(null, scope) : "");
     str += ") {";
     writer.enter(str);
@@ -1262,26 +1291,17 @@ ForStatement.prototype = {
   }
 };
 
-
 function compile(source, generateExports) {
-
   var program = parser.parse(source);
-
 //  print (JSON.stringify(program, null, 2));
-
   program.computeType(types);
-
 //  print (JSON.stringify(program, null, 2));
-
   var str = "";
   var writer = new IndentingWriter(false, {writeLn: function (x) {
     str += x + "\n";
   }});
-
   program.generateCode(writer);
-
   return str;
-
 }
 
 

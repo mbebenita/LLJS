@@ -20,6 +20,7 @@ options.parse(arguments.slice(0, arguments.length - 1));
 var generateParser = options.register(new Option("p", "p", false, "Generate Parser"));
 
 var execute = options.register(new Option("x", "x", false, "Execute"));
+var output = options.register(new Option("o", "o", false, "Output"));
 
 if (help.value) {
   printUsage();
@@ -40,20 +41,24 @@ if (generateParser.value) {
   load("parser.js");
 }
 
-var extern = {
-  trace: function (x) { print(x); },
-  toHex: function (x) {
-    return "0x" + Number(x).toString(16);
-  }
-};
+
 
 var source = snarf(file, "text");
 
-print ("Compiling");
-var com = compile(source, false);
-print (com);
+var code = compile(source, false);
 
-var o = new Function (com)();
+if (output.value) {
+  print ("load(\"memory.js\");");
+  print (code);
+}
+if (execute.value) {
+
+}
+
+/*
+var fn = new Function (com);
+var o = fn();
+
 
 var start = new Date();
 
@@ -70,16 +75,17 @@ var mTotal = 0, fTotal = 0;
 
 var sum = 0;
 for (var i = 0; i < 1000; i++) {
-  var ptrs = [];
+  var ptrs = new Uint32Array(10000);
   mTotal += time(function () {
     for (var j = 0; j < 10000; j++) {
-      ptrs[j] = malloc(4 + j % 20);
+      ptrs[j] = malloc(32);
+      // print(ptrs[j]);
     }
   });
 
   fTotal += time(function () {
     for (var j = 0; j < 10000; j++) {
-      sum += (U4[ptrs[j] - 8 + 4 >> 2]);
+      // sum += (U4[ptrs[j] - 8 + 4 >> 2]);
       free(ptrs[j]);
     }
   });
@@ -88,3 +94,4 @@ for (var i = 0; i < 1000; i++) {
 print("Malloc: " + mTotal + ", Free: " + fTotal);
 
 print("Done in " + (new Date() - start) + " checksum: " + sum);
+*/

@@ -1,14 +1,5 @@
-var i8 a;
-var i8 * ap = &a;
-
-var i16 b;
-var i16 * bp = &b;
-
-var i32 c;
-var i32 * cp = &c;
-
-var i8 * p0 = malloc(32);
-var i16 * p1 = malloc(32);
-
-p0 = p0 + 1;
-p1 += 1;
+var int x;
+var int *y = &x;
+var int **z = &y;
+*y = 1;
+**z = ***(&z);

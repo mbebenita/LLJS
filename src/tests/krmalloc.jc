@@ -17,7 +17,7 @@ function void * sbrk(int nBytes) {
   return address;
 }
 
-var uint nUnitsMin = 1024 * 256;
+var uint nUnitsMin = 1024;
 
 function Header * morecore(uint nUnits) {
   if (nUnits < nUnitsMin) {
@@ -40,6 +40,7 @@ function void * malloc(int nBytes) {
   if ((prevp = freep) === NULL) {
     base.next = freep = prevp = &base;
     base.size = 0;
+    extern.trace("ADDRESS OF BASE: " + &base);
   }
   for (p = prevp->next; true; prevp = p, p = p->next) {
     if (p->size >= nUnits) {
@@ -83,6 +84,3 @@ function void free(void *ap) {
   }
   freep = p;
 }
-
-extern.malloc = malloc;
-extern.free = free;
