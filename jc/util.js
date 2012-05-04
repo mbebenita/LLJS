@@ -48,8 +48,8 @@ function notImplemented(message) {
   assert(false, "Not Implemented " + message);
 }
 
-function unexpected() {
-  assert(false);
+function unexpected(message) {
+  assert(false, message);
 }
 
 function defineReadOnlyProperty(obj, name, value) {
@@ -93,6 +93,23 @@ function quote(s) {
 
 function paren(s) {
   return "(" + s + ")";
+}
+
+function unparen(s) {
+  if (s[0] === "(" && s[s.length - 1] === ")") {
+    return s.substring(1, s.length - 1);
+  }
+  return s;
+}
+
+function mapObject(obj, fn) {
+  var a = [];
+  for (var k in obj) {
+    if (obj.hasOwnProperty(k)) {
+      a.push(fn(k, obj[k]));
+    }
+  }
+  return a;
 }
 
 (function () {
