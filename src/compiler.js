@@ -946,7 +946,7 @@ function ExpressionStatement (expression) {
   this.tag = "ExpressionStatement";
   this.expression = expression;
 }
-
+ 
 ExpressionStatement.prototype = {
   computeType: function (scope) {
     return this.expression.computeType(scope);
@@ -1304,44 +1304,85 @@ function compile2(source, generateExports) {
   return str;
 }
 
-function walk(node, match) {
-  print("Walk : " + node.type);
-  var fn = match[node.type];
-  if (fn) {
-    fn.call(node);
-  } else {
-    for (var key in node) {
-      var val = node[key];
-      if (val) {
-        if (val instanceof Object && "type" in val) {
-          walk(val, match);
-        } else if (val instanceof Array) {
-          for (var i = 0; i < val.length; i++) {
-            if (val[i] instanceof Object && "type" in val[i]) {
-              walk(val[i], match);
-            }
-          }
-        }
+function compile(node) {
+  // print (JSON.stringify(node, null, 2));
+  computeTypes(node, types);
+//  print (JSON.stringify(node, null, 2));
+}
+
+var tracer = new IndentingWriter(true);
+
+function computeTypes(node, types) {
+
+  function TypeName(scope) {
+    var type = scope.getType(this.typeSpecifier);
+    if (this.pointer) {
+      for (var i = 0; i < this.pointer.count; i++) {
+        type = new PointerType(type);
       }
     }
+    return type;
   }
-}
 
+  var scanFunctions = {
+    Program: function Program() {
+      this.scope = new Scope(null, "Program", true);
+      this.scope.types = clone(types);
+      walkRecursively(this.body, this.scope, scanFunctions);
+    },
+    StructDeclaration: function (scope) {
+      scope.addType(new StructType(this.id.name));
+    },
+    FunctionDeclaration: function FunctionDeclaration(scope) {
+      var returnType = walk(this.returnType, scope, {TypeName: TypeName});
+      var outerScope = scope;
+      scope = this.scope = new Scope(scope, "Function " + this.id.name);
+      var parameterTypes = [];
+      walkList(this.params, scope, {
+        Identifier: function () {
+          var type = walk(this.typeName, scope, {TypeName: TypeName});
+          scope.addVariable(new Variable(this.name, type));
+          parameterTypes.push(type);
+        }
+      });
+      var type = new FunctionType(returnType, parameterTypes);
+      outerScope.addVariable(new Variable(this.id.name, type));
+    }
+  };
 
-function compile(node) {
-  print (JSON.stringify(node, null, 2));
+  walkRecursively(node, null, scanFunctions);
 
-  computeTypes(node);
+  tracer.writeLn("Scan Done");
 
-  print (JSON.stringify(node, null, 2));
-}
+  function createMemoryAccess(type, address) {
+    return {
+      type: "MemberExpression",
+      computed: true,
+      object: {
+        type: "Identifier",
+        name: getViewName(type)
+      },
+      property: address,
+      cType: type
+    };
+  }
 
-function computeTypes(node) {
-  var scope = node.scope = new Scope(null, "Program", true);
-  var match = {
+  var typeFunctions = {
+    Program: function () {
+      var scope = this.scope;
+      scope.addVariable(new Variable("extern", types.dyn));
+      scope.addVariable(new Variable("$HP", types.i32Pointer));
+      scope.addVariable(new Variable("$SP", types.i32Pointer));
+      scope.addVariable(new Variable("NULL", types.i32Pointer));
+      scope.addVariable(new Variable("$HP_END", types.i32Pointer));
+      scope.addVariable(new Variable("malloc", new FunctionType(types.u8Pointer, [types.u32])));
+
+      walkList(this.body, this.scope, typeFunctions);
+    },
+    StructDeclaration: function (scope) { },
     VariableDeclaration: function (scope) {
-      var type = getType(this.typeSpecifier);
-      walkList(this.declarations, {
+      var type = scope.getType(this.typeSpecifier);
+      walkList(this.declarations, scope, {
         VariableDeclarator: function () {
           if (this.pointer) {
             for (var i = 0; i < this.pointer.count; i++) {
@@ -1349,18 +1390,137 @@ function computeTypes(node) {
             }
           }
           scope.addVariable(this.variable = new Variable(this.id.name, type));
+          tracer.writeLn("Added variable " + quote(this.id.name) + " to scope");
+          if (this.init) {
+            walk(this.init, scope, typeFunctions);
+          }
         }
       });
-    }
+    },
+    FunctionDeclaration: function () {
+      var scope = this.scope;
+      walk(this.body, scope, typeFunctions);
+    },
+    BlockStatement: function (scope) {
+      walkList(this.body, scope, typeFunctions);
+    },
+    IfStatement: function (scope) {
+      walkList([this.test, this.consequent, this.alternate], scope, typeFunctions);
+    },
+    ForStatement: function (scope) {
+      walk(this.init, scope, typeFunctions);
+      walk(this.test, scope, typeFunctions);
+      walk(this.update, scope, typeFunctions);
+      walk(this.body, scope, typeFunctions);
+    },
+    BinaryExpression: function (scope) {
+      this.left = walk(this.left, scope, typeFunctions);
+      this.right = walk(this.right, scope, typeFunctions);
+    },
+    LogicalExpression: function (scope) {
+      var lType = walk(this.left, scope, typeFunctions);
+      var rType = walk(this.right, scope, typeFunctions);
+    },
+    UnaryExpression: function (scope) {
+      var type;
+      if (this.operator === "sizeof") {
+        type = walk(this.argument, scope, {TypeName: TypeName});
+        return {type: "Literal", value: type.getSize()};
+      }
+      this.argument = walk(this.argument, scope, typeFunctions);
+      if (this.operator === "*") {
+        var pType = this.argument.cType;
+        check(this, pType instanceof PointerType, "Cannot dereference non-pointer type.");
+        return createMemoryAccess(pType.type, this.argument);
+      }
+    },
+    ExpressionStatement: function (scope) {
+      walk(this.expression, scope, typeFunctions);
+    },
+    BreakStatement: function (scope) { },
+    CallExpression: function (scope) {
+      walk(this.callee, scope, typeFunctions);
+      walkList(this.arguments, scope, typeFunctions);
+    },
+    CastExpression: function (scope) {
+      walk(this.typeName, scope, {TypeName: TypeName});
+      walk(this.argument, scope, typeFunctions);
+    },
+    MemberExpression: function (scope) {
+      walk(this.object, scope, typeFunctions);
+      walk(this.property, scope, typeFunctions);
+    },
+    Identifier: function (scope) {
+      if (this.kind === "variable") {
+        if (this.name === "NULL") {
+          return {type: "Literal", value: 0};
+        }
+        this.variable = scope.getVariable(this.name);
+        check(this, this.variable, "Variable " + quote(this.name) + " not found in current scope " + scope);
+        this.cType = this.variable.type;
+      }
+    },
+    Literal: function (scope) {
+      if (typeof this.value === "number") {
+        this.cType = isInteger(this.value) ? types.i32 : types.f64;
+        return;
+      }
+      this.cType = types.dyn;
+    },
+    ReturnStatement: function (scope) {
+      this.argument = walk(this.argument, scope, typeFunctions);
+    },
+    AssignmentExpression: function (scope) {
+      this.left = walk(this.left, scope, typeFunctions);
+      this.right = walk(this.right, scope, typeFunctions);
+    },
+    SequenceExpression: function (scope) {
+      walkList(this.expressions, scope, typeFunctions);
+    },
+    TypeName: TypeName
   };
-  function walk(node, scope) {
-    assert (node.type in match);
-    return match[node.type].call(node, scope);
+
+  function walk(node, scope, functions) {
+    assert (node);
+    assert (functions);
+    tracer.enter("> " + node.type);
+    assert (node.type in functions, "Node type " + quote(node.type) + " not found.");
+    var result = functions[node.type].call(node, scope);
+    tracer.leave("< " + node.type + (result ? " <-- " + result.type : ""));
+    if (result !== undefined) {
+      return result;
+    }
+    return node;
   }
-  function walkList(list, match) {
+
+  function walkList(list, scope, functions) {
+    var result = [];
     for (var i = 0; i < list.length; i++) {
-      match[list[i].type].call(list[i]);
+      var res = null;
+      if (list[i]) {
+        res = walk(list[i], scope, functions);
+      }
+      result.push(res);
+    }
+    return result;
+  }
+
+  function walkRecursively(node, scope, functions) {
+    if (node instanceof Array) {
+      for (var i = 0; i < node.length; i++) {
+        walkRecursively(node[i], scope, functions);
+      }
+    } else if (node.type in functions) {
+      walk(node, scope, functions);
+    } else {
+      for (var key in node) {
+        var child = node[key];
+        if (child instanceof Object && "type" in child) {
+          walkRecursively(child, scope, functions);
+        }
+      }
     }
   }
-  walk(node, match);
+
+  walk(node, null, typeFunctions);
 }

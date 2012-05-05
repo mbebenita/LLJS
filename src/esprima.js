@@ -1553,7 +1553,8 @@
     if (type === Token.Identifier) {
       return {
         type: Syntax.Identifier,
-        name: lex().value
+        name: lex().value,
+        kind: "variable"
       };
     }
 

@@ -35,7 +35,7 @@ var node = esprima.parse(source);
 
 compile(node);
 
-// print (escodegen.generate(node, {base: "", indent: "  "}));
+print (escodegen.generate(node, {base: "", indent: "  "}));
 
 
 
