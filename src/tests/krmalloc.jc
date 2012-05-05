@@ -1,6 +1,6 @@
 struct Header {
-  Header * next,
-  uint size
+  var Header * next;
+  var uint size;
 }
 
 var Header base;
@@ -37,6 +37,7 @@ function Header * morecore(uint nUnits) {
 function void * malloc(int nBytes) {
   var Header *p, *prevp;
   var uint nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
+
   if ((prevp = freep) === NULL) {
     base.next = freep = prevp = &base;
     base.size = 0;
