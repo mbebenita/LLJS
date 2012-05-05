@@ -61,18 +61,12 @@ var o = fn();
 
 
 var start = new Date();
-
-var malloc = extern.malloc;
-var free = extern.free;
-
 function time (fn) {
   var start = new Date();
   fn();
   return new Date() - start;
 }
-
 var mTotal = 0, fTotal = 0;
-
 var sum = 0;
 for (var i = 0; i < 1000; i++) {
   var ptrs = new Uint32Array(10000);
@@ -92,6 +86,5 @@ for (var i = 0; i < 1000; i++) {
 }
 
 print("Malloc: " + mTotal + ", Free: " + fTotal);
-
 print("Done in " + (new Date() - start) + " checksum: " + sum);
 */

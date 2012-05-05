@@ -1291,7 +1291,7 @@ ForStatement.prototype = {
   }
 };
 
-function compile(source, generateExports) {
+function compile2(source, generateExports) {
   var program = parser.parse(source);
 //  print (JSON.stringify(program, null, 2));
   program.computeType(types);
@@ -1304,4 +1304,63 @@ function compile(source, generateExports) {
   return str;
 }
 
+function walk(node, match) {
+  print("Walk : " + node.type);
+  var fn = match[node.type];
+  if (fn) {
+    fn.call(node);
+  } else {
+    for (var key in node) {
+      var val = node[key];
+      if (val) {
+        if (val instanceof Object && "type" in val) {
+          walk(val, match);
+        } else if (val instanceof Array) {
+          for (var i = 0; i < val.length; i++) {
+            if (val[i] instanceof Object && "type" in val[i]) {
+              walk(val[i], match);
+            }
+          }
+        }
+      }
+    }
+  }
+}
 
+
+function compile(node) {
+  print (JSON.stringify(node, null, 2));
+
+  computeTypes(node);
+
+  print (JSON.stringify(node, null, 2));
+}
+
+function computeTypes(node) {
+  var scope = node.scope = new Scope(null, "Program", true);
+  var match = {
+    VariableDeclaration: function (scope) {
+      var type = getType(this.typeSpecifier);
+      walkList(this.declarations, {
+        VariableDeclarator: function () {
+          if (this.pointer) {
+            for (var i = 0; i < this.pointer.count; i++) {
+              type = new PointerType(type);
+            }
+          }
+          scope.addVariable(this.variable = new Variable(this.id.name, type));
+        }
+      });
+    }
+  };
+  function walk(node, scope) {
+    assert (node.type in match);
+    return match[node.type].call(node, scope);
+  }
+  function walkList(list, match) {
+    for (var i = 0; i < list.length; i++) {
+      match[list[i].type].call(list[i]);
+    }
+  }
+  walk(node, match);
+}

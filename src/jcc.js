@@ -1,6 +1,7 @@
 load("util.js");
 load("esprima.js");
 load("escodegen.js");
+load("compiler.js");
 
 var options = new OptionSet("option(s)");
 
@@ -32,9 +33,9 @@ var source = snarf(file);
 // var node = esprima.parse(source);
 var node = esprima.parse(source);
 
-print (JSON.stringify(node, null, 2));
+compile(node);
 
-print (escodegen.generate(node, {base: "", indent: "  "}));
+// print (escodegen.generate(node, {base: "", indent: "  "}));
 
 
 

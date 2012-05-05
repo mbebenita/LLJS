@@ -62,10 +62,10 @@ table.definitions td {
 */
 code, pre, tt, textarea {
     font-family: Monaco, Consolas, "Lucida Console", monospace;
-    font-size: 10px;
-    font-weight: bold;
+    font-size: 12px;
+    // font-weight: bold;
     line-height: 18px;
-    color: #845;
+    color: #255;
     white-space: pre-wrap;
     word-wrap: break-word;
 }
@@ -402,7 +402,7 @@ div.code pre:first-child {
 }
 
 .jcResult {
-    font-size: 10px;
+    font-size: 11px;
     width: 600px;
 }
 
