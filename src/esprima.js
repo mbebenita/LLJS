@@ -2153,7 +2153,8 @@
 
     return {
       type: Syntax.Identifier,
-      name: token.value
+      name: token.value,
+      kind: "variable"
     };
   }
 

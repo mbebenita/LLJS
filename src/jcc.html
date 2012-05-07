@@ -10,6 +10,8 @@
   <script src="vendor/jquery-1.6.4.js"></script>
   <script src="util.js"></script>
   <script src="esprima.js"></script>
+  <script src="escodegen.js"></script>
+  <script src="compiler.js"></script>
   <body>
     <script>
 
@@ -46,6 +48,7 @@
 
     new FileReader("tests/simple.jc", "text").readAll(null, function (source) {
       var node = esprima.parse(source);
+      compile(node);
 
       print (escodegen.generate(node, {base: "", indent: "  "}));
 

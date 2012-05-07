@@ -1,34 +1,8 @@
-struct Header {
+// var _ = A[1] = 2;
 
-}
+var int k;
+var int x = 1, *y = &x, *z = &k;
 
-
-var int x = 1;
-var int *****y;
-
-*****y = (*****y)[1] + 1;
-
-var int x = *****y, k = *****y;
-
-
-/*
-var int **z = &y;
 *y = 1;
-**z = ***(&z);
-
-for (var int x; true; x++) {
-
-}
-
-function foo (int *x, b) {
-
-}
-
-struct A {
-  var int a, *b;
-}
-
-function foo (int *x, b) {
-
-}
-*/
+*z = k;
+// *z = *(&z);
