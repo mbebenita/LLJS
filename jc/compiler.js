@@ -199,14 +199,6 @@ types.i32Pointer = new PointerType(types.i32);
 types.voidPointer = new PointerType(types.void);
 types.wordPointer = new PointerType(types.word);
 
-/*
-function getType(name) {
-  assert (name in types, "Type \"" + name + "\" is not found.");
-  assert (types[name]);
-  return types[name];
-}
-*/
-
 var Scope = (function () {
   function scope(parent, name, type) {
     this.name = name;
@@ -238,14 +230,16 @@ var Scope = (function () {
     this.variables[variable.name] = variable;
   };
 
-  scope.prototype.getType = function getType(name, find) {
+  scope.prototype.getType = function getType(name, strict) {
     var type = this.types[name];
     if (type) {
       return type;
     } else if (this.parent) {
-      return this.parent.getType(name);
+      return this.parent.getType(name, strict);
     }
-    return unexpected ("Undefined type " + name);
+    if (strict) {
+      return unexpected ("Undefined type " + name);
+    }
   };
 
   scope.prototype.addType = function addType(type) {
@@ -384,11 +378,11 @@ function createIdentity(argument, type) {
   };
 }
 
-function createCall(callee, arguments, type) {
+function createCall(callee, args, type) {
   return {
     type: "CallExpression",
     callee: callee,
-    arguments: arguments,
+    arguments: args,
     cType: type
   };
 }
@@ -521,7 +515,7 @@ function isIdentifier(node) {
 function computeTypes(node, types) {
 
   function TypeName(scope) {
-    var type = scope.getType(this.typeSpecifier);
+    var type = scope.getType(this.typeSpecifier, true);
     if (this.pointer) {
       for (var i = 0; i < this.pointer.count; i++) {
         type = new PointerType(type);
@@ -542,7 +536,7 @@ function computeTypes(node, types) {
       scope.addType(sType);
       walkList(this.fields, scope, {
         VariableDeclaration: function (scope) {
-          var bType = this.typeSpecifier ? scope.getType(this.typeSpecifier) : types.dyn;
+          var bType = this.typeSpecifier ? scope.getType(this.typeSpecifier, true) : types.dyn;
           walkList(this.declarations, scope, {
             VariableDeclarator: function () {
               var type = bType;
@@ -578,7 +572,7 @@ function computeTypes(node, types) {
       this.scope.close();
     },
     VariableDeclaration: function (scope) {
-      var bType = this.typeSpecifier ? scope.getType(this.typeSpecifier) : types.dyn;
+      var bType = this.typeSpecifier ? scope.getType(this.typeSpecifier, true) : types.dyn;
       walkList(this.declarations, scope, {
         VariableDeclarator: function () {
           var type = bType;
@@ -736,9 +730,9 @@ function computeTypes(node, types) {
       if (this.operator === "*") {
         type = this.argument.cType;
         check(this, type instanceof PointerType, "Cannot dereference non-pointer type " + quote(type));
-        if (type.type instanceof StructType) {
-          return this;
-        }
+        // if (type.type instanceof StructType) {
+        //  return this;
+        // }
         return createMemoryAccess(scope, type.type, this.argument);
       } else if (this.operator === "&") {
         if (this.argument.type === "MemberExpression") {
@@ -850,7 +844,14 @@ function computeTypes(node, types) {
       checkTypeAssignment(this, lType, rType);
       if (lType instanceof StructType) {
         var left = this.left.property;
-        var right = this.right ? this.right.property : createLiteral(null);
+        var right;
+        if (!this.right) {
+          right = createLiteral(null);
+        } else if (this.right.type === "MemberExpression") {
+          right = this.right.property;
+        } else if (this.right.type === "CallExpression") {
+          right = this.right;
+        }
         var sizeInWords = lType.getSize() / types.word.getSize();
         assert (lType.getSize() % types.word.getSize() === 0);
         return createCall(createIdentifier("memoryCopy"), [left, right, createLiteral(sizeInWords)], lType);
@@ -863,7 +864,7 @@ function computeTypes(node, types) {
     TypeName: TypeName,
     NewExpression: function NewExpression(scope) {
       if (this.callee.type === "Identifier") {
-        var type = scope.getType(this.callee.name);
+        var type = scope.getType(this.callee.name, false);
         if (type) {
           return createCall(createIdentifier("malloc"), [createLiteral(type.getSize())], new PointerType(type));
         }
