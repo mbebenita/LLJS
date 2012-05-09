@@ -1,3 +1,5 @@
+load("memory.js");
+
 struct Header {
   var Header * next;
   var uint size;
@@ -9,7 +11,7 @@ var Header * freep = NULL;
 function void * sbrk(int nBytes) {
   var int nWords = nBytes / sizeof (u32);
   if ($HP + nWords > $HP_END) {
-    extern.assert("Out of memory.");
+    extern.trace("Out of memory.");
     return NULL;
   }
   var void * address = $HP;
@@ -19,7 +21,7 @@ function void * sbrk(int nBytes) {
 
 var uint nUnitsMin = 1024;
 
-function Header * morecore(uint nUnits) {
+function Header * morecore(int nUnits) {
   if (nUnits < nUnitsMin) {
     nUnits = nUnitsMin;
   }
@@ -36,7 +38,7 @@ function Header * morecore(uint nUnits) {
 
 function void * malloc(int nBytes) {
   var Header *p, *prevp;
-  var uint nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
+  var int nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
 
   if ((prevp = freep) === NULL) {
     base.next = freep = prevp = &base;
@@ -85,3 +87,33 @@ function void free(void *ap) {
   }
   freep = p;
 }
+
+var start = new Date();
+
+function time (fn) {
+  var start = new Date();
+  fn();
+  return new Date() - start;
+}
+
+var mTotal = 0, fTotal = 0;
+
+var sum = 0;
+for (var i = 0; i < 1000; i++) {
+  var ptrs = new Uint32Array(10000);
+  mTotal += time(function () {
+    for (var j = 0; j < 10000; j++) {
+      ptrs[j] = malloc(32);
+      // extern.trace("Allocated: " + ptrs[j]);
+    }
+  });
+
+  fTotal += time(function () {
+    for (var k = 0; k < 10000; k++) {
+      free(ptrs[k]);
+    }
+  });
+}
+
+extern.trace("Malloc: " + mTotal + ", Free: " + fTotal);
+extern.trace("Done in " + (new Date() - start) + " checksum: " + sum);

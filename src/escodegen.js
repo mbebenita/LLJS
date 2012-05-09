@@ -85,7 +85,8 @@
         WhileStatement: 'WhileStatement',
         WithStatement: 'WithStatement',
         TypeName: 'TypeName',
-        CastExpression: 'CastExpression'
+        CastExpression: 'CastExpression',
+        IdentityExpression: 'IdentityExpression'
     };
 
     Precedence = {
@@ -413,7 +414,9 @@
                 precedence
             );
             break;
-
+        case Syntax.IdentityExpression:
+          result = generateExpression(expr.argument, Precedence.Unary);
+          break;
         case Syntax.UpdateExpression:
             if (expr.prefix) {
                 result = parenthesize(
@@ -789,7 +792,8 @@
             result += generateFunctionBody(stmt);
             break;
         case Syntax.StructDeclaration:
-            result = '// StructDeclaration';
+            // result = '// StructDeclaration';
+            result = "";
             break;
         case Syntax.ReturnStatement:
             if (stmt.argument) {
@@ -884,6 +888,7 @@
         case Syntax.AssignmentExpression:
         case Syntax.ArrayExpression:
         case Syntax.BinaryExpression:
+        case Syntax.IdentityExpression:
         case Syntax.CallExpression:
         case Syntax.ConditionalExpression:
         case Syntax.FunctionExpression:

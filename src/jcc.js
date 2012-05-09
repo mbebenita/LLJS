@@ -1,9 +1,10 @@
 load("util.js");
+var options = new OptionSet("option(s)");
+
 load("esprima.js");
 load("escodegen.js");
 load("compiler.js");
 
-var options = new OptionSet("option(s)");
 
 if (arguments.length === 0) {
   printUsage();
@@ -31,7 +32,7 @@ options.parse(arguments.slice(0, arguments.length - 1));
 
 var source = snarf(file);
 // var node = esprima.parse(source);
-var node = esprima.parse(source);
+var node = esprima.parse(source, {loc: true});
 
 compile(node);
 

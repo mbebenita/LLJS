@@ -2170,7 +2170,7 @@
     };
   }
 
-  function parseVariableDeclaration(kind) {
+  function parseVariableDeclaration(kind, noAssignment) {
     var pointer = parsePointer(),
         id = parseVariableIdentifier(),
         init = null;
@@ -2183,7 +2183,7 @@
     if (kind === 'const') {
       expect('=');
       init = parseAssignmentExpression();
-    } else if (match('=')) {
+    } else if (!noAssignment && match('=')) {
       lex();
       init = parseAssignmentExpression();
     }
@@ -2196,11 +2196,11 @@
     };
   }
 
-  function parseVariableDeclarationList(kind) {
+  function parseVariableDeclarationList(kind, noAssignment) {
     var list = [];
 
     while (index < length) {
-      list.push(parseVariableDeclaration(kind));
+      list.push(parseVariableDeclaration(kind, noAssignment));
       if (!match(',')) {
         break;
       }
@@ -2238,13 +2238,13 @@
     };
   }
 
-  function parseVariableStatement() {
+  function parseVariableStatement(noAssignment) {
     var declarations;
 
     expectKeyword('var');
 
     var typeSpecifier = parseTypeSpecifier();
-    declarations = parseVariableDeclarationList();
+    declarations = parseVariableDeclarationList(undefined, noAssignment);
 
     consumeSemicolon();
 
@@ -2995,7 +2995,7 @@
       if (match('}')) {
         break;
       }
-      statement = parseVariableStatement();
+      statement = parseVariableStatement(true);
       if (typeof statement === 'undefined') {
         break;
       }

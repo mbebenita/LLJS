@@ -123,7 +123,7 @@ var o = (function() {
 
 var start = new Date();
 
-function time (fn) {
+function timxe (fn) {
   var start = new Date();
   fn();
   return new Date() - start;

@@ -681,3 +681,25 @@ var IndentingWriter = (function () {
 
   return indentingWriter;
 })();
+
+function isInteger(x) {
+  return parseInt(x) === Number(x);
+}
+
+function isPowerOfTwo(x) {
+  return x && ((x & (x - 1)) === 0);
+}
+
+function wordAlignment(x) {
+  return (x + 3) & ~0x3;
+}
+
+function log2(x) {
+  assert (isPowerOfTwo(x), "Value " + x + " is not a power of two.");
+  return Math.log(x) / Math.LN2;
+}
+
+function div4(x) {
+  assert (x % 4 === 0, "Value " + x + " is not divisible by four.");
+  return x / 4;
+}
