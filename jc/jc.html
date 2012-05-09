@@ -1,0 +1,68 @@
+<html>
+  <head>
+    <title>JS*</title>
+  </head>
+  <script>
+    print = function (x) {
+      console.info(x);
+    }
+  </script>
+  <script src="vendor/jquery-1.6.4.js"></script>
+  <script src="util.js"></script>
+  <script src="peg.js"></script>
+  <script src="compiler.js"></script>
+  <script src="memory.js"></script>
+  <body>
+    <script>
+
+  var FileReader = (function fileReader() {
+
+  function constructor(url, responseType) {
+    this.url = url;
+    this.responseType = responseType || "arraybuffer";
+  }
+
+  constructor.prototype = {
+    readAll: function(progress, complete) {
+      var xhr = new XMLHttpRequest();
+      var async = true;
+      xhr.open("GET", this.url, async);
+      xhr.responseType = this.responseType;
+      if (progress) {
+        xhr.onprogress = function (event) {
+          progress(xhr.response, event.loaded, event.total);
+        };
+      }
+      xhr.onreadystatechange = function (event) {
+        if (xhr.readyState === 4) {
+          complete(xhr.response);
+        }
+      }
+      xhr.setRequestHeader("If-Modified-Since", "Fri, 01 Jan 1960 00:00:00 GMT"); // no-cache
+      xhr.send(null);
+    }
+  };
+  return constructor;
+})();
+
+  var extern = {trace: function (x) {
+    console.info(x);
+  }};
+
+  var parser;
+  new FileReader("jc.peg", "text").readAll(null, function (text) {
+    parser = P.buildParser(text, { trackLineAndColumn: true});
+    new FileReader("tests/simple.jc", "text").readAll(null, function (source) {
+      var com = compile(source);
+      document.write("<pre>" + com + "</pre>");
+
+      var o = new Function (com)();
+      document.write("<pre> Result: " + extern.malloc(10) + "</pre>");
+      document.write("<pre> Result: " + extern.malloc(10) + "</pre>");
+      document.write("<pre> Result: " + extern.malloc(10) + "</pre>");
+
+    });
+  });
+    </script>
+  </body>
+</html>

@@ -11,6 +11,7 @@ var F8 = new Float64Array(M);
 
 var $HP;
 var $SP;
+var $BP;
 var $HP_END;
 var $MAX_STACK_SIZE = 1024 * 1024 / 4;
 
@@ -22,9 +23,10 @@ function resetHeap() {
   $HP = 10;
   $HP_END = U4.length - $MAX_STACK_SIZE;
   $SP = U4.length;
+  $BP = $HP_END;
 }
 
-var mc = function memoryCopyWords(dst, src, len) {
+var memoryCopy = function memoryCopyWords(dst, src, len) {
   if (src === null) {
     return;
   }

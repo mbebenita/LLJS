@@ -1,0 +1,5 @@
+var int x;
+var int *y = &x;
+var int **z = &y;
+*y = 1;
+**z = ***(&z);

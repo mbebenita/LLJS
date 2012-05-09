@@ -1,0 +1,87 @@
+struct Header {
+  Header * next,
+  uint size
+}
+
+var Header base;
+var Header * freep = NULL;
+
+function void * sbrk(int nBytes) {
+  if ($HP + nBytes > $HEAP_SIZE) {
+    extern.assert("Out of memory.");
+    return NULL;
+  }
+  var int p = $HP;
+  $HP += nBytes;
+  return (void *)p;
+}
+
+var int nUnitsMin = 1024 * 1024;
+
+function Header * morecore(uint nUnits) {
+  if (nUnits < nUnitsMin) {
+    nUnits = nUnitsMin;
+  }
+  var void * buffer = sbrk(nUnits * sizeof (Header));
+
+  if (buffer === 0) {
+    return NULL;
+  }
+  var Header * header = (Header *)buffer;
+  header->size = nUnits;
+  free(header + 1);
+  return freep;
+}
+
+function void * malloc(int nBytes) {
+  var Header *p, *prevp;
+  var uint nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
+  if ((prevp = freep) === NULL) {
+    base.next = freep = prevp = &base;
+    base.size = 0;
+  }
+  for (p = prevp->next; true; prevp = p, p = p->next) {
+    if (p->size >= nUnits) {
+      if (p->size === nUnits) {
+        prevp->next = p->next;
+      } else {
+        p->size -= nUnits;
+        p += p->size;
+        p->size = nUnits;
+      }
+      freep = prevp;
+      return p + 1;
+    }
+    if (p === freep) {
+      if ((p = morecore(nUnits)) == NULL) {
+        return NULL;
+      }
+    }
+  }
+  return NULL;
+}
+
+function void free(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+extern.malloc = malloc;
+extern.free = free;
