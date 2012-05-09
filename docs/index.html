@@ -298,12 +298,15 @@ function executeExample(id) {
   var number = id.split(":")[1];
   var result = document.getElementById("ex:" + number + ":result");
   try {
-    resetMemory();
+    resetHeap();
     result.innerHTML = "";
     extern.trace = function (x) {
       result.innerHTML += x;
     };
-    new Function (compile(this.value))();
+    var node = esprima.parse(this.getValue(), {loc: true});
+    compile(node);
+    var code = escodegen.generate(node, {base: "", indent: "  "});
+    new Function (code)();
   } catch (x) {
     result.innerHTML = x.message;
   }
@@ -315,6 +318,11 @@ $('.jcCode').each(function() {
     tabSize: 2,
     onChange: function () {
       compileExample.call(cm, id);
+    },
+    extraKeys: {
+      "Ctrl-R": function () {
+        executeExample.call(cm, id);
+      }
     }
   });
   compileExample.call(cm, id);

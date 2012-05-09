@@ -104,7 +104,6 @@ for (var i = 0; i < 1000; i++) {
   mTotal += time(function () {
     for (var j = 0; j < 10000; j++) {
       ptrs[j] = malloc(32);
-      // extern.trace("Allocated: " + ptrs[j]);
     }
   });
 

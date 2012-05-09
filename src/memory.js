@@ -28,11 +28,12 @@ function resetHeap() {
 
 var memoryCopy = function memoryCopyWords(dst, src, len) {
   if (src === null) {
-    return;
+    return dst;
   }
   for (var i = 0; i < len; i++) {
     U4[dst++] = U4[src++];
   }
+  return dst;
 };
 
 function memoryCopyBytes(dst, src, len) {

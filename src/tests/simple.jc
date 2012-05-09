@@ -10,11 +10,11 @@ struct Line {
   var Point e;
 }
 
-// var Line l, *pl = &l;
-
-// var Point z = pl->s;
-
 var Line *p = new Line;
+var Line *x;
+
+*x = *p = *p;
+
 
 /*
 var i8 a, *pa = &a;
