@@ -510,6 +510,7 @@ function createDefaultValue(type) {
 
 function createStackPointer() {
   return createMember(createIdentifier("U4"), createLiteral(0), types.intPointer, true);
+  // return createIdentifier("$SP", types.intPointer);
 }
 
 var Variable = (function () {
@@ -569,7 +570,7 @@ function createImports(imports, name) {
           "type": "Identifier",
           "name": x
         },
-        init: createMember(createIdentifier(name), createIdentifier(x), types.dyn, true)
+        init: createMember(createIdentifier(name), createIdentifier(x), types.dyn, false)
       };
     })
   };
@@ -625,16 +626,6 @@ function createModule(program, name) {
     body.push(createImports(["I1", "U1", "I2", "U2", "I4", "U4", "malloc", "free"], "$M"));
   }
   body = body.concat(program.body);
-
-  if (program.scope.frameSizeInWords) {
-    body.push (
-      createExpressionStatement (
-        createAssignment (
-          createStackPointer(), "+=", createLiteral(program.scope.frameSizeInWords, types.int)
-        )
-      )
-    );
-  }
 
   body = body.concat({
     "type": "ReturnStatement",
@@ -823,7 +814,7 @@ function process(node, types) {
 
   tracer.writeLn("Scan Done");
 
-  function createFrame(scope) {
+  function createPrologue(scope) {
     var code = [];
 
     var constants = {};
@@ -862,6 +853,20 @@ function process(node, types) {
     return code;
   }
 
+  function createEpilogue(scope) {
+    var code = [];
+    if (scope.frameSizeInWords) {
+      code.push (
+        createExpressionStatement (
+          createAssignment (
+            createStackPointer(), "+=", createLiteral(scope.frameSizeInWords, types.int)
+          )
+        )
+      );
+    }
+    return code;
+  }
+
   var typeFunctions = {
     Program: function Program() {
       var scope = this.scope;
@@ -873,15 +878,18 @@ function process(node, types) {
       scope.addVariable(new Variable("load", new FunctionType(types.dyn, [types.dyn])));
       scope.addVariable(new Variable("malloc", new FunctionType(types.voidPointer, [types.int])));
       walkList(this.body, this.scope, typeFunctions);
-      this.body = createFrame(this.scope).concat(this.body);
+      var prologue = createPrologue(this.scope);
+      var epilogue = createEpilogue(this.scope);
+      this.body = prologue.concat(this.body).concat(epilogue);
     },
     StructDeclaration: function StructDeclaration(scope) { },
     FunctionDeclaration: function FunctionDeclaration() {
       var scope = this.scope;
       walk(this.body, scope, typeFunctions);
-      var prologue = createFrame(this.scope);
+      var prologue = createPrologue(this.scope);
+      var epilogue = createEpilogue(this.scope);
       if (this.body.type === "BlockStatement") {
-        this.body.body = prologue.concat(this.body.body);
+        this.body.body = prologue.concat(this.body.body).concat(epilogue);
       } else {
         assert (false);
       }

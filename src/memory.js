@@ -1,68 +1,115 @@
-var M = new ArrayBuffer(1024 * 1024 * 32);
-
-var U1 = new Uint8Array(M);
-var I1 = new Int16Array(M);
-var U2 = new Uint16Array(M);
-var I2 = new Int16Array(M);
-var U4 = new Uint32Array(M);
-var I4 = new Int32Array(M);
-var F4 = new Float32Array(M);
-var F8 = new Float64Array(M);
-
-var $HP;
-var $SP;
-var $BP;
-var $HP_END;
-var $MAX_STACK_SIZE = 1024 * 1024 / 4;
-
-function ma(size) {
-  return $HP += size;
-}
-
-function resetHeap() {
-  $HP = 10;
-  $HP_END = U4.length - $MAX_STACK_SIZE;
-  $SP = U4.length;
-  $BP = $HP_END;
-}
-
-var memoryCopy = function memoryCopyWords(dst, src, len) {
-  if (src === null) {
+modules.memory = function () {
+  var exports = {};
+  const MB = 1024 * 1024;
+  const SIZE = 32 * MB;
+  const STACK_SIZE = 2 * MB;
+  const HEAP_SIZE = SIZE - STACK_SIZE;
+  var I4, U4;
+  function memoryCopy(dst, src, length) {
+    const $I4 = I4;
+    var $TU4 = null;
+    for (var i = 0; i < length; i = i + 1 | 0) {
+      $I4[($TU4 = dst, dst = dst + 1, $TU4)] = $I4[($TU4 = src, src = src + 1, $TU4)];
+    }
     return dst;
   }
-  for (var i = 0; i < len; i++) {
-    U4[dst++] = U4[src++];
+  
+  var base = 0 >> 2;
+  var freep = 0 >> 2;
+  function resetMemory() {
+    var M = exports.M = new ArrayBuffer(SIZE);
+    exports.U1 = new Uint8Array(M);
+    exports.I1 = new Int16Array(M);
+    exports.U2 = new Uint16Array(M);
+    exports.I2 = new Int16Array(M);
+    U4 = exports.U4 = new Uint32Array(M);
+    I4 = exports.I4 = new Int32Array(M);
+    exports.F4 = new Float32Array(M);
+    exports.F8 = new Float64Array(M);
+    U4[0] = 4;
+    U4[1] = SIZE;
+    base = 2;
+    freep = 0 >> 2;
   }
-  return dst;
-};
-
-function memoryCopyBytes(dst, src, len) {
-  if (src === null) {
-    return;
-  }
-  var i = 0;
-  if (len & 3 === 0) {
-    len >>= 2;
-    for (; i < len; i++) {
-      U4[dst++] = U4[src++];
+  resetMemory();
+  function sbrk(nBytes) {
+    var nWords = nBytes / 4 | 0;
+    if (U4[0] + nWords > HEAP_SIZE) {
+      trace('Out of Memory');
+      return 0;
     }
-  } else if (len & 1 === 0) {
-    len >>= 1;
-    for (; i < len; i++) {
-      U2[dst++] = U2[src++];
-    }
-  } else {
-    for (; i < len; i++) {
-      U1[dst++] = U1[src++];
-    }
+    var address = U4[0] << 2;
+    U4[0] = U4[0] + nWords;
+    return address;
   }
-};
-
-resetHeap();
-
-var extern = {
-  trace: function (x) { print(x); },
-  toHex: function (x) {
-    return "0x" + Number(x).toString(16);
+  var nUnitsMin = 1024 >>> 0;
+  function morecore(nUnits) {
+    const $U4 = U4;
+    if (nUnits < nUnitsMin) {
+      nUnits = nUnitsMin | 0;
+    }
+    var buffer = sbrk(nUnits * 8 | 0);
+    if (buffer === 0) {
+      return 0 >> 2;
+    }
+    var header = (buffer >> 2);
+    $U4[header + 1] = nUnits >>> 0;
+    free(header + 1 * 2 << 2);
+    return freep;
   }
+  function malloc(nBytes) {
+    const $U4 = U4;
+    var p = 0, prevp = 0;
+    var nUnits = (nBytes + 8 - 1) / 8 + 1 | 0;
+    if ((prevp = freep) === 0) {
+      $U4[base] = (freep = (prevp = base));
+      $U4[base + 1] = 0 >>> 0;
+    }
+    for (p = $U4[prevp]; true; prevp = p, p = $U4[p]) {
+      if ($U4[p + 1] >= nUnits) {
+        if ($U4[p + 1] === nUnits) {
+          $U4[prevp] = $U4[p];
+        } else {
+          $U4[p + 1] = $U4[p + 1] - nUnits >>> 0;
+          p += ($U4[p + 1] | 0) * 2;
+          $U4[p + 1] = nUnits >>> 0;
+        }
+        freep = prevp;
+        return p + 1 * 2 << 2;
+      }
+      if (p === freep) {
+        if ((p = morecore(nUnits)) == 0) {
+          return 0;
+        }
+      }
+    }
+    return 0;
+  }
+  function free(ap) {
+    const $U4 = U4;
+    var bp = ((ap >> 2) - 1 * 2), p = 0;
+    for (p = freep; !(bp > p && bp < $U4[p]); p = $U4[p]) {
+      if (p >= $U4[p] && (bp > p || bp < $U4[p])) {
+        break;
+      }
+    }
+    if (bp + $U4[bp + 1] * 2 === $U4[p]) {
+      $U4[bp + 1] = $U4[bp + 1] + $U4[$U4[p] + 1] >>> 0;
+      $U4[bp] = $U4[$U4[p]];
+    } else {
+      $U4[bp] = $U4[p];
+    }
+    if (p + $U4[p + 1] * 2 == bp) {
+      $U4[p + 1] = $U4[p + 1] + $U4[bp + 1] >>> 0;
+      $U4[p] = $U4[bp];
+    } else {
+      $U4[p] = bp;
+    }
+    freep = p;
+  }
+  exports.resetMemory = resetMemory;
+  exports.memoryCopy = memoryCopy;
+  exports.malloc = malloc;
+  exports.free = free;
+  return exports;
 };
