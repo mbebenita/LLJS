@@ -1,6 +1,6 @@
 <html>
 <head>
-  <title>JS*</title>
+  <title>*JS</title>
   <link rel="stylesheet" type="text/css" href="css/docs.css" />
   <link rel="stylesheet" type="text/css" href="css/idle.css" />
 </head>
@@ -19,10 +19,12 @@
   var options = new OptionSet("option(s)");
 </script>
 <script src="vendor/jquery-1.6.4.js"></script>
+<script src="jc/modules.js"></script>
 <script src="jc/esprima.js"></script>
 <script src="jc/escodegen.js"></script>
 <script src="jc/compiler.js"></script>
 <script src="jc/memory.js"></script>
+<script src="jc/krmalloc.js"></script>
 <body>
   <div class="container">
     <h1>*JS : Low-Level JavaScript</h1>
@@ -36,10 +38,17 @@
       In addition, *JS lets you define struct and pointer types.
     </p>
 
-    <h4>Variables</h4>
     <p>
-      Unlike JavaScript, *JS variable declarations are block scoped and can be annotated with type information.
+      This is an interactive tutorial, code is compiled as you type.
+      To execute the compiled code use <tt>Ctrl-R</tt> or <tt>Alt-/</tt>.
     </p>
+
+
+<h4>Variables & Arithmetic</h4>
+<p>
+  Unlike JavaScript, *JS variable declarations are block scoped and can be annotated with type information.
+  Untyped variable declarations are defaulted to the <tt>dyn</tt> type.
+</p>
 
 <pre class="example">
 var x;               // Declare 'x' as dyn.
@@ -51,9 +60,24 @@ y = (int) x;         // Assignment of 'x' to 'y' requires an explicit cast.
 var int z = y + 1;   // Although 'y' is of type int, the binary expression
                      // y + 1 is of type num and requires an implicit cast.
 
-var uint w = z;      // Unsigned types are suported but discouraged because
-                     // they can be quite slow because they can overflow to
-                     // doubles.
+var uint w = z;      // Unsigned integer types are suported but are discouraged
+                     // because JavaScript engines usually store numbers that
+                     // are larger than max signed int in doubles rather than
+                     // 32 bit ints.
+
+timer.begin("Empty For loop with signed integers.");
+
+for (var int i = 0; i < 50000000; ++i) { }
+
+timer.begin("Empty For loop with unsigned integers.");
+
+for (var uint i = 0; i < 50000000; ++i) { }
+
+timer.begin("Empty For loop with untyped integers.");
+
+for (var i = 0; i < 50000000; ++i) { }
+
+
 </pre>
 
 <p>
@@ -120,9 +144,11 @@ function void swap(int *a, int *b) {
   *b = t;
 }
 
-var int x, y;
+var int x = 1, y = 2;
 
 swap(&x, &y);
+
+trace("x = " + x + ", y = " + y);
 
 </pre>
 
@@ -172,30 +198,84 @@ function void add (int value) {
       <tt>malloc</tt> and <tt>free</tt> are themselves implemented in *JS, see proof below:
     </p>
 <pre class="example">
-/* K&R Malloc */
+const MB = 1024 * 1024;
+const SIZE = 32 * MB;
+const STACK_SIZE = 2 * MB;
+const HEAP_SIZE = SIZE - STACK_SIZE;
+
+var I4, U4;
+
+/*
+   +---------------+ -
+ 0 | Heap  Pointer |
+ 1 | Stack Pointer |
+   +---------------+ <- Heap Pointer (HP)
+   |               |
+   |               | |
+   |     HEAP      | | Malloc Region
+   |               | v
+   |               |
+   +---------------+
+   |               |
+   |               | ^
+   |     STACK     | |
+   |               | |
+   |               |
+   +---------------+ <- Stack Pointer (SP)
+*/
+
+function int * memoryCopy(int *dst, int *src, int length) {
+  for (var int i = 0; i < length; ++i) {
+    *dst++ = *src++;
+  }
+  return dst;
+}
+
+
+/* K & R Malloc */
 
 struct Header {
   var Header * next;
   var uint size;
 }
 
-var Header base;
+var Header * base = NULL;
 var Header * freep = NULL;
+
+function resetMemory() {
+  var M = exports.M = new ArrayBuffer(SIZE);
+  exports.U1 = new Uint8Array(M);
+  exports.I1 = new Int16Array(M);
+  exports.U2 = new Uint16Array(M);
+  exports.I2 = new Int16Array(M);
+  U4 = exports.U4 = new Uint32Array(M);
+  I4 = exports.I4 = new Int32Array(M);
+  exports.F4 = new Float32Array(M);
+  exports.F8 = new Float64Array(M);
+
+  U4[0] = 4;
+  U4[1] = SIZE;
+
+  base = (Header *)2;
+  freep = NULL;
+}
+
+resetMemory();
 
 function void * sbrk(int nBytes) {
   var int nWords = nBytes / sizeof (u32);
-  if ($HP + nWords > $HP_END) {
-    extern.assert("Ran out of memory.");
+  if (U4[0] + nWords > HEAP_SIZE) {
+    trace("Out of Memory");
     return NULL;
   }
-  var void * address = $HP;
-  $HP += nWords;
+  var void * address = (int *)U4[0];
+  U4[0] += nWords;
   return address;
 }
 
 var uint nUnitsMin = 1024;
 
-function Header * morecore(uint nUnits) {
+function Header * morecore(int nUnits) {
   if (nUnits < nUnitsMin) {
     nUnits = nUnitsMin;
   }
@@ -212,10 +292,11 @@ function Header * morecore(uint nUnits) {
 
 function void * malloc(int nBytes) {
   var Header *p, *prevp;
-  var uint nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
+  var int nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
+
   if ((prevp = freep) === NULL) {
-    base.next = freep = prevp = &base;
-    base.size = 0;
+    base->next = freep = prevp = base;
+    base->size = 0;
   }
   for (p = prevp->next; true; prevp = p, p = p->next) {
     if (p->size >= nUnits) {
@@ -280,30 +361,87 @@ $('.example').replaceWith(function() {
   // <div class="minibutton ok run" title="Ctrl-Enter">Run</div>
 });
 
+var lastMarker;
 function compileExample(id) {
+  if (lastMarker) {
+    this.clearMarker(lastMarker);
+  }
   var number = id.split(":")[1];
   var result = document.getElementById("ex:" + number + ":result");
   try {
     var node = esprima.parse(this.getValue(), {loc: true});
-    compile(node);
+    compile(node, "EX_" + number);
     result.innerHTML = escodegen.generate(node, {base: "", indent: "  "});
   } catch (x) {
     result.innerHTML = x.message;
+    if (x.lineNumber !== undefined) {
+      lastMarker = this.setMarker(x.lineNumber - 1, "<span style=\"color: #900\">o</span> %N%");
+    }
   }
 }
 
 var extern = {};
 
+var Timer = (function () {
+  function timer() {
+    this.name = null;
+    this.start = null;
+  }
+
+  timer.prototype.begin = function (name) {
+    if (this.start) {
+      if (this.name) {
+        extern.trace("Timer: " + (new Date() - this.start) + " ms: " + this.name);
+      } else {
+        extern.trace("Timer: " + (new Date() - this.start) + " ms.");
+      }
+    }
+    this.start = new Date();
+    this.name = name;
+  };
+
+  return timer;
+})();
+
+var timer;
+var trace;
+
 function executeExample(id) {
   var number = id.split(":")[1];
   var result = document.getElementById("ex:" + number + ":result");
   try {
-    resetMemory();
+    require("memory").resetMemory();
+
+    timer = new Timer();
+
     result.innerHTML = "";
-    extern.trace = function (x) {
-      result.innerHTML += x;
+
+    extern.trace = trace = function (x) {
+      result.innerHTML += x + "\n";
     };
-    new Function (compile(this.value))();
+
+    var start = new Date();
+    var node = esprima.parse(this.getValue(), {loc: true});
+    result.innerHTML += "Parser: " + (new Date() - start) + " ms, ";
+
+    start = new Date();
+    node = compile(node, "EX_" + number);
+    result.innerHTML += "Compiler: " + (new Date() - start) + " ms, ";
+
+    start = new Date();
+    var code = escodegen.generate(node, {base: "", indent: "  "});
+    result.innerHTML += "Code Generator: " + (new Date() - start) + " ms.\n";
+    result.innerHTML += "-----------------------------------------------------\n";
+
+    start = new Date();
+    new Function (code)();
+    var fn = modules["EX_" + number];
+    fn();
+
+    timer.begin(null);
+    result.innerHTML += "-----------------------------------------------------\n";
+    result.innerHTML += "Executed in : " + (new Date() - start) + " ms.";
+
   } catch (x) {
     result.innerHTML = x.message;
   }
@@ -313,8 +451,18 @@ $('.jcCode').each(function() {
   var id = this.id;
   var cm = CodeMirror.fromTextArea(this, {
     tabSize: 2,
+    lineNumbers: true,
+    gutter: true,
     onChange: function () {
       compileExample.call(cm, id);
+    },
+    extraKeys: {
+      "Ctrl-R": function () {
+        executeExample.call(cm, id);
+      },
+      "Cmd-Enter": function () {
+        executeExample.call(cm, id);
+      }
     }
   });
   compileExample.call(cm, id);

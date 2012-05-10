@@ -1,45 +1,17 @@
-modules.memory = function () {
+modules.krmalloc = function () {
   var exports = {};
-  const MB = 1024 * 1024;
-  const SIZE = 32 * MB;
-  const STACK_SIZE = 2 * MB;
-  const HEAP_SIZE = SIZE - STACK_SIZE;
-  var I4, U4;
-  function memoryCopy(dst, src, length) {
-    const $I4 = I4;
-    var $TU4 = null;
-    for (var i = 0; i < length; i = i + 1 | 0) {
-      $I4[($TU4 = dst, dst = dst + 1, $TU4)] = $I4[($TU4 = src, src = src + 1, $TU4)];
-    }
-    return dst;
-  }
+  const $BP = $MP += 2;
   
-  var base = 0 >> 2;
+  var _ = memoryCopy(($BP + 0), null, 2);
   var freep = 0 >> 2;
-  function resetMemory() {
-    var M = exports.M = new ArrayBuffer(SIZE);
-    exports.U1 = new Uint8Array(M);
-    exports.I1 = new Int16Array(M);
-    exports.U2 = new Uint16Array(M);
-    exports.I2 = new Int16Array(M);
-    U4 = exports.U4 = new Uint32Array(M);
-    I4 = exports.I4 = new Int32Array(M);
-    exports.F4 = new Float32Array(M);
-    exports.F8 = new Float64Array(M);
-    U4[0] = 4;
-    U4[1] = SIZE;
-    base = 2;
-    freep = 0 >> 2;
-  }
-  resetMemory();
   function sbrk(nBytes) {
     var nWords = nBytes / 4 | 0;
-    if (U4[0] + nWords > HEAP_SIZE) {
+    if ($HP + nWords > $HP_END) {
       trace('Out of Memory');
       return 0;
     }
-    var address = U4[0] << 2;
-    U4[0] = U4[0] + nWords;
+    var address = $HP << 2;
+    $HP += nWords;
     return address;
   }
   var nUnitsMin = 1024 >>> 0;
@@ -62,8 +34,9 @@ modules.memory = function () {
     var p = 0, prevp = 0;
     var nUnits = (nBytes + 8 - 1) / 8 + 1 | 0;
     if ((prevp = freep) === 0) {
-      $U4[base] = (freep = (prevp = base));
-      $U4[base + 1] = 0 >>> 0;
+      $U4[($BP + 0)] = (freep = (prevp = ($BP + 0)));
+      $U4[($BP + 0) + 1] = 0 >>> 0;
+      trace('ADDRESS OF BASE: ' + ($BP + 0));
     }
     for (p = $U4[prevp]; true; prevp = p, p = $U4[p]) {
       if ($U4[p + 1] >= nUnits) {
@@ -107,8 +80,6 @@ modules.memory = function () {
     }
     freep = p;
   }
-  exports.resetMemory = resetMemory;
-  exports.memoryCopy = memoryCopy;
   exports.malloc = malloc;
   exports.free = free;
   return exports;

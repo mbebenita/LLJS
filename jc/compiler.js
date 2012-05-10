@@ -205,10 +205,15 @@ var Scope = (function () {
     this.parent = parent;
     this.types = {};
     this.variables = {};
-    this.global = type === "global";
+    this.type = type;
     this.options = parent ? Object.create(parent.options) : {};
-    if (type === "global" || type === "function") {
+    if (type === "function") {
       this.options.cachedLocals = {};
+      this.functionScope = this;
+      this.hoistedVariables = {};
+    } else if (type === "block") {
+      this.functionScope = parent.functionScope;
+      assert (this.functionScope.type === "function");
     }
   }
 
@@ -216,8 +221,10 @@ var Scope = (function () {
     var variable = this.variables[name];
     if (variable) {
       return variable;
+    } else if (this.type === "function" && this.hoistedVariables[name]) {
+      return this.hoistedVariables[name];
     } else if (!local && this.parent) {
-      return this.parent.getVariable(name);
+      return this.parent.getVariable(name, local);
     }
     return null;
   };
@@ -228,6 +235,17 @@ var Scope = (function () {
     tracer.writeLn("Added variable " + variable + " to scope " + this);
     variable.scope = this;
     this.variables[variable.name] = variable;
+    if (this.type === "block") {
+      this.functionScope.addHoistedVariable(variable);
+    }
+  };
+
+  scope.prototype.addHoistedVariable = function(variable) {
+    assert (this.type === "function");
+    var name = variable.name;
+    name = variable.name + "$" + Object.keys(this.hoistedVariables).length;
+    variable.name = name;
+    this.hoistedVariables[name] = variable;
   };
 
   scope.prototype.getType = function getType(name, strict) {
@@ -258,19 +276,34 @@ var Scope = (function () {
     this.options.cachedLocals[cachedName] = name;
     return cachedName;
   };
+  scope.prototype.getTempName = function getTempName(type) {
+    assert (type);
+    var name = "T" + (type.signed ? "I" : "U") + type.size;
+    var cachedName = "$" + name;
+    this.options.cachedLocals[cachedName] = null;
+    return cachedName;
+  };
   scope.prototype.toString = function toString() {
     return this.name;
   };
 
   scope.prototype.close = function close() {
     var wordOffset = 0;
-    for (var key in this.variables) {
-      var x = this.variables[key];
+    function computeOffset(x) {
       if (x.isStackAllocated) {
         x.wordOffset = wordOffset;
         wordOffset += wordAlignment(x.type.getSize()) / 4;
       }
     }
+
+    mapObject(this.variables, function (k, v) {
+      computeOffset(v);
+    });
+
+    mapObject(this.hoistedVariables, function (k, v) {
+      computeOffset(v);
+    });
+
     this.frameSizeInWords = wordOffset;
   };
 
@@ -331,7 +364,12 @@ function reportError(node, message) {
     str = "At " + node.type + ": ";
   }
 
-  throw new Error(str + message);
+  var error = new Error(str + message);
+  if (position) {
+    error.lineNumber = position.start.line;
+    error.column = position.start.column;
+  }
+  throw error;
 }
 
 function checkTypeAssignment(node, a, b, message) {
@@ -347,23 +385,40 @@ function check(node, condition, message) {
   }
 }
 
-
-function createLiteral(value) {
-  return {type: "Literal", value: value};
+function createLiteral(value, type) {
+  assert (value !== undefined);
+  return {type: "Literal", value: value, cType: type, fixed: true};
 }
 
-function createIdentifier(name) {
-  return {type: "Identifier", name: name};
+function createIdentifier(name, type, fixed) {
+  return {type: "Identifier", name: name, cType: type, fixed: fixed};
+}
+
+function createMember(object, property, type, computed) {
+  return {
+    type: "MemberExpression",
+    computed: computed,
+    object: object,
+    property: property,
+    cType: type
+  };
 }
 
 function createBinary(left, operator, right, type) {
-  assert (type);
   return {
     type: "BinaryExpression",
     operator: operator,
     left: left,
     right: right,
     cType: type
+  };
+}
+
+
+function createSequence(expressions) {
+  return {
+    type: "SequenceExpression",
+    expressions: expressions
   };
 }
 
@@ -383,7 +438,8 @@ function createCall(callee, args, type) {
     type: "CallExpression",
     callee: callee,
     arguments: args,
-    cType: type
+    cType: type,
+    fixed: true
   };
 }
 
@@ -411,22 +467,11 @@ function createMemoryAccess(scope, type, address, byteOffset) {
     assert (byteOffset % typeSize === 0, "Unaligned byte offset " + byteOffset + " for type " + quote(type) + " with size " + type.getSize());
     var offset = byteOffset / typeSize;
     if (offset) {
-      address = createBinary(address, "+", createLiteral(offset), address.cType);
+      address = createBinary(address, "+", createLiteral(offset, types.int), address.cType);
     }
   }
-  return {
-    type: "MemberExpression",
-    computed: true,
-    object: {
-      type: "Identifier",
-      name: scope.getViewName(type),
-      cType: new PointerType(type)
-    },
-    property: address,
-    cType: type
-  };
+  return createMember(createIdentifier(scope.getViewName(type), new PointerType(type)), address, type, true);
 }
-
 
 function createConversion(value, lType) {
   assert (value);
@@ -439,27 +484,33 @@ function createConversion(value, lType) {
     var shift = log2(Math.min(rType.type.size, types.word.size)) -
                 log2(Math.min(lType.type.size, types.word.size));
     if (shift) {
-      value = createBinary(value, (shift > 0 ? "<<" : ">>"), createLiteral(Math.abs(shift)), lType);
+      value = createBinary(value, (shift > 0 ? "<<" : ">>"), createLiteral(Math.abs(shift), types.int), lType);
     } else {
       value = createIdentity(value, lType);
     }
   } else if (lType instanceof Type && rType instanceof Type) {
     if (lType === types.u32) {
-      value = createBinary(value, ">>>", createLiteral(0), lType);
+      value = createBinary(value, ">>>", createLiteral(0, types.int), lType);
     } else if (lType === types.i32) {
-      value = createBinary(value, "|", createLiteral(0), lType);
+      value = createBinary(value, "|", createLiteral(0, types.int), lType);
     } else if (lType === types.num) {
       // No Conversion Needed
     }
+  } else if (rType === types.dyn) {
+    value = createIdentity(value, lType);
+  } else if (lType instanceof PointerType && rType === types.int) {
+    value = createIdentity(value, lType);
   }
   return value;
 }
 
 function createDefaultValue(type) {
-  var node = createLiteral(type.defaultValue);
-  node.cType = type;
-  node.fixed = true;
-  return node;
+  return createLiteral(type.defaultValue, type);
+}
+
+function createStackPointer() {
+  return createMember(createIdentifier("U4"), createLiteral(0), types.intPointer, true);
+  // return createIdentifier("$SP", types.intPointer);
 }
 
 var Variable = (function () {
@@ -482,14 +533,14 @@ var Variable = (function () {
   };
   variable.prototype.getMemoryAccess = function getMemoryAccess(scope) {
     assert (this.isStackAllocated);
-    return createMemoryAccess (scope, this.type, this.getAddress());
+    return createMemoryAccess (scope, this.type, this.getAddress(scope));
   };
-  variable.prototype.getAddress = function getAddress() {
+  variable.prototype.getAddress = function getAddress(scope) {
     assert (this.isStackAllocated);
     var wordAddress = createBinary (
-      createIdentifier(this.scope.global ? "$BP" : "$SP"),
+      createStackPointer(),
       "+",
-      createLiteral(this.wordOffset),
+      createLiteral(this.wordOffset, types.int),
       types.wordPointer
     );
     return createConversion(wordAddress, new PointerType(this.type));
@@ -498,21 +549,150 @@ var Variable = (function () {
 })();
 
 var tracer;
-function compile(node) {
+
+function compile(node, name) {
   tracer = new IndentingWriter(!trace.value);
   if (trace.value) {
     print (JSON.stringify(node, null, 2));
   }
-  computeTypes(node, types);
+  process(node, types);
+  return createModule(node, name);
 }
 
+function createImports(imports, name) {
+  return {
+    type: "VariableDeclaration",
+    kind: "const",
+    declarations: imports.map(function (x) {
+      return {
+        type: "VariableDeclarator",
+        id: {
+          "type": "Identifier",
+          "name": x
+        },
+        init: createMember(createIdentifier(name), createIdentifier(x), types.dyn, false)
+      };
+    })
+  };
+}
+
+function createModule(program, name) {
+  var body = [
+    {
+      "type": "VariableDeclaration",
+      "declarations": [
+        {
+          "type": "VariableDeclarator",
+          "id": {
+            "type": "Identifier",
+            "name": "exports"
+          },
+          "init": {
+            "type": "ObjectExpression",
+            "properties": []
+          }
+        }
+      ],
+      "kind": "var"
+    }
+  ];
+  if (name !== "memory") {
+    body.push({
+      "type": "VariableDeclaration",
+      "declarations": [
+        {
+          "type": "VariableDeclarator",
+          "id": {
+            "type": "Identifier",
+            "name": "$M"
+          },
+          "init": {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "require"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": "memory"
+              }
+            ]
+          }
+        }
+      ],
+      "kind": "const"
+    });
+    body.push(createImports(["I1", "U1", "I2", "U2", "I4", "U4", "malloc", "free"], "$M"));
+  }
+  body = body.concat(program.body);
+
+  body = body.concat({
+    "type": "ReturnStatement",
+    "argument": {
+      "type": "Identifier",
+      "name": "exports"
+    }
+  });
+
+  return {
+    "type": "Program",
+    "body": [
+      {
+        "type": "ExpressionStatement",
+        "expression":{
+          "type": "AssignmentExpression",
+          "operator": "=",
+          "left": createMember(createIdentifier("modules"), createIdentifier(name), types.dyn, false),
+          "right": {
+            "type": "FunctionExpression",
+            "id": null,
+            "params": [],
+            "body": {
+              "type": "BlockStatement",
+              "body": body
+            }
+          }
+        }
+      }
+    ]
+  };
+}
 
 function isIdentifier(node) {
   assert (node);
   return node.type === "Identifier";
 }
 
-function computeTypes(node, types) {
+var binaryOperators = {
+  "+":   {name: "+", computeType: function (l, r) { return types.dyn; }},
+  "-":   {name: "-", computeType: function (l, r) { return types.dyn; }},
+  "*":   {name: "*", computeType: function (l, r) { return types.dyn; }},
+  "/":   {name: "/", computeType: function (l, r) { return types.dyn; }},
+  "&":   {name: "&", computeType: function (l, r) { return types.int; }},
+  "<<":  {name: "<<", computeType: function (l, r) { return types.int; }},
+  ">>":  {name: ">>", computeType: function (l, r) { return types.int; }},
+  ">>>": {name: ">>>", computeType: function (l, r) { return types.uint; }},
+  "|":   {name: "|", computeType: function (l, r) { return types.int; }},
+  "^":   {name: "^", computeType: function (l, r) { return types.int; }},
+  "&":   {name: "&", computeType: function (l, r) { return types.int; }}
+};
+
+var assignmentOperators = {
+  "+=":   binaryOperators["+"],
+  "-=":   binaryOperators["-"],
+  "*=":   binaryOperators["*"],
+  "/=":   binaryOperators["/"],
+  "&=":   binaryOperators["&"],
+  "<<=":  binaryOperators["<<"],
+  ">>=":  binaryOperators[">>"],
+  ">>>=": binaryOperators[">>>"],
+  "|=":   binaryOperators["|"],
+  "^=":   binaryOperators["^"],
+  "&=":   binaryOperators["&"]
+};
+
+function process(node, types) {
 
   function TypeName(scope) {
     var type = scope.getType(this.typeSpecifier, true);
@@ -526,7 +706,7 @@ function computeTypes(node, types) {
 
   var scanFunctions = {
     Program: function Program() {
-      this.scope = new Scope(null, "Program", "global");
+      this.scope = new Scope(null, "Program", "function");
       this.scope.types = clone(types);
       walkRecursively(this.body, this.scope, scanFunctions);
       this.scope.close();
@@ -567,6 +747,7 @@ function computeTypes(node, types) {
       });
       var type = new FunctionType(returnType, parameterTypes);
       scope.options.functionType = type;
+      scope.options.functionScope = scope;
       outerScope.addVariable(new Variable(this.id.name, type));
       walkRecursively(this.body, this.scope, scanFunctions);
       this.scope.close();
@@ -597,6 +778,17 @@ function computeTypes(node, types) {
           scope.getVariable(this.argument.name).isStackAllocated = true;
         }
       }
+    },
+    ForStatement: function(scope) {
+      scope = this.scope = new Scope(scope, "ForStatement", "block");
+      walkRecursively(this.init, scope, scanFunctions);
+      walkRecursively(this.test, scope, scanFunctions);
+      walkRecursively(this.update, scope, scanFunctions);
+      walkRecursively(this.body, scope, scanFunctions);
+    },
+    BlockStatement: function(scope) {
+      scope = this.scope = new Scope(scope, "BlockStatement", "block");
+      walkRecursively(this.body, scope, scanFunctions);
     }
   };
   function walkRecursively(node, scope, functions) {
@@ -622,20 +814,55 @@ function computeTypes(node, types) {
 
   tracer.writeLn("Scan Done");
 
-  function createFrame(scope) {
+  function createPrologue(scope) {
     var code = [];
-    if (Object.keys(scope.options.cachedLocals).length) {
-      code.push({
-        type: "VariableDeclaration",
-        kind: "const",
-        declarations: mapObject(scope.options.cachedLocals, function (k, v) {
-          return {
-            type: "VariableDeclarator",
-            id: createIdentifier(k),
-            init: createIdentifier(v)
-          };
-        })
-      });
+
+    var constants = {};
+    var variables = {};
+
+    mapObject(scope.options.cachedLocals, function (k, v) {
+      (v ? constants : variables)[k] = v;
+    });
+
+    [constants, variables].forEach(function (set) {
+      if (Object.keys(set).length) {
+        code.push({
+          type: "VariableDeclaration",
+          kind: set === constants ? "const": "var",
+          declarations: mapObject(set, function (k, v) {
+            return {
+              type: "VariableDeclarator",
+              id: createIdentifier(k),
+              init: createIdentifier(v)
+            };
+          })
+        });
+      }
+    });
+
+    if (scope.frameSizeInWords) {
+      code.push (
+        createExpressionStatement (
+          createAssignment (
+            createStackPointer(), "-=", createLiteral(scope.frameSizeInWords, types.int)
+          )
+        )
+      );
+    }
+
+    return code;
+  }
+
+  function createEpilogue(scope) {
+    var code = [];
+    if (scope.frameSizeInWords) {
+      code.push (
+        createExpressionStatement (
+          createAssignment (
+            createStackPointer(), "+=", createLiteral(scope.frameSizeInWords, types.int)
+          )
+        )
+      );
     }
     return code;
   }
@@ -643,24 +870,26 @@ function computeTypes(node, types) {
   var typeFunctions = {
     Program: function Program() {
       var scope = this.scope;
-      scope.addVariable(new Variable("extern", types.dyn));
-      scope.addVariable(new Variable("$HP", types.i32Pointer));
-      scope.addVariable(new Variable("$BP", types.i32Pointer));
-      scope.addVariable(new Variable("$SP", types.i32Pointer));
-      scope.addVariable(new Variable("NULL", types.i32Pointer));
-      scope.addVariable(new Variable("$HP_END", types.i32Pointer));
+      scope.addVariable(new Variable("exports", types.dyn));
+      scope.addVariable(new Variable("require", types.dyn));
+      scope.addVariable(new Variable("timer", types.dyn));
+      scope.addVariable(new Variable("trace", types.dyn));
+      scope.addVariable(new Variable("NULL", types.voidPointer));
       scope.addVariable(new Variable("load", new FunctionType(types.dyn, [types.dyn])));
-      scope.addVariable(new Variable("malloc", new FunctionType(types.u8Pointer, [types.u32])));
+      scope.addVariable(new Variable("malloc", new FunctionType(types.voidPointer, [types.int])));
       walkList(this.body, this.scope, typeFunctions);
-      this.body = createFrame(this.scope).concat(this.body);
+      var prologue = createPrologue(this.scope);
+      var epilogue = createEpilogue(this.scope);
+      this.body = prologue.concat(this.body).concat(epilogue);
     },
     StructDeclaration: function StructDeclaration(scope) { },
     FunctionDeclaration: function FunctionDeclaration() {
       var scope = this.scope;
       walk(this.body, scope, typeFunctions);
-      var prologue = createFrame(this.scope);
+      var prologue = createPrologue(this.scope);
+      var epilogue = createEpilogue(this.scope);
       if (this.body.type === "BlockStatement") {
-        this.body.body = prologue.concat(this.body.body);
+        this.body.body = prologue.concat(this.body.body).concat(epilogue);
       } else {
         assert (false);
       }
@@ -672,7 +901,7 @@ function computeTypes(node, types) {
       this.id = walk(this.id, scope, typeFunctions);
       var type = this.id.cType;
       if (this.init) {
-        this.init = createConversion(walk(this.init, scope, typeFunctions), type);
+        this.init = walk(this.init, scope, typeFunctions);
       } else if (type !== types.dyn && !(type instanceof StructType)) {
         this.init = createDefaultValue(type);
       }
@@ -686,16 +915,26 @@ function computeTypes(node, types) {
       }
     },
     BlockStatement: function BlockStatement(scope) {
-      walkList(this.body, scope, typeFunctions);
+      scope = this.scope;
+      this.body = walkList(this.body, scope, typeFunctions);
     },
     IfStatement: function IfStatement(scope) {
-      walkList([this.test, this.consequent, this.alternate], scope, typeFunctions);
+      this.test = walk(this.test, scope, typeFunctions);
+      this.consequent = walk(this.consequent, scope, typeFunctions);
+      if (this.alternate) {
+        this.alternate = walk(this.alternate, scope, typeFunctions);
+      }
     },
     ForStatement: function ForStatement(scope) {
-      walk(this.init, scope, typeFunctions);
-      walk(this.test, scope, typeFunctions);
-      walk(this.update, scope, typeFunctions);
-      walk(this.body, scope, typeFunctions);
+      scope = this.scope;
+      this.init = walk(this.init, scope, typeFunctions);
+      this.test = walk(this.test, scope, typeFunctions);
+      this.update = walk(this.update, scope, typeFunctions);
+      this.body = walk(this.body, scope, typeFunctions);
+    },
+    WhileStatement: function WhileStatement(scope) {
+      this.test = walk(this.test, scope, typeFunctions);
+      this.body = walk(this.body, scope, typeFunctions);
     },
     BinaryExpression: function BinaryExpression(scope) {
       this.left = walk(this.left, scope, typeFunctions);
@@ -707,7 +946,7 @@ function computeTypes(node, types) {
         var scale = lType.type.size / types.word.size;
         assert (scale);
         if (scale > 1) {
-          this.right = createBinary(this.right, "*", createLiteral(scale), types.i32);
+          this.right = createBinary(this.right, "*", createLiteral(scale, types.int), types.i32);
           this.fixed = true;
         }
         this.cType = lType;
@@ -724,15 +963,12 @@ function computeTypes(node, types) {
       var type;
       if (this.operator === "sizeof") {
         type = walk(this.argument, scope, {TypeName: TypeName});
-        return createLiteral(type.getSize());
+        return createLiteral(type.getSize(), types.int);
       }
       this.argument = walk(this.argument, scope, typeFunctions);
       if (this.operator === "*") {
         type = this.argument.cType;
         check(this, type instanceof PointerType, "Cannot dereference non-pointer type " + quote(type));
-        // if (type.type instanceof StructType) {
-        //  return this;
-        // }
         return createMemoryAccess(scope, type.type, this.argument);
       } else if (this.operator === "&") {
         if (this.argument.type === "MemberExpression") {
@@ -767,11 +1003,11 @@ function computeTypes(node, types) {
       this.property = walk(this.property, scope, typeFunctions);
       var oType = this.object.cType;
       var pType = this.property.cType;
-      if (this.computed) {
-        return;
-      }
       if (oType === types.dyn) {
         this.cType = types.dyn;
+        return;
+      }
+      if (this.computed) {
         return;
       }
       var address;
@@ -781,10 +1017,14 @@ function computeTypes(node, types) {
         oType = oType.base;
         address = this.object;
       } else {
-        check(this, !(oType instanceof PointerType), "Cannot use . operator on pointer types.");
-        // The object here is actually a MemberExpression
-        assert (this.object.type === "MemberExpression", this.object.type);
-        address = this.object.property;
+        if (this.kind === ".") {
+          check(this, !(oType instanceof PointerType), "Cannot use . operator on pointer types.");
+          // The object here is actually a MemberExpression
+          assert (this.object.type === "MemberExpression", this.object.type);
+          address = this.object.property;
+        } else {
+          assert (false);
+        }
       }
       check(this, oType instanceof StructType, "Property access on non structs is not possible.");
       check(this, isIdentifier(this.property), "Invalid property name.");
@@ -796,10 +1036,11 @@ function computeTypes(node, types) {
     },
     Identifier: function Identifier(scope) {
       if (this.kind === "variable") {
-        if (this.name === "NULL") {
-          return {type: "Literal", value: 0, cType: types.voidPointer};
-        }
         this.variable = scope.getVariable(this.name);
+        if (this.name === "NULL") {
+          return createLiteral(0, this.variable.type);
+        }
+        this.name = this.variable.name;
         check(this, this.variable, "Variable " + quote(this.name) + " not found in current scope " + scope);
         var type = this.cType = this.variable.type;
         if (this.variable.isStackAllocated) {
@@ -822,6 +1063,16 @@ function computeTypes(node, types) {
       var rType = scope.options.functionType.returnType;
       checkTypeAssignment(this, rType, this.argument.cType);
       this.argument = createConversion(this.argument, rType);
+
+      var frameSizeInWords = scope.options.functionScope.frameSizeInWords;
+      if (frameSizeInWords) {
+        this.argument = createSequence([
+          createAssignment (
+            createStackPointer(), "+=", createLiteral(frameSizeInWords, types.int)
+          ),
+          this.argument
+        ]);
+      }
     },
     AssignmentExpression: function AssignmentExpression(scope) {
       this.left = walk(this.left, scope, typeFunctions);
@@ -837,7 +1088,7 @@ function computeTypes(node, types) {
         var scale = lType.type.size / types.word.size;
         assert (scale);
         if (scale > 1) {
-          this.right = createBinary(this.right, "*", createLiteral(scale), rType);
+          this.right = createBinary(this.right, "*", createLiteral(scale, types.int), rType);
         }
         return;
       }
@@ -846,7 +1097,7 @@ function computeTypes(node, types) {
         var left = this.left.property;
         var right;
         if (!this.right) {
-          right = createLiteral(null);
+          right = createLiteral(null, types.dyn);
         } else if (this.right.type === "MemberExpression") {
           right = this.right.property;
         } else if (this.right.type === "CallExpression") {
@@ -854,25 +1105,61 @@ function computeTypes(node, types) {
         }
         var sizeInWords = lType.getSize() / types.word.getSize();
         assert (lType.getSize() % types.word.getSize() === 0);
-        return createCall(createIdentifier("memoryCopy"), [left, right, createLiteral(sizeInWords)], lType);
+        return createCall(createIdentifier("memoryCopy"), [left, right, createLiteral(sizeInWords, types.int)], lType);
       }
       this.cType = lType;
+      if (this.operator in assignmentOperators) {
+        var binaryOperator = assignmentOperators[this.operator];
+        this.right = createBinary(this.left, binaryOperator.name, this.right, binaryOperator.computeType(lType, rType));
+        this.operator = "=";
+      }
+      if (this.right) {
+        this.right = createConversion(this.right, lType);
+      }
     },
     SequenceExpression: function SequenceExpression(scope) {
       this.expressions = walkList(this.expressions, scope, typeFunctions);
+      this.cType = this.expressions[this.expressions.length - 1].cType;
     },
     TypeName: TypeName,
     NewExpression: function NewExpression(scope) {
       if (this.callee.type === "Identifier") {
         var type = scope.getType(this.callee.name, false);
         if (type) {
-          return createCall(createIdentifier("malloc"), [createLiteral(type.getSize())], new PointerType(type));
+          return createCall(createIdentifier("malloc"), [createLiteral(type.getSize(), types.int)], new PointerType(type));
         }
       }
       this.cType = types.dyn;
     },
-    UpdateExpression: function () {
-
+    UpdateExpression: function (scope) {
+      this.argument = walk(this.argument, scope, typeFunctions);
+      this.cType = this.argument.cType;
+      if (this.argument.cType === types.dyn || this.argument === types.num) {
+        return;
+      }
+      var operator = this.operator === "++" ? "+" : "-";
+      var value = createAssignment (
+        this.argument,
+        "=",
+        createBinary (
+          this.argument,
+          "+",
+          createLiteral(1, types.int)
+        )
+      );
+      if (!this.prefix) {
+        var t = createIdentifier(scope.getTempName(this.argument.cType), this.argument.cType, true);
+        value = createSequence([
+          createAssignment (
+            t,
+            "=",
+            this.argument
+          ),
+          value,
+          t
+        ]);
+      }
+      return walk(value, scope, typeFunctions);
     },
     FunctionExpression: function UpdateExpression() {
       this.cType = types.dyn;

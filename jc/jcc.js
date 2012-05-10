@@ -34,9 +34,8 @@ var source = snarf(file);
 // var node = esprima.parse(source);
 var node = esprima.parse(source, {loc: true});
 
-compile(node);
+var name = file.substr(0, file.lastIndexOf('.')) || file;
+
+node = compile(node, name);
 
 print (escodegen.generate(node, {base: "", indent: "  "}));
-
-
-
