@@ -182,7 +182,9 @@
     u32: true,
     int: true,
     uint: true,
-    void: true
+    void: true,
+    num: true,
+    dyn: true
   };
 
   // Ensure the condition is true, otherwise throw an error.
