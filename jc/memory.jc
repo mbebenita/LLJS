@@ -1,6 +1,7 @@
 const MB = 1024 * 1024;
-const SIZE = 32 * MB;
-const STACK_SIZE = 2 * MB;
+const WORD_SIZE = 4;
+const SIZE = (32 * MB) / WORD_SIZE;
+const STACK_SIZE = (2 * MB) / WORD_SIZE;
 const HEAP_SIZE = SIZE - STACK_SIZE;
 
 // let I4, U4;
@@ -31,6 +32,13 @@ function int * memoryCopy(int *dst, int *src, int length) {
   return dst;
 }
 
+function int * memoryZero(int *dst, int length) {
+  for (let int i = 0; i < length; ++i) {
+    *dst++ = 0;
+  }
+  return dst;
+}
+
 
 /* K&R Malloc */
 
@@ -43,7 +51,7 @@ let Header * base = NULL;
 let Header * freep = NULL;
 
 function resetMemory() {
-  let M = exports.M = new ArrayBuffer(SIZE);
+  let M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
   exports.U1 = new Uint8Array(M);
   exports.I1 = new Int8Array(M);
   exports.U2 = new Uint16Array(M);
@@ -145,5 +153,6 @@ function void free(void *ap) {
 
 exports.resetMemory = resetMemory;
 exports.memoryCopy = memoryCopy;
+exports.memoryZero = memoryZero;
 exports.malloc = malloc;
 exports.free = free;

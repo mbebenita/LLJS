@@ -1,25 +1,11 @@
-
-{
-  var int a;
-  var int c = a + b;
-  var int *z = &a;
+struct Point {
+  let int x, y, z;
 }
 
-{
-  var int a;
-  var int c = a + b;
-  var int *z = &a;
+struct Line {
+  let Point start, end;
 }
 
-var int a;
-var int b;
-var int c;
-
-
-/*
-function foo() {
-  var int y;
-  var int *k = &y;
+struct Box {
+  let Line left, top, right, bottom;
 }
-*/
-

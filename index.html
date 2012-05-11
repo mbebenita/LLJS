@@ -1,6 +1,6 @@
 <html>
 <head>
-  <title>*JS</title>
+   <title>*JS : Low-Level JavaScript</title>
   <link rel="stylesheet" type="text/css" href="css/docs.css" />
   <link rel="stylesheet" type="text/css" href="css/idle.css" />
 </head>
@@ -24,7 +24,6 @@
 <script src="jc/escodegen.js"></script>
 <script src="jc/compiler.js"></script>
 <script src="jc/memory.js"></script>
-<script src="jc/krmalloc.js"></script>
 <body>
   <div class="container">
     <h1>*JS : Low-Level JavaScript</h1>
@@ -32,15 +31,13 @@
       <b>*JS</b> is a typed dialect of JavaScript that offers a C-like type system with manual memory management.
       It compiles to JavaScript and lets you write memory-efficient and GC pause-free code less painfully, in short, *JS is the bastard child of JavaScript and C.
       *JS is early research prototype work, so don't expect anything rock solid just yet.
-    </p>
-    <p>
-      *JS has 6 integral types: <tt>int -> i32</tt>, <tt>uint -> u32</tt>, <tt>i16</tt>, <tt>u16</tt>, <tt>i8</tt>, <tt>u8</tt>, which
-      behave as they do in C, and two additional types: <tt>num</tt> (the JavaScript number type) and <tt>dyn</tt> (any type) which are used to interoperate with the JavaScript type system.
-      In addition, *JS lets you define struct and pointer types.
+
+      The research goal here is to explore low-level statically typed features in a high-level dynamically typed language.
+      Think of it as inline assembly in C, or the <tt>unsafe</tt> keyword in C#. It's not pretty, but it gets the job done.
     </p>
     <p>
       This is an interactive tutorial, code is compiled as you type.
-      To execute the compiled code use <tt>Ctrl-R</tt> or <tt>Cmd-Enter</tt>.
+      To execute a piece of code press <tt>Ctrl-R</tt> or <tt>Cmd-Enter</tt>.
     </p>
 
 <h4>Variables</h4>
@@ -59,7 +56,7 @@ y = (int) x;         // Assignment of 'x' to 'y' requires an explicit cast.
 let int z = y + 1;   // Although 'y' is of type int, the binary expression
                      // y + 1 is of type num and requires an implicit cast.
 
-let uint w = z;      // Unsigned integer types are suported but are discouraged
+let uint w = z;      // Unsigned integer types are supported but are discouraged
                      // because JavaScript engines usually store numbers that
                      // are larger than max signed int in doubles rather than
                      // 32 bit ints.
@@ -79,8 +76,43 @@ for (let i = 0; i < 50000000; ++i) { }
 
 </pre>
 
+<h4> Data Types and Arithmetic</h4>
 <p>
-  *JS lets you use C-style pointers.
+  *JS has 6 integral types: <tt>int -> i32</tt>, <tt>uint -> u32</tt>, <tt>i16</tt>, <tt>u16</tt>, <tt>i8</tt>,
+  <tt>u8</tt>, which behave as they do in C, and two additional types: <tt>num</tt> (the JavaScript number type)
+  and <tt>dyn</tt> (any type) which are used to interoperate with the JavaScript type system.
+  Arithmetic operations usually produce the <tt>num</tt> type even if their operands are integral types.
+  *JS emits the appropriate coersions for assignments and cast operations.
+</p>
+
+<pre class="example">
+trace(" u8: " + sizeof (u8));
+trace(" i8: " + sizeof (i8));
+trace("u16: " + sizeof (u16));
+trace("i16: " + sizeof (i16));
+trace("u32: " + sizeof (u32));
+trace("i32: " + sizeof (i32));
+
+trace(" u8: " + (u8) -1);
+trace(" i8: " + (i8) -1);
+trace("u16: " + (u16) -1);
+trace("i16: " + (i16) -1);
+trace("u32: " + (u32) -1);
+trace("i32: " + (i32) -1);
+
+let int x = 3;
+let int y = 2;
+
+// Arithmetic follows JavaScript semantics, coersions only happen during
+// assignments and cast operations, so beware.
+
+trace("Result is not an integer: " + x / y);
+trace("Result is an integer: " + (x += x / y));
+
+</pre>
+
+<p>
+  Moreover, *JS lets you define your own struct and pointer types.
 </p>
 
 <pre class="example">
@@ -92,15 +124,53 @@ let int *y = &x;     // Declare 'y' as a pointer to int and assign it the addres
 
 let int **z = &y;    // Declare 'z' as a pointer to a pointer to int.
 
+trace(x);
+
 *y = 1;              // Assign to the variable pointed to by 'y'.
 
+trace(x);
+
+**z = 12;
+
+trace(x);
+
 **z = ***(&z);       // You can get as fancy as you want.
+</pre>
+
+
+<p>
+  Structs are defined using the <tt>struct</tt> keyword.
+</p>
+
+<pre class="example">
+struct Point {
+  let int x, y, z;
+}
+
+struct Line {
+  let Point start, end;
+}
+
+struct Box {
+  let Line left, top, right, bottom;
+}
+
+let Box b;
+
+trace(b.top.start.x);
+
+let Line * p = &b.top;
+
+p->start.x = 42;
+
+trace(b.top.start.x);
+
 </pre>
 
 <h4>Functions</h4>
 
 <p>
-  *JS lets you type functions as well. A typed function is any function that has
+  Function declarations can be typed, a typed function is any function that has
   its return value or at least one of its arguments typed.
 </p>
 
@@ -132,7 +202,7 @@ val("123", 2, 123.456);
 </pre>
 
 <p>
-  For example, you can implement a <tt>swap</tt> function in *JS as follows:
+  Example: you can implement a <tt>swap</tt> function in *JS as follows:
 </p>
 
 <pre class="example">
@@ -156,7 +226,7 @@ trace("x = " + x + ", y = " + y);
 
 <p>
   *JS has two object models: C style <tt>malloc</tt> and <tt>free</tt>, and the JavaScript object model.
-  Why would you ever want to mange your memory explicitly when the JavaScript garbage collector already does the work for you.
+  Why would you ever want to manage your memory explicitly when the JavaScript garbage collector already does the work for you.
   <!--  (*JS offers limited support for interoperability between the two, for now at least.) -->
   Well imagine you wanted to write a linked list in JavaScript.
   You would probably chain a sequence of objects together, like so:
@@ -210,18 +280,20 @@ function void traceList(Node * p) {
 </pre>
 
 <p>
-  You may notice that the <tt>new</tt> operator behaves diferently whenever it's applied to a type name. It computes the size of
-  the data item in bytes, and calls <tt>malloc</tt>, a library routine that manages memory.
+  You may notice that the <tt>new</tt> operator behaves differently whenever it's applied to a type name. It computes the size of
+  the data item in bytes, and calls <tt>malloc</tt>.
 </p>
 
 <pre class="example">
 
 // Allocate an int on the heap using malloc().
 let int * y = malloc(sizeof (int));
+
 trace(y);
 
 // Alternate syntax.
 let int * x = new int;
+
 trace(x);
 
 </pre>
@@ -372,16 +444,16 @@ function void free(void *ap) {
   freep = p;
 }
 </pre>
+
+<h4>Acknowledgements</h4>
+<p>
+  <a href="https://github.com/kripken/emscripten">Emscripten</a> for the inspiration,
+  <a href="http://esprima.org/">Esprima</a> and
+  <a href="https://github.com/Constellation/escodegen">Escodegen</a> for parsing and code generation, and
+  <a href="http://codemirror.net/">CodeMirror</a> for the code editor.
+</p>
 </div>
 
-<script>
-/*
-var myCodeMirror = CodeMirror(document.body, {
-  value: "function myScript(){return 100;}\n",
-  mode:  "javascript"
-});
-*/
-</script>
 
 <script>
 var id = 0;
