@@ -2,16 +2,18 @@
   <head>
     <title>JS*</title>
   </head>
+  <script src="util.js"></script>
   <script>
     print = function (x) {
       console.info(x);
     }
+    var options = new OptionSet("option(s)");
+
   </script>
   <script src="vendor/jquery-1.6.4.js"></script>
-  <script src="util.js"></script>
-  <script src="peg.js"></script>
+  <script src="esprima.js"></script>
+  <script src="escodegen.js"></script>
   <script src="compiler.js"></script>
-  <script src="memory.js"></script>
   <body>
     <script>
 
@@ -45,24 +47,14 @@
   return constructor;
 })();
 
-  var extern = {trace: function (x) {
-    console.info(x);
-  }};
 
-  var parser;
-  new FileReader("jc.peg", "text").readAll(null, function (text) {
-    parser = P.buildParser(text, { trackLineAndColumn: true});
-    new FileReader("tests/simple.jc", "text").readAll(null, function (source) {
-      var com = compile(source);
-      document.write("<pre>" + com + "</pre>");
+    new FileReader("tests/scope.jc", "text").readAll(null, function (source) {
+      var node = esprima.parse(source);
+      compile(node);
 
-      var o = new Function (com)();
-      document.write("<pre> Result: " + extern.malloc(10) + "</pre>");
-      document.write("<pre> Result: " + extern.malloc(10) + "</pre>");
-      document.write("<pre> Result: " + extern.malloc(10) + "</pre>");
+      print (escodegen.generate(node, {base: "", indent: "  "}));
 
     });
-  });
     </script>
   </body>
 </html>

@@ -31,67 +31,66 @@
     <p>
       <b>*JS</b> is a typed dialect of JavaScript that offers a C-like type system with manual memory management.
       It compiles to JavaScript and lets you write memory-efficient and GC pause-free code less painfully, in short, *JS is the bastard child of JavaScript and C.
+      *JS is early research prototype work, so don't expect anything rock solid just yet.
     </p>
     <p>
       *JS has 6 integral types: <tt>int -> i32</tt>, <tt>uint -> u32</tt>, <tt>i16</tt>, <tt>u16</tt>, <tt>i8</tt>, <tt>u8</tt>, which
       behave as they do in C, and two additional types: <tt>num</tt> (the JavaScript number type) and <tt>dyn</tt> (any type) which are used to interoperate with the JavaScript type system.
       In addition, *JS lets you define struct and pointer types.
     </p>
-
     <p>
       This is an interactive tutorial, code is compiled as you type.
-      To execute the compiled code use <tt>Ctrl-R</tt> or <tt>Alt-/</tt>.
+      To execute the compiled code use <tt>Ctrl-R</tt> or <tt>Cmd-Enter</tt>.
     </p>
 
-
-<h4>Variables & Arithmetic</h4>
+<h4>Variables</h4>
 <p>
-  Unlike JavaScript, *JS variable declarations are block scoped and can be annotated with type information.
+  Unlike JavaScript, *JS variable declarations are block scoped (only the <tt>let</tt> keyword is allowed) and can be annotated with type information.
   Untyped variable declarations are defaulted to the <tt>dyn</tt> type.
 </p>
 
 <pre class="example">
-var x;               // Declare 'x' as dyn.
+let x;               // Declare 'x' as dyn.
 
-var int y;           // Declare 'y' as int.
+let int y;           // Declare 'y' as int.
 
 y = (int) x;         // Assignment of 'x' to 'y' requires an explicit cast.
 
-var int z = y + 1;   // Although 'y' is of type int, the binary expression
+let int z = y + 1;   // Although 'y' is of type int, the binary expression
                      // y + 1 is of type num and requires an implicit cast.
 
-var uint w = z;      // Unsigned integer types are suported but are discouraged
+let uint w = z;      // Unsigned integer types are suported but are discouraged
                      // because JavaScript engines usually store numbers that
                      // are larger than max signed int in doubles rather than
                      // 32 bit ints.
 
 timer.begin("Empty For loop with signed integers.");
 
-for (var int i = 0; i < 50000000; ++i) { }
+for (let int i = 0; i < 50000000; ++i) { }
 
 timer.begin("Empty For loop with unsigned integers.");
 
-for (var uint i = 0; i < 50000000; ++i) { }
+for (let uint i = 0; i < 50000000; ++i) { }
 
 timer.begin("Empty For loop with untyped integers.");
 
-for (var i = 0; i < 50000000; ++i) { }
+for (let i = 0; i < 50000000; ++i) { }
 
 
 </pre>
 
 <p>
-  *JS lets you use pointers.
+  *JS lets you use C-style pointers.
 </p>
 
 <pre class="example">
-var int x = 42;      // Declare 'x' as int and assign '42' to it.
+let int x = 42;      // Declare 'x' as int and assign '42' to it.
 
-var int *y = &x;     // Declare 'y' as a pointer to int and assign it the address
+let int *y = &x;     // Declare 'y' as a pointer to int and assign it the address
                      // of x. Since JavaScript doesn't allow taking references to
                      // to variables, we allocate 'x' on an emulated stack.
 
-var int **z = &y;    // Declare 'z' as a pointer to a pointer to int.
+let int **z = &y;    // Declare 'z' as a pointer to a pointer to int.
 
 *y = 1;              // Assign to the variable pointed to by 'y'.
 
@@ -125,7 +124,7 @@ car("123", 2, 123.456);
 
 // The type system is not smart enough to track types that leak into the dynamic
 // type system. Safety is your responsability.
-var val = car;
+let val = car;
 
 // Calling 'var' is not safe.
 val("123", 2, 123.456);
@@ -139,12 +138,12 @@ val("123", 2, 123.456);
 <pre class="example">
 
 function void swap(int *a, int *b) {
-  var int t = *a;
+  let int t = *a;
   *a = *b;
   *b = t;
 }
 
-var int x = 1, y = 2;
+let int x = 1, y = 2;
 
 swap(&x, &y);
 
@@ -171,39 +170,71 @@ trace("x = " + x + ", y = " + y);
    tail = next;
  }
 </pre>
-    <p>
-      This is inefficient for several reasons. Objects in JavaScript are not cheap, they need to carry around lots of extra information and can be
-      many times larger than their C style counterparts, moreover property access is slow. In *JS you can write a much more efficient linked list
-      using pointers and structs. The code below uses <tt>malloc</tt> to allocate memory, which is modeled using typed arrays.
-      (<tt>I32</tt> and <tt>U32</tt> are typed signed/unsigned views over one large array buffer.)
-      With great power comes great responsibility, so what is malloc'ed must be freed, even in JavaScript.
-    </p>
+<p>
+  This is inefficient for several reasons. Objects in JavaScript are not cheap, they need to carry around lots of extra information and can be
+  many times larger than their C style counterparts, moreover property access is slow. In *JS you can write a much more space efficient linked
+  list using pointers and structs. The code below uses <tt>malloc</tt> to manage memory (more on that later).
+  <!-- With great power comes great responsibility, so what is malloc'ed must be freed, even in JavaScript. -->
+</p>
 
 <pre class="example">
 struct Node {
-  var Node *next;
-  var int value;
+  let Node *next;
+  let int value;
 }
 
-var Node *head = new Node, *tail = head;
+let Node *head = new Node, *tail = head;
 
-function void add (int value) {
-  var Node * next = new Node;
+function Node * add (int value) {
+  let Node * next = new Node;
   next->value = value;
   tail->next = next;
   tail = next;
+  return next;
 }
+
+trace(add(1));
+trace(add(2));
+trace(add(3));
+
+traceList(head->next);
+
+function void traceList(Node * p) {
+  while (p) {
+    trace("Node at address: " + p + ", has value: " + p->value);
+    p = p->next;
+  }
+}
+
+
 </pre>
-    <p>
-      <tt>malloc</tt> and <tt>free</tt> are themselves implemented in *JS, see proof below:
-    </p>
+
+<p>
+  You may notice that the <tt>new</tt> operator behaves diferently whenever it's applied to a type name. It computes the size of
+  the data item in bytes, and calls <tt>malloc</tt>, a library routine that manages memory.
+</p>
+
+<pre class="example">
+
+// Allocate an int on the heap using malloc().
+let int * y = malloc(sizeof (int));
+trace(y);
+
+// Alternate syntax.
+let int * x = new int;
+trace(x);
+
+</pre>
+
+<p>
+  <tt>malloc</tt> and <tt>free</tt> are themselves implemented in *JS, see below:
+</p>
+
 <pre class="example">
 const MB = 1024 * 1024;
 const SIZE = 32 * MB;
 const STACK_SIZE = 2 * MB;
 const HEAP_SIZE = SIZE - STACK_SIZE;
-
-var I4, U4;
 
 /*
    +---------------+ -
@@ -225,25 +256,25 @@ var I4, U4;
 */
 
 function int * memoryCopy(int *dst, int *src, int length) {
-  for (var int i = 0; i < length; ++i) {
+  for (let int i = 0; i < length; ++i) {
     *dst++ = *src++;
   }
   return dst;
 }
 
 
-/* K & R Malloc */
+/* K&R Malloc */
 
 struct Header {
-  var Header * next;
-  var uint size;
+  let Header * next;
+  let uint size;
 }
 
-var Header * base = NULL;
-var Header * freep = NULL;
+let Header * base = NULL;
+let Header * freep = NULL;
 
 function resetMemory() {
-  var M = exports.M = new ArrayBuffer(SIZE);
+  let M = exports.M = new ArrayBuffer(SIZE);
   exports.U1 = new Uint8Array(M);
   exports.I1 = new Int16Array(M);
   exports.U2 = new Uint16Array(M);
@@ -263,36 +294,36 @@ function resetMemory() {
 resetMemory();
 
 function void * sbrk(int nBytes) {
-  var int nWords = nBytes / sizeof (u32);
+  let int nWords = nBytes / sizeof (u32);
   if (U4[0] + nWords > HEAP_SIZE) {
     trace("Out of Memory");
     return NULL;
   }
-  var void * address = (int *)U4[0];
+  let void * address = (int *)U4[0];
   U4[0] += nWords;
   return address;
 }
 
-var uint nUnitsMin = 1024;
+let uint nUnitsMin = 1024;
 
 function Header * morecore(int nUnits) {
   if (nUnits < nUnitsMin) {
     nUnits = nUnitsMin;
   }
-  var void * buffer = sbrk(nUnits * sizeof (Header));
+  let void * buffer = sbrk(nUnits * sizeof (Header));
 
   if (buffer === 0) {
     return NULL;
   }
-  var Header * header = (Header *)buffer;
+  let Header * header = (Header *)buffer;
   header->size = nUnits;
   free(header + 1);
   return freep;
 }
 
 function void * malloc(int nBytes) {
-  var Header *p, *prevp;
-  var int nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
+  let Header *p, *prevp;
+  let int nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
 
   if ((prevp = freep) === NULL) {
     base->next = freep = prevp = base;
@@ -320,7 +351,7 @@ function void * malloc(int nBytes) {
 }
 
 function void free(void *ap) {
-  var Header *bp = (Header *)ap - 1, *p;
+  let Header *bp = (Header *)ap - 1, *p;
   for (p = freep; !(bp > p && bp < p->next); p = p->next) {
     if (p >= p->next && (bp > p || bp < p->next)) {
       break;

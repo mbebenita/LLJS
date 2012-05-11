@@ -1,0 +1,1165 @@
+struct Header {
+  Header * next,
+  uint size
+}
+
+var Header base;
+var Header * freep = NULL;
+
+function void * sbrk(int nBytes) {
+  var int nWords = nBytes / sizeof (u32);
+  if ($HP + nWords > $HP_END) {
+    extern.assert("Out of memory.");
+    return NULL;
+  }
+  var void * address = $HP;
+  $HP += nWords;
+  return address;
+}
+
+var uint nUnitsMin = 1024;
+
+function Header * morecore(uint nUnits) {
+  if (nUnits < nUnitsMin) {
+    nUnits = nUnitsMin;
+  }
+  var void * buffer = sbrk(nUnits * sizeof (Header));
+
+  if (buffer === 0) {
+    return NULL;
+  }
+  var Header * header = (Header *)buffer;
+  header->size = nUnits;
+  free(header + 1);
+  return freep;
+}
+
+function void * malloc(int nBytes) {
+  var Header *p, *prevp;
+  var uint nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
+  if ((prevp = freep) === NULL) {
+    base.next = freep = prevp = &base;
+    base.size = 0;
+    extern.trace("ADDRESS OF BASE: " + &base);
+  }
+  for (p = prevp->next; true; prevp = p, p = p->next) {
+    if (p->size >= nUnits) {
+      if (p->size === nUnits) {
+        prevp->next = p->next;
+      } else {
+        p->size -= nUnits;
+        p += p->size;
+        p->size = nUnits;
+      }
+      freep = prevp;
+      return p + 1;
+    }
+    if (p === freep) {
+      if ((p = morecore(nUnits)) == NULL) {
+        return NULL;
+      }
+    }
+  }
+  return NULL;
+}
+
+function void free(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+function void free_00(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_01(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_02(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+
+function void free_03(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+
+
+
+
+function void free_04(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_05(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_05(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_06(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_07(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_08(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_9(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+
+
+
+
+
+
+
+
+function void free_01000(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_01001(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_01002(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+
+function void free_01003(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+
+
+
+
+function void free_01004(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_01005(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_01005(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_01006(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_01007(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_01008(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_0109(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_01000(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_01001(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_01002(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+
+function void free_01003(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+
+
+
+
+function void free_01004(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_01005(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_01005(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_01006(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_01007(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_01008(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_0109(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+
+
+
+
+
+
+
+
+function void free_01001000(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_01001001(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_01001002(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+
+function void free_01001003(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+
+
+
+
+function void free_01001004(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_01001005(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_01001005(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_01001006(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+function void free_01001007(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_01001008(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function void free_0100109(void *ap) {
+  var Header *bp = (Header *)ap - 1, *p;
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+
+

@@ -196,6 +196,7 @@ types.float = types.f32;
 types.double = types.f64;
 types.u8Pointer = new PointerType(types.u8);
 types.i32Pointer = new PointerType(types.i32);
+types.u32Pointer = new PointerType(types.u32);
 types.voidPointer = new PointerType(types.void);
 types.wordPointer = new PointerType(types.word);
 
@@ -207,10 +208,11 @@ var Scope = (function () {
     this.variables = {};
     this.type = type;
     this.options = parent ? Object.create(parent.options) : {};
+    this.depth = this.parent ? this.parent.depth + 1 : 0;
     if (type === "function") {
       this.options.cachedLocals = {};
       this.functionScope = this;
-      this.hoistedVariables = {};
+      this.localVariables = {};
     } else if (type === "block") {
       this.functionScope = parent.functionScope;
       assert (this.functionScope.type === "function");
@@ -221,31 +223,25 @@ var Scope = (function () {
     var variable = this.variables[name];
     if (variable) {
       return variable;
-    } else if (this.type === "function" && this.hoistedVariables[name]) {
-      return this.hoistedVariables[name];
-    } else if (!local && this.parent) {
+    } else if (this.localVariables && this.localVariables[name]) {
+      return this.localVariables[name];
+    } else if (this.parent && !local) {
       return this.parent.getVariable(name, local);
     }
     return null;
   };
 
-  scope.prototype.addVariable = function addVariable(variable) {
+  scope.prototype.addVariable = function addVariable(variable, external) {
     assert (variable);
     assert (!variable.scope);
-    tracer.writeLn("Added variable " + variable + " to scope " + this);
     variable.scope = this;
     this.variables[variable.name] = variable;
-    if (this.type === "block") {
-      this.functionScope.addHoistedVariable(variable);
+    var functionScope = this.type === "block" ? this.functionScope : this;
+    if (!external) {
+      variable.name = variable.name + "$" + Object.keys(functionScope.localVariables).length;
     }
-  };
-
-  scope.prototype.addHoistedVariable = function(variable) {
-    assert (this.type === "function");
-    var name = variable.name;
-    name = variable.name + "$" + Object.keys(this.hoistedVariables).length;
-    variable.name = name;
-    this.hoistedVariables[name] = variable;
+    functionScope.localVariables[variable.name] = variable;
+    tracer.writeLn("Added variable " + variable + " to scope " + this, INFO);
   };
 
   scope.prototype.getType = function getType(name, strict) {
@@ -296,11 +292,7 @@ var Scope = (function () {
       }
     }
 
-    mapObject(this.variables, function (k, v) {
-      computeOffset(v);
-    });
-
-    mapObject(this.hoistedVariables, function (k, v) {
+    mapObject(this.localVariables, function (k, v) {
       computeOffset(v);
     });
 
@@ -536,6 +528,7 @@ var Variable = (function () {
     return createMemoryAccess (scope, this.type, this.getAddress(scope));
   };
   variable.prototype.getAddress = function getAddress(scope) {
+    assert (this.wordOffset !== undefined, "Local variable offset is not computed.");
     assert (this.isStackAllocated);
     var wordAddress = createBinary (
       createStackPointer(),
@@ -553,7 +546,7 @@ var tracer;
 function compile(node, name) {
   tracer = new IndentingWriter(!trace.value);
   if (trace.value) {
-    print (JSON.stringify(node, null, 2));
+    // print (JSON.stringify(node, null, 2));
   }
   process(node, types);
   return createModule(node, name);
@@ -706,10 +699,33 @@ function process(node, types) {
 
   var scanFunctions = {
     Program: function Program() {
-      this.scope = new Scope(null, "Program", "function");
-      this.scope.types = clone(types);
-      walkRecursively(this.body, this.scope, scanFunctions);
-      this.scope.close();
+      var scope = this.scope = new Scope(null, "Program", "function");
+      scope.addVariable(new Variable("exports", types.dyn), true);
+      scope.addVariable(new Variable("require", types.dyn), true);
+      scope.addVariable(new Variable("timer", types.dyn), true);
+      scope.addVariable(new Variable("trace", types.dyn), true);
+      scope.addVariable(new Variable("NULL", types.voidPointer), true);
+      scope.addVariable(new Variable("load", new FunctionType(types.dyn, [types.dyn])), true);
+      scope.addVariable(new Variable("malloc", new FunctionType(types.voidPointer, [types.int])), true);
+      scope.addVariable(new Variable("free", new FunctionType(types.voidPointer, [types.voidPointer])), true);
+
+      scope.addVariable(new Variable("ArrayBuffer", types.dyn), true);
+      scope.addVariable(new Variable("Uint8Array", types.dyn), true);
+      scope.addVariable(new Variable("Int8Array", types.dyn), true);
+      scope.addVariable(new Variable("Uint16Array", types.dyn), true);
+      scope.addVariable(new Variable("Int16Array", types.dyn), true);
+      scope.addVariable(new Variable("Uint32Array", types.dyn), true);
+      scope.addVariable(new Variable("Int32Array", types.dyn), true);
+      scope.addVariable(new Variable("Float32Array", types.dyn), true);
+      scope.addVariable(new Variable("Float64Array", types.dyn), true);
+
+      scope.addVariable(new Variable("U4", types.dyn), true);
+      scope.addVariable(new Variable("I4", types.dyn), true);
+
+
+      scope.types = clone(types);
+      walkRecursively(this.body, scope, scanFunctions);
+      scope.close();
     },
     StructDeclaration: function (scope) {
       var sType = new StructType(this.id.name);
@@ -721,7 +737,6 @@ function process(node, types) {
             VariableDeclarator: function () {
               var type = bType;
               if (this.pointer) {
-                tracer.writeLn(this.pointer.count);
                 for (var i = 0; i < this.pointer.count; i++) {
                   type = new PointerType(type);
                 }
@@ -753,6 +768,10 @@ function process(node, types) {
       this.scope.close();
     },
     VariableDeclaration: function (scope) {
+      check(this, this.kind === "let" || this.kind === "const", "Only block scoped variable declarations are allowed, use the " + quote("let") + " keyword instead.");
+      if (this.kind === "let") {
+        this.kind = "var"; // Only emit vars.
+      }
       var bType = this.typeSpecifier ? scope.getType(this.typeSpecifier, true) : types.dyn;
       walkList(this.declarations, scope, {
         VariableDeclarator: function () {
@@ -763,7 +782,7 @@ function process(node, types) {
               type = new PointerType(type);
             }
           }
-          check(this, !scope.getVariable(this.id.name, true), "Variable " + quote(this.id.name) + " is already declared.");
+          check(this, !scope.getVariable(this.id.name, true), "Variable " + quote(this.id.name) + " is already declared in local scope.");
           scope.addVariable(this.variable = new Variable(this.id.name, type));
           if (this.init) {
             walkRecursively(this.init, scope, scanFunctions);
@@ -775,7 +794,9 @@ function process(node, types) {
       walkRecursively(this.argument, scope, scanFunctions);
       if (this.operator === "&") {
         if (isIdentifier(this.argument) && this.argument.kind === "variable") {
-          scope.getVariable(this.argument.name).isStackAllocated = true;
+          var variable = scope.getVariable(this.argument.name);
+          check(this, variable.type !== types.dyn, "Cannot take the address of a variable declared as dyn.");
+          variable.isStackAllocated = true;
         }
       }
     },
@@ -870,21 +891,16 @@ function process(node, types) {
   var typeFunctions = {
     Program: function Program() {
       var scope = this.scope;
-      scope.addVariable(new Variable("exports", types.dyn));
-      scope.addVariable(new Variable("require", types.dyn));
-      scope.addVariable(new Variable("timer", types.dyn));
-      scope.addVariable(new Variable("trace", types.dyn));
-      scope.addVariable(new Variable("NULL", types.voidPointer));
-      scope.addVariable(new Variable("load", new FunctionType(types.dyn, [types.dyn])));
-      scope.addVariable(new Variable("malloc", new FunctionType(types.voidPointer, [types.int])));
       walkList(this.body, this.scope, typeFunctions);
       var prologue = createPrologue(this.scope);
       var epilogue = createEpilogue(this.scope);
       this.body = prologue.concat(this.body).concat(epilogue);
     },
     StructDeclaration: function StructDeclaration(scope) { },
-    FunctionDeclaration: function FunctionDeclaration() {
+    FunctionDeclaration: function FunctionDeclaration(scope) {
+      walk(this.id, scope, typeFunctions);
       var scope = this.scope;
+      walkList(this.params, scope, typeFunctions);
       walk(this.body, scope, typeFunctions);
       var prologue = createPrologue(this.scope);
       var epilogue = createEpilogue(this.scope);
@@ -1040,8 +1056,8 @@ function process(node, types) {
         if (this.name === "NULL") {
           return createLiteral(0, this.variable.type);
         }
-        this.name = this.variable.name;
         check(this, this.variable, "Variable " + quote(this.name) + " not found in current scope " + scope);
+        this.name = this.variable.name;
         var type = this.cType = this.variable.type;
         if (this.variable.isStackAllocated) {
           return this.variable.getMemoryAccess(scope);
@@ -1126,9 +1142,12 @@ function process(node, types) {
       if (this.callee.type === "Identifier") {
         var type = scope.getType(this.callee.name, false);
         if (type) {
-          return createCall(createIdentifier("malloc"), [createLiteral(type.getSize(), types.int)], new PointerType(type));
+          var call = createCall(createIdentifier("malloc"), [createLiteral(type.getSize(), types.int)], types.voidPointer);
+          return createConversion(call, new PointerType(type));
         }
       }
+      this.callee = walk(this.callee, scope, typeFunctions);
+      this.arguments = walkList(this.arguments, scope, typeFunctions);
       this.cType = types.dyn;
     },
     UpdateExpression: function (scope) {

@@ -1,5 +1,25 @@
-var int x;
-var int *y = &x;
-var int **z = &y;
-*y = 1;
-**z = ***(&z);
+
+{
+  var int a;
+  var int c = a + b;
+  var int *z = &a;
+}
+
+{
+  var int a;
+  var int c = a + b;
+  var int *z = &a;
+}
+
+var int a;
+var int b;
+var int c;
+
+
+/*
+function foo() {
+  var int y;
+  var int *k = &y;
+}
+*/
+

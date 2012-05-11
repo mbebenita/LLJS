@@ -2269,6 +2269,7 @@
 
     expectKeyword(kind);
 
+    var typeSpecifier = parseTypeSpecifier();
     declarations = parseVariableDeclarationList(kind);
 
     consumeSemicolon();
@@ -2276,6 +2277,7 @@
     return {
       type: Syntax.VariableDeclaration,
       declarations: declarations,
+      typeSpecifier: typeSpecifier,
       kind: kind
     };
   }
@@ -2997,7 +2999,7 @@
       if (match('}')) {
         break;
       }
-      statement = parseVariableStatement(true);
+      statement = parseConstLetDeclaration("let");
       if (typeof statement === 'undefined') {
         break;
       }

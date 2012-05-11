@@ -1,0 +1,31 @@
+
+
+<html>
+  <head>
+    <title>JS*</title>
+  </head>
+  <script src="util.js"></script>
+  <script src="modules.js"></script>
+  <script src="memory.js"></script>
+  <script>
+    print = function (x) {
+      console.info(x);
+    }
+
+    function trace(s) {
+      print(s);
+    }
+  </script>
+  <body>
+    <script>
+      var memory = require("memory");
+
+
+      trace(memory.malloc(123));
+      trace(memory.malloc(123));
+      trace(memory.malloc(123));
+
+    </script>
+  </body>
+</html>
+
