@@ -1,115 +1,116 @@
 modules.memory = function () {
   var exports = {};
-  const MB = 1024 * 1024;
-  const SIZE = 32 * MB;
-  const STACK_SIZE = 2 * MB;
-  const HEAP_SIZE = SIZE - STACK_SIZE;
-  var I4, U4;
-  function memoryCopy(dst, src, length) {
+  const MB$18 = 1024 * 1024;
+  const SIZE$19 = 32 * MB$18;
+  const STACK_SIZE$20 = 2 * MB$18;
+  const HEAP_SIZE$21 = SIZE$19 - STACK_SIZE$20;
+  function memoryCopy$22(dst$0, src$1, length$2) {
     const $I4 = I4;
     var $TU4 = null;
-    for (var i = 0; i < length; i = i + 1 | 0) {
-      $I4[($TU4 = dst, dst = dst + 1, $TU4)] = $I4[($TU4 = src, src = src + 1, $TU4)];
+    for (var i$3 = 0; i$3 < length$2; i$3 = i$3 + 1 | 0) {
+      $I4[($TU4 = dst$0, dst$0 = dst$0 + 1, $TU4)] = $I4[($TU4 = src$1, src$1 = src$1 + 1, $TU4)];
     }
-    return dst;
+    return dst$0;
   }
   
-  var base = 0 >> 2;
-  var freep = 0 >> 2;
-  function resetMemory() {
-    var M = exports.M = new ArrayBuffer(SIZE);
-    exports.U1 = new Uint8Array(M);
-    exports.I1 = new Int16Array(M);
-    exports.U2 = new Uint16Array(M);
-    exports.I2 = new Int16Array(M);
-    U4 = exports.U4 = new Uint32Array(M);
-    I4 = exports.I4 = new Int32Array(M);
-    exports.F4 = new Float32Array(M);
-    exports.F8 = new Float64Array(M);
+  var base$23 = 0 >> 2;
+  var freep$24 = 0 >> 2;
+  function resetMemory$25() {
+    var M$0 = exports.M = new ArrayBuffer(SIZE$19);
+    exports.U1 = new Uint8Array(M$0);
+    exports.I1 = new Int8Array(M$0);
+    exports.U2 = new Uint16Array(M$0);
+    exports.I2 = new Int16Array(M$0);
+    U4 = new Uint32Array(M$0);
+    I4 = new Int32Array(M$0);
+    exports.U4 = U4;
+    exports.I4 = I4;
+    exports.F4 = new Float32Array(M$0);
+    exports.F8 = new Float64Array(M$0);
     U4[0] = 4;
-    U4[1] = SIZE;
-    base = 2;
-    freep = 0 >> 2;
+    U4[1] = SIZE$19;
+    base$23 = 2;
+    freep$24 = 0 >> 2;
   }
-  resetMemory();
-  function sbrk(nBytes) {
-    var nWords = nBytes / 4 | 0;
-    if (U4[0] + nWords > HEAP_SIZE) {
+  resetMemory$25();
+  function sbrk$26(nBytes$0) {
+    var nWords$1 = nBytes$0 / 4 | 0;
+    if (U4[0] + nWords$1 > HEAP_SIZE$21) {
       trace('Out of Memory');
       return 0;
     }
-    var address = U4[0] << 2;
-    U4[0] = U4[0] + nWords;
-    return address;
+    var address$2 = U4[0] << 2;
+    U4[0] = U4[0] + nWords$1;
+    return address$2;
   }
-  var nUnitsMin = 1024 >>> 0;
-  function morecore(nUnits) {
+  var nUnitsMin$27 = 1024 >>> 0;
+  function morecore$28(nUnits$0) {
     const $U4 = U4;
-    if (nUnits < nUnitsMin) {
-      nUnits = nUnitsMin | 0;
+    if (nUnits$0 < nUnitsMin$27) {
+      nUnits$0 = nUnitsMin$27 | 0;
     }
-    var buffer = sbrk(nUnits * 8 | 0);
-    if (buffer === 0) {
+    var buffer$1 = sbrk$26(nUnits$0 * 8 | 0);
+    if (buffer$1 === 0) {
       return 0 >> 2;
     }
-    var header = (buffer >> 2);
-    $U4[header + 1] = nUnits >>> 0;
-    free(header + 1 * 2 << 2);
-    return freep;
+    var header$2 = (buffer$1 >> 2);
+    $U4[header$2 + 1] = nUnits$0 >>> 0;
+    free$30(header$2 + 1 * 2 << 2);
+    return freep$24;
   }
-  function malloc(nBytes) {
+  function malloc$29(nBytes$0) {
     const $U4 = U4;
-    var p = 0, prevp = 0;
-    var nUnits = (nBytes + 8 - 1) / 8 + 1 | 0;
-    if ((prevp = freep) === 0) {
-      $U4[base] = (freep = (prevp = base));
-      $U4[base + 1] = 0 >>> 0;
+    var p$1 = 0, prevp$2 = 0;
+    var nUnits$3 = (nBytes$0 + 8 - 1) / 8 + 1 | 0;
+    if ((prevp$2 = freep$24) === 0) {
+      $U4[base$23] = (freep$24 = (prevp$2 = base$23));
+      $U4[base$23 + 1] = 0 >>> 0;
     }
-    for (p = $U4[prevp]; true; prevp = p, p = $U4[p]) {
-      if ($U4[p + 1] >= nUnits) {
-        if ($U4[p + 1] === nUnits) {
-          $U4[prevp] = $U4[p];
+    for (p$1 = $U4[prevp$2]; true; prevp$2 = p$1, p$1 = $U4[p$1]) {
+      if ($U4[p$1 + 1] >= nUnits$3) {
+        if ($U4[p$1 + 1] === nUnits$3) {
+          $U4[prevp$2] = $U4[p$1];
         } else {
-          $U4[p + 1] = $U4[p + 1] - nUnits >>> 0;
-          p += ($U4[p + 1] | 0) * 2;
-          $U4[p + 1] = nUnits >>> 0;
+          $U4[p$1 + 1] = $U4[p$1 + 1] - nUnits$3 >>> 0;
+          p$1 += ($U4[p$1 + 1] | 0) * 2;
+          $U4[p$1 + 1] = nUnits$3 >>> 0;
         }
-        freep = prevp;
-        return p + 1 * 2 << 2;
+        freep$24 = prevp$2;
+        return p$1 + 1 * 2 << 2;
       }
-      if (p === freep) {
-        if ((p = morecore(nUnits)) == 0) {
+      if (p$1 === freep$24) {
+        if ((p$1 = morecore$28(nUnits$3)) == 0) {
           return 0;
         }
       }
     }
     return 0;
   }
-  function free(ap) {
+  function free$30(ap$0) {
     const $U4 = U4;
-    var bp = ((ap >> 2) - 1 * 2), p = 0;
-    for (p = freep; !(bp > p && bp < $U4[p]); p = $U4[p]) {
-      if (p >= $U4[p] && (bp > p || bp < $U4[p])) {
+    var bp$1 = ((ap$0 >> 2) - 1 * 2), p$2 = 0;
+    for (p$2 = freep$24; !(bp$1 > p$2 && bp$1 < $U4[p$2]); p$2 = $U4[p$2]) {
+      if (p$2 >= $U4[p$2] && (bp$1 > p$2 || bp$1 < $U4[p$2])) {
         break;
       }
     }
-    if (bp + $U4[bp + 1] * 2 === $U4[p]) {
-      $U4[bp + 1] = $U4[bp + 1] + $U4[$U4[p] + 1] >>> 0;
-      $U4[bp] = $U4[$U4[p]];
+    if (bp$1 + $U4[bp$1 + 1] * 2 === $U4[p$2]) {
+      $U4[bp$1 + 1] = $U4[bp$1 + 1] + $U4[$U4[p$2] + 1] >>> 0;
+      $U4[bp$1] = $U4[$U4[p$2]];
     } else {
-      $U4[bp] = $U4[p];
+      $U4[bp$1] = $U4[p$2];
     }
-    if (p + $U4[p + 1] * 2 == bp) {
-      $U4[p + 1] = $U4[p + 1] + $U4[bp + 1] >>> 0;
-      $U4[p] = $U4[bp];
+    if (p$2 + $U4[p$2 + 1] * 2 == bp$1) {
+      $U4[p$2 + 1] = $U4[p$2 + 1] + $U4[bp$1 + 1] >>> 0;
+      $U4[p$2] = $U4[bp$1];
     } else {
-      $U4[p] = bp;
+      $U4[p$2] = bp$1;
     }
-    freep = p;
+    freep$24 = p$2;
   }
-  exports.resetMemory = resetMemory;
-  exports.memoryCopy = memoryCopy;
-  exports.malloc = malloc;
-  exports.free = free;
+  exports.resetMemory = resetMemory$25;
+  exports.memoryCopy = memoryCopy$22;
+  exports.malloc = malloc$29;
+  exports.free = free$30;
   return exports;
 };

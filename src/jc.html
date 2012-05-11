@@ -48,7 +48,7 @@
 })();
 
 
-    new FileReader("tests/simple.jc", "text").readAll(null, function (source) {
+    new FileReader("tests/scope.jc", "text").readAll(null, function (source) {
       var node = esprima.parse(source);
       compile(node);
 

@@ -6,9 +6,9 @@ body {
     font-family: "PT Serif", "Georgia", "Helvetica Neue", "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, sans-serif !important;
 }
 .container {
-    width: 850px;
+    width: 1150px;
     margin: 0;
-    padding: 40px 0px 50px 50px;
+    padding: 30px 0px 40px 40px;
     text-align: justify;
 }
 
@@ -397,14 +397,14 @@ div.code pre:first-child {
 }
 
 .jcCode {
-    width: 600px;
+    width: 80px;
     padding: 10px;
 }
 
 .jcResult {
     line-height: 14px;
     font-size: 11px;
-    width: 600px;
+    width: 500px;
 }
 
 .example {
@@ -419,7 +419,7 @@ div.code pre:first-child {
   }
 
 .example td {
-    padding: 4px;
+    padding: 0px;
 }
 
 table.example {
@@ -434,7 +434,6 @@ table.example {
 
 .example .minibutton {
     text-transform: none;
-//    position: absolute;
     right: 8px; bottom: 8px;
     width: 20px;
 }

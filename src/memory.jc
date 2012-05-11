@@ -3,24 +3,29 @@ const SIZE = 32 * MB;
 const STACK_SIZE = 2 * MB;
 const HEAP_SIZE = SIZE - STACK_SIZE;
 
-var I4, U4;
+// let I4, U4;
 
 /*
    +---------------+ -
- 0 | HEAP  POINTER |
- 1 | STACK POINTER |
-   |               | <- HP
-   | HEAP ...      |
+ 0 | Heap  Pointer |
+ 1 | Stack Pointer |
+   +---------------+ <- Heap Pointer (HP)
+   |               |
+   |               | |
+   |     HEAP      | | Malloc Region
+   |               | v
    |               |
    +---------------+
    |               |
-   | STACK ...     |
+   |               | ^
+   |     STACK     | |
+   |               | |
    |               |
-   +---------------+ <- SP
+   +---------------+ <- Stack Pointer (SP)
 */
 
 function int * memoryCopy(int *dst, int *src, int length) {
-  for (var int i = 0; i < length; ++i) {
+  for (let int i = 0; i < length; ++i) {
     *dst++ = *src++;
   }
   return dst;
@@ -30,21 +35,23 @@ function int * memoryCopy(int *dst, int *src, int length) {
 /* K&R Malloc */
 
 struct Header {
-  var Header * next;
-  var uint size;
+  let Header * next;
+  let uint size;
 }
 
-var Header * base = NULL;
-var Header * freep = NULL;
+let Header * base = NULL;
+let Header * freep = NULL;
 
 function resetMemory() {
-  var M = exports.M = new ArrayBuffer(SIZE);
+  let M = exports.M = new ArrayBuffer(SIZE);
   exports.U1 = new Uint8Array(M);
-  exports.I1 = new Int16Array(M);
+  exports.I1 = new Int8Array(M);
   exports.U2 = new Uint16Array(M);
   exports.I2 = new Int16Array(M);
-  U4 = exports.U4 = new Uint32Array(M);
-  I4 = exports.I4 = new Int32Array(M);
+  U4 = new Uint32Array(M);
+  I4 = new Int32Array(M);
+  exports.U4 = U4;
+  exports.I4 = I4;
   exports.F4 = new Float32Array(M);
   exports.F8 = new Float64Array(M);
 
@@ -58,36 +65,36 @@ function resetMemory() {
 resetMemory();
 
 function void * sbrk(int nBytes) {
-  var int nWords = nBytes / sizeof (u32);
+  let int nWords = nBytes / sizeof (u32);
   if (U4[0] + nWords > HEAP_SIZE) {
     trace("Out of Memory");
     return NULL;
   }
-  var void * address = (int *)U4[0];
+  let void * address = (int *)U4[0];
   U4[0] += nWords;
   return address;
 }
 
-var uint nUnitsMin = 1024;
+let uint nUnitsMin = 1024;
 
 function Header * morecore(int nUnits) {
   if (nUnits < nUnitsMin) {
     nUnits = nUnitsMin;
   }
-  var void * buffer = sbrk(nUnits * sizeof (Header));
+  let void * buffer = sbrk(nUnits * sizeof (Header));
 
   if (buffer === 0) {
     return NULL;
   }
-  var Header * header = (Header *)buffer;
+  let Header * header = (Header *)buffer;
   header->size = nUnits;
   free(header + 1);
   return freep;
 }
 
 function void * malloc(int nBytes) {
-  var Header *p, *prevp;
-  var int nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
+  let Header *p, *prevp;
+  let int nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
 
   if ((prevp = freep) === NULL) {
     base->next = freep = prevp = base;
@@ -115,7 +122,7 @@ function void * malloc(int nBytes) {
 }
 
 function void free(void *ap) {
-  var Header *bp = (Header *)ap - 1, *p;
+  let Header *bp = (Header *)ap - 1, *p;
   for (p = freep; !(bp > p && bp < p->next); p = p->next) {
     if (p >= p->next && (bp > p || bp < p->next)) {
       break;

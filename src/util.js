@@ -615,7 +615,12 @@ var consoleWriter = {
   }
 };
 
+const INFO = '\033[94m';
+const WARN = '\033[93m';
+
 var IndentingWriter = (function () {
+  const ENDC = '\033[0m';
+
   function indentingWriter(suppressOutput, out) {
     this.tab = "  ";
     this.padding = "";
@@ -623,7 +628,10 @@ var IndentingWriter = (function () {
     this.out = out || consoleWriter;
   }
 
-  indentingWriter.prototype.writeLn = function writeLn(str) {
+  indentingWriter.prototype.writeLn = function writeLn(str, type) {
+    if (type) {
+      str = type + str + ENDC;
+    }
     if (!this.suppressOutput) {
       this.out.writeLn(this.padding + str);
     }
