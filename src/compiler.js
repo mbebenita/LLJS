@@ -236,11 +236,17 @@ var Scope = (function () {
     assert (!variable.scope);
     variable.scope = this;
     this.variables[variable.name] = variable;
-    var functionScope = this.type === "block" ? this.functionScope : this;
+    var localVariables = (this.type === "block" ? this.functionScope : this).localVariables;
     if (!external) {
-      variable.name = variable.name + "$" + Object.keys(functionScope.localVariables).length;
+      var name = variable.name;
+      if (localVariables[name]) {
+        var nameIndex = 0;
+        while (localVariables[name + "$" + ++nameIndex]);
+        name = name + "$" + nameIndex;
+      }
+      variable.name = name;
     }
-    functionScope.localVariables[variable.name] = variable;
+    localVariables[variable.name] = variable;
     tracer.writeLn("Added variable " + variable + " to scope " + this, INFO);
   };
 
@@ -396,13 +402,14 @@ function createMember(object, property, type, computed) {
   };
 }
 
-function createBinary(left, operator, right, type) {
+function createBinary(left, operator, right, type, fixed) {
   return {
     type: "BinaryExpression",
     operator: operator,
     left: left,
     right: right,
-    cType: type
+    cType: type,
+    fixed: fixed
   };
 }
 
@@ -459,7 +466,7 @@ function createMemoryAccess(scope, type, address, byteOffset) {
     assert (byteOffset % typeSize === 0, "Unaligned byte offset " + byteOffset + " for type " + quote(type) + " with size " + type.getSize());
     var offset = byteOffset / typeSize;
     if (offset) {
-      address = createBinary(address, "+", createLiteral(offset, types.int), address.cType);
+      address = createBinary(address, "+", createLiteral(offset, types.int), address.cType, true);
     }
   }
   return createMember(createIdentifier(scope.getViewName(type), new PointerType(type)), address, type, true);
@@ -485,6 +492,14 @@ function createConversion(value, lType) {
       value = createBinary(value, ">>>", createLiteral(0, types.int), lType);
     } else if (lType === types.i32) {
       value = createBinary(value, "|", createLiteral(0, types.int), lType);
+    } else if (lType === types.u16) {
+      value = createBinary(value, "&", createLiteral(0xFFFF, types.int), lType);
+    } else if (lType === types.i16) {
+      value = createBinary(createBinary(value, "<<", createLiteral(16, types.int), types.int), ">>", createLiteral(16, types.int), lType);
+    } else if (lType === types.u8) {
+      value = createBinary(value, "&", createLiteral(0xFF, types.int), lType);
+    } else if (lType === types.i8) {
+      value = createBinary(createBinary(value, "<<", createLiteral(24, types.int), types.int), ">>", createLiteral(24, types.int), lType);
     } else if (lType === types.num) {
       // No Conversion Needed
     }
@@ -501,7 +516,7 @@ function createDefaultValue(type) {
 }
 
 function createStackPointer() {
-  return createMember(createIdentifier("U4"), createLiteral(0), types.intPointer, true);
+  return createMember(createIdentifier("U4"), createLiteral(1), types.intPointer, true);
   // return createIdentifier("$SP", types.intPointer);
 }
 
@@ -548,7 +563,7 @@ function compile(node, name) {
   if (trace.value) {
     // print (JSON.stringify(node, null, 2));
   }
-  process(node, types);
+  process(node, types, name);
   return createModule(node, name);
 }
 
@@ -616,7 +631,7 @@ function createModule(program, name) {
       ],
       "kind": "const"
     });
-    body.push(createImports(["I1", "U1", "I2", "U2", "I4", "U4", "malloc", "free"], "$M"));
+    body.push(createImports(["I1", "U1", "I2", "U2", "I4", "U4", "malloc", "free", "memoryCopy", "memoryZero"], "$M"));
   }
   body = body.concat(program.body);
 
@@ -685,7 +700,7 @@ var assignmentOperators = {
   "&=":   binaryOperators["&"]
 };
 
-function process(node, types) {
+function process(node, types, name) {
 
   function TypeName(scope) {
     var type = scope.getType(this.typeSpecifier, true);
@@ -700,14 +715,18 @@ function process(node, types) {
   var scanFunctions = {
     Program: function Program() {
       var scope = this.scope = new Scope(null, "Program", "function");
+      scope.addVariable(new Variable("Number", types.dyn), true);
       scope.addVariable(new Variable("exports", types.dyn), true);
       scope.addVariable(new Variable("require", types.dyn), true);
       scope.addVariable(new Variable("timer", types.dyn), true);
       scope.addVariable(new Variable("trace", types.dyn), true);
       scope.addVariable(new Variable("NULL", types.voidPointer), true);
       scope.addVariable(new Variable("load", new FunctionType(types.dyn, [types.dyn])), true);
-      scope.addVariable(new Variable("malloc", new FunctionType(types.voidPointer, [types.int])), true);
-      scope.addVariable(new Variable("free", new FunctionType(types.voidPointer, [types.voidPointer])), true);
+
+      if (name !== "memory") {
+        scope.addVariable(new Variable("malloc", new FunctionType(types.voidPointer, [types.int])), true);
+        scope.addVariable(new Variable("free", new FunctionType(types.voidPointer, [types.voidPointer])), true);
+      }
 
       scope.addVariable(new Variable("ArrayBuffer", types.dyn), true);
       scope.addVariable(new Variable("Uint8Array", types.dyn), true);
@@ -891,12 +910,14 @@ function process(node, types) {
   var typeFunctions = {
     Program: function Program() {
       var scope = this.scope;
-      walkList(this.body, this.scope, typeFunctions);
+      this.body = walkList(this.body, this.scope, typeFunctions);
       var prologue = createPrologue(this.scope);
       var epilogue = createEpilogue(this.scope);
       this.body = prologue.concat(this.body).concat(epilogue);
     },
-    StructDeclaration: function StructDeclaration(scope) { },
+    StructDeclaration: function StructDeclaration(scope) {
+      return null;
+    },
     FunctionDeclaration: function FunctionDeclaration(scope) {
       walk(this.id, scope, typeFunctions);
       var scope = this.scope;
@@ -991,6 +1012,7 @@ function process(node, types) {
           return this.argument.property;
         }
       }
+      this.cType = types.num;
     },
     ExpressionStatement: function ExpressionStatement(scope) {
       this.expression = walk(this.expression, scope, typeFunctions);
@@ -1111,16 +1133,16 @@ function process(node, types) {
       checkTypeAssignment(this, lType, rType);
       if (lType instanceof StructType) {
         var left = this.left.property;
+        var sizeInWords = lType.getSize() / types.word.getSize();
+        assert (lType.getSize() % types.word.getSize() === 0);
         var right;
         if (!this.right) {
-          right = createLiteral(null, types.dyn);
+          return createCall(createIdentifier("memoryZero"), [left, createLiteral(sizeInWords, types.int)], lType);
         } else if (this.right.type === "MemberExpression") {
           right = this.right.property;
         } else if (this.right.type === "CallExpression") {
           right = this.right;
         }
-        var sizeInWords = lType.getSize() / types.word.getSize();
-        assert (lType.getSize() % types.word.getSize() === 0);
         return createCall(createIdentifier("memoryCopy"), [left, right, createLiteral(sizeInWords, types.int)], lType);
       }
       this.cType = lType;
@@ -1211,7 +1233,9 @@ function process(node, types) {
       if (list[i]) {
         res = walk(list[i], scope, functions);
       }
-      result.push(res);
+      if (res !== null) {
+        result.push(res);
+      }
     }
     return result;
   }
