@@ -3094,7 +3094,7 @@
     var token, id = null, firstRestricted, message, param, params = [], body, previousStrict, paramSet;
 
     expectKeyword('function');
-
+    var typeName = parseTypeName();
     if (!match('(')) {
       token = lookahead();
       id = parseVariableIdentifier();
@@ -3118,6 +3118,7 @@
     if (!match(')')) {
       paramSet = {};
       while (index < length) {
+        var paramTypeName = parseTypeName();
         token = lookahead();
         param = parseVariableIdentifier();
         if (strict) {
@@ -3139,6 +3140,7 @@
             message = Messages.StrictParamDupe;
           }
         }
+        param.typeName = paramTypeName;
         params.push(param);
         paramSet[param.name] = true;
         if (match(')')) {
@@ -3160,6 +3162,7 @@
     return {
       type: Syntax.FunctionExpression,
       id: id,
+      returnType: typeName,
       params: params,
       body: body
     };
