@@ -21,7 +21,6 @@ modules.memory = function () {
     }
     return dst;
   }
-  
   var base = 0 >> 2;
   var freep = 0 >> 2;
   function resetMemory() {

@@ -275,6 +275,7 @@ var Scope = (function () {
     assert (type.size <= types.word.size);
     var name = (type.signed ? "I" : "U") + type.size;
     var cachedName = "$" + name;
+
     this.options.cachedLocals[cachedName] = name;
     return cachedName;
   };
@@ -515,9 +516,11 @@ function createDefaultValue(type) {
   return createLiteral(type.defaultValue, type);
 }
 
-function createStackPointer() {
+function createStackPointer(cached) {
+  if (cached) {
+    return createIdentifier("$SP", types.intPointer);
+  }
   return createMember(createIdentifier("U4"), createLiteral(1), types.intPointer, true);
-  // return createIdentifier("$SP", types.intPointer);
 }
 
 var Variable = (function () {
@@ -546,7 +549,7 @@ var Variable = (function () {
     assert (this.wordOffset !== undefined, "Local variable offset is not computed.");
     assert (this.isStackAllocated);
     var wordAddress = createBinary (
-      createStackPointer(),
+      createStackPointer(true),
       "+",
       createLiteral(this.wordOffset, types.int),
       types.wordPointer
@@ -712,6 +715,32 @@ function process(node, types, name) {
     return type;
   }
 
+  function ScanFunctionDeclarationOrExpression(scope) {
+    var returnType = this.returnType ? walk(this.returnType, scope, {TypeName: TypeName}) : types.dyn;
+    var outerScope = scope;
+    scope = this.scope = new Scope(scope, "Function " + (this.id ? this.id.name : "anonymous"), "function");
+    var parameterTypes = [];
+    var parameters = [];
+    walkList(this.params, scope, {
+      Identifier: function () {
+        var type = this.typeName ? walk(this.typeName, scope, {TypeName: TypeName}) : types.dyn;
+        var variable = new Variable(this.name, type);
+        scope.addVariable(variable);
+        parameters.push(variable);
+        parameterTypes.push(type);
+      }
+    });
+    this.parameters = parameters;
+    var type = new FunctionType(returnType, parameterTypes);
+    this.cType = scope.options.functionType = type;
+    scope.options.functionScope = scope;
+    if (this.id) {
+      outerScope.addVariable(new Variable(this.id.name, type));
+    }
+    walkRecursively(this.body, this.scope, scanFunctions);
+    this.scope.close();
+  }
+
   var scanFunctions = {
     Program: function Program() {
       var scope = this.scope = new Scope(null, "Program", "function");
@@ -720,6 +749,7 @@ function process(node, types, name) {
       scope.addVariable(new Variable("require", types.dyn), true);
       scope.addVariable(new Variable("timer", types.dyn), true);
       scope.addVariable(new Variable("trace", types.dyn), true);
+      scope.addVariable(new Variable("test", types.dyn), true);
       scope.addVariable(new Variable("NULL", types.voidPointer), true);
       scope.addVariable(new Variable("load", new FunctionType(types.dyn, [types.dyn])), true);
 
@@ -767,25 +797,8 @@ function process(node, types, name) {
         }
       });
     },
-    FunctionDeclaration: function FunctionDeclaration(scope) {
-      var returnType = this.returnType ? walk(this.returnType, scope, {TypeName: TypeName}) : types.dyn;
-      var outerScope = scope;
-      scope = this.scope = new Scope(scope, "Function " + this.id.name, "function");
-      var parameterTypes = [];
-      walkList(this.params, scope, {
-        Identifier: function () {
-          var type = this.typeName ? walk(this.typeName, scope, {TypeName: TypeName}) : types.dyn;
-          scope.addVariable(new Variable(this.name, type));
-          parameterTypes.push(type);
-        }
-      });
-      var type = new FunctionType(returnType, parameterTypes);
-      scope.options.functionType = type;
-      scope.options.functionScope = scope;
-      outerScope.addVariable(new Variable(this.id.name, type));
-      walkRecursively(this.body, this.scope, scanFunctions);
-      this.scope.close();
-    },
+    FunctionDeclaration: ScanFunctionDeclarationOrExpression,
+    FunctionExpression: ScanFunctionDeclarationOrExpression,
     VariableDeclaration: function (scope) {
       check(this, this.kind === "let" || this.kind === "const", "Only block scoped variable declarations are allowed, use the " + quote("let") + " keyword instead.");
       if (this.kind === "let") {
@@ -854,7 +867,9 @@ function process(node, types, name) {
 
   tracer.writeLn("Scan Done");
 
-  function createPrologue(scope) {
+  function createPrologue(node) {
+    var scope = node.scope;
+
     var code = [];
 
     var constants = {};
@@ -881,25 +896,45 @@ function process(node, types, name) {
     });
 
     if (scope.frameSizeInWords) {
-      code.push (
-        createExpressionStatement (
-          createAssignment (
-            createStackPointer(), "-=", createLiteral(scope.frameSizeInWords, types.int)
-          )
-        )
-      );
+      code.push ({
+        type: "VariableDeclaration",
+        kind: "const",
+        declarations: [{
+            type: "VariableDeclarator",
+            id: createStackPointer(true),
+            init: createAssignment (
+              createStackPointer(), "-=", createLiteral(scope.frameSizeInWords, types.int)
+            )
+          }
+        ]
+      });
     }
 
+    if (node.parameters) {
+      node.parameters.forEach(function (x) {
+        if (x.isStackAllocated) {
+          code.push (
+            createExpressionStatement (
+              createAssignment (
+                x.getMemoryAccess(scope), "=", createIdentifier(x.name)
+              )
+            )
+          );
+        }
+      });
+    }
     return code;
   }
 
-  function createEpilogue(scope) {
+  function createEpilogue(node) {
+    var scope = node.scope;
+
     var code = [];
     if (scope.frameSizeInWords) {
       code.push (
         createExpressionStatement (
           createAssignment (
-            createStackPointer(), "+=", createLiteral(scope.frameSizeInWords, types.int)
+            createStackPointer(false), "+=", createLiteral(scope.frameSizeInWords, types.int)
           )
         )
       );
@@ -907,42 +942,48 @@ function process(node, types, name) {
     return code;
   }
 
-  var typeFunctions = {
+  function CompileFunctionDeclarationOrExpression(scope) {
+    if (this.id) {
+      walk(this.id, scope, compileFunctions);
+    }
+    var scope = this.scope;
+    walkList(this.params, scope, compileFunctions);
+    walk(this.body, scope, compileFunctions);
+    var prologue = createPrologue(this);
+    var epilogue = createEpilogue(this);
+    if (this.body.type === "BlockStatement") {
+      this.body.body = prologue.concat(this.body.body).concat(epilogue);
+    } else {
+      assert (false);
+    }
+    // this.cType is assigned during scanning
+  }
+
+  var compileFunctions = {
     Program: function Program() {
       var scope = this.scope;
-      this.body = walkList(this.body, this.scope, typeFunctions);
-      var prologue = createPrologue(this.scope);
-      var epilogue = createEpilogue(this.scope);
+      this.body = walkList(this.body, this.scope, compileFunctions);
+      var prologue = createPrologue(this);
+      var epilogue = createEpilogue(this);
       this.body = prologue.concat(this.body).concat(epilogue);
     },
     StructDeclaration: function StructDeclaration(scope) {
       return null;
     },
-    FunctionDeclaration: function FunctionDeclaration(scope) {
-      walk(this.id, scope, typeFunctions);
-      var scope = this.scope;
-      walkList(this.params, scope, typeFunctions);
-      walk(this.body, scope, typeFunctions);
-      var prologue = createPrologue(this.scope);
-      var epilogue = createEpilogue(this.scope);
-      if (this.body.type === "BlockStatement") {
-        this.body.body = prologue.concat(this.body.body).concat(epilogue);
-      } else {
-        assert (false);
-      }
-    },
+    FunctionDeclaration: CompileFunctionDeclarationOrExpression,
+    FunctionExpression: CompileFunctionDeclarationOrExpression,
     VariableDeclaration: function VariableDeclaration(scope) {
-      walkList(this.declarations, scope, typeFunctions);
+      walkList(this.declarations, scope, compileFunctions);
     },
     VariableDeclarator: function VariableDeclarator(scope) {
-      this.id = walk(this.id, scope, typeFunctions);
+      this.id = walk(this.id, scope, compileFunctions);
       var type = this.id.cType;
       if (this.init) {
-        this.init = walk(this.init, scope, typeFunctions);
+        this.init = walk(this.init, scope, compileFunctions);
       } else if (type !== types.dyn && !(type instanceof StructType)) {
         this.init = createDefaultValue(type);
       }
-      this.init = walk(createAssignment(this.id, "=", this.init), scope, typeFunctions);
+      this.init = walk(createAssignment(this.id, "=", this.init), scope, compileFunctions);
       this.id = {type: "Identifier", name: "_"};
       if (this.init.left && isIdentifier(this.init.left)) {
         var variable = this.init.left.variable;
@@ -953,29 +994,29 @@ function process(node, types, name) {
     },
     BlockStatement: function BlockStatement(scope) {
       scope = this.scope;
-      this.body = walkList(this.body, scope, typeFunctions);
+      this.body = walkList(this.body, scope, compileFunctions);
     },
     IfStatement: function IfStatement(scope) {
-      this.test = walk(this.test, scope, typeFunctions);
-      this.consequent = walk(this.consequent, scope, typeFunctions);
+      this.test = walk(this.test, scope, compileFunctions);
+      this.consequent = walk(this.consequent, scope, compileFunctions);
       if (this.alternate) {
-        this.alternate = walk(this.alternate, scope, typeFunctions);
+        this.alternate = walk(this.alternate, scope, compileFunctions);
       }
     },
     ForStatement: function ForStatement(scope) {
       scope = this.scope;
-      this.init = walk(this.init, scope, typeFunctions);
-      this.test = walk(this.test, scope, typeFunctions);
-      this.update = walk(this.update, scope, typeFunctions);
-      this.body = walk(this.body, scope, typeFunctions);
+      this.init = walk(this.init, scope, compileFunctions);
+      this.test = walk(this.test, scope, compileFunctions);
+      this.update = walk(this.update, scope, compileFunctions);
+      this.body = walk(this.body, scope, compileFunctions);
     },
     WhileStatement: function WhileStatement(scope) {
-      this.test = walk(this.test, scope, typeFunctions);
-      this.body = walk(this.body, scope, typeFunctions);
+      this.test = walk(this.test, scope, compileFunctions);
+      this.body = walk(this.body, scope, compileFunctions);
     },
     BinaryExpression: function BinaryExpression(scope) {
-      this.left = walk(this.left, scope, typeFunctions);
-      this.right = walk(this.right, scope, typeFunctions);
+      this.left = walk(this.left, scope, compileFunctions);
+      this.right = walk(this.right, scope, compileFunctions);
       var lType = this.left.cType;
       var rType = this.right.cType;
 
@@ -993,8 +1034,8 @@ function process(node, types, name) {
       }
     },
     LogicalExpression: function LogicalExpression(scope) {
-      var lType = walk(this.left, scope, typeFunctions);
-      var rType = walk(this.right, scope, typeFunctions);
+      var lType = walk(this.left, scope, compileFunctions);
+      var rType = walk(this.right, scope, compileFunctions);
     },
     UnaryExpression: function UnaryExpression(scope) {
       var type;
@@ -1002,7 +1043,7 @@ function process(node, types, name) {
         type = walk(this.argument, scope, {TypeName: TypeName});
         return createLiteral(type.getSize(), types.int);
       }
-      this.argument = walk(this.argument, scope, typeFunctions);
+      this.argument = walk(this.argument, scope, compileFunctions);
       if (this.operator === "*") {
         type = this.argument.cType;
         check(this, type instanceof PointerType, "Cannot dereference non-pointer type " + quote(type));
@@ -1015,12 +1056,12 @@ function process(node, types, name) {
       this.cType = types.num;
     },
     ExpressionStatement: function ExpressionStatement(scope) {
-      this.expression = walk(this.expression, scope, typeFunctions);
+      this.expression = walk(this.expression, scope, compileFunctions);
     },
     BreakStatement: function BreakStatement(scope) { },
     CallExpression: function CallExpression(scope) {
-      this.callee = walk(this.callee, scope, typeFunctions);
-      this.arguments = walkList(this.arguments, scope, typeFunctions);
+      this.callee = walk(this.callee, scope, compileFunctions);
+      this.arguments = walkList(this.arguments, scope, compileFunctions);
       var type = this.callee.cType;
       if (type !== types.dyn) {
         assert (type instanceof FunctionType);
@@ -1033,12 +1074,12 @@ function process(node, types, name) {
     },
     CastExpression: function CastExpression(scope) {
       var type = walk(this.typeName, scope, {TypeName: TypeName});
-      this.argument = walk(this.argument, scope, typeFunctions);
+      this.argument = walk(this.argument, scope, compileFunctions);
       return createConversion(this.argument, type);
     },
     MemberExpression: function MemberExpression(scope) {
-      this.object = walk(this.object, scope, typeFunctions);
-      this.property = walk(this.property, scope, typeFunctions);
+      this.object = walk(this.object, scope, compileFunctions);
+      this.property = walk(this.property, scope, compileFunctions);
       var oType = this.object.cType;
       var pType = this.property.cType;
       if (oType === types.dyn) {
@@ -1097,7 +1138,7 @@ function process(node, types, name) {
       this.cType = types.dyn;
     },
     ReturnStatement: function (scope) {
-      this.argument = walk(this.argument, scope, typeFunctions);
+      this.argument = walk(this.argument, scope, compileFunctions);
       var rType = scope.options.functionType.returnType;
       checkTypeAssignment(this, rType, this.argument.cType);
       this.argument = createConversion(this.argument, rType);
@@ -1113,11 +1154,11 @@ function process(node, types, name) {
       }
     },
     AssignmentExpression: function AssignmentExpression(scope) {
-      this.left = walk(this.left, scope, typeFunctions);
+      this.left = walk(this.left, scope, compileFunctions);
       var lType = this.left.cType;
       var rType = lType;
       if (this.right) {
-        this.right = walk(this.right, scope, typeFunctions);
+        this.right = walk(this.right, scope, compileFunctions);
         rType = this.right.cType;
       }
       if (lType instanceof PointerType && (this.operator === "+=" || this.operator === "-=")) {
@@ -1156,7 +1197,7 @@ function process(node, types, name) {
       }
     },
     SequenceExpression: function SequenceExpression(scope) {
-      this.expressions = walkList(this.expressions, scope, typeFunctions);
+      this.expressions = walkList(this.expressions, scope, compileFunctions);
       this.cType = this.expressions[this.expressions.length - 1].cType;
     },
     TypeName: TypeName,
@@ -1168,12 +1209,12 @@ function process(node, types, name) {
           return createConversion(call, new PointerType(type));
         }
       }
-      this.callee = walk(this.callee, scope, typeFunctions);
-      this.arguments = walkList(this.arguments, scope, typeFunctions);
+      this.callee = walk(this.callee, scope, compileFunctions);
+      this.arguments = walkList(this.arguments, scope, compileFunctions);
       this.cType = types.dyn;
     },
     UpdateExpression: function (scope) {
-      this.argument = walk(this.argument, scope, typeFunctions);
+      this.argument = walk(this.argument, scope, compileFunctions);
       this.cType = this.argument.cType;
       if (this.argument.cType === types.dyn || this.argument === types.num) {
         return;
@@ -1200,13 +1241,10 @@ function process(node, types, name) {
           t
         ]);
       }
-      return walk(value, scope, typeFunctions);
-    },
-    FunctionExpression: function UpdateExpression() {
-      this.cType = types.dyn;
+      return walk(value, scope, compileFunctions);
     },
     IdentityExpression: function IdentityExpression(scope) {
-      this.argument = walk(this.argument, scope, typeFunctions);
+      this.argument = walk(this.argument, scope, compileFunctions);
     }
   };
 
@@ -1240,5 +1278,5 @@ function process(node, types, name) {
     return result;
   }
 
-  walk(node, null, typeFunctions);
+  walk(node, null, compileFunctions);
 }
