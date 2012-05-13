@@ -39,14 +39,14 @@
       Think of it as inline assembly in C, or the <tt>unsafe</tt> keyword in C#. It's not pretty, but it gets the job done.
     </p>
     <p>
-      We're exploring a similar approach in CoffeeScript as well, check out <a href="https://github.com/syg/heap.coffee/">heap.coffee</a>.
+      We're exploring a similar approach in CoffeeScript as well, check out <a href="http://syg.github.com/heap.coffee/">heap.coffee</a>.
     </p>
     <p>
       This is an interactive tutorial, code is compiled as you type.
       To execute a piece of code press <tt>Ctrl-R</tt> or <tt>Cmd-Enter</tt>.
     </p>
 
-<h4>Variables</h4>
+<h2>Variables</h2>
 <p>
   Unlike JavaScript, *JS variable declarations are block scoped (only the <tt>let</tt> keyword is allowed) and can be annotated with type information.
   Untyped variable declarations are defaulted to the <tt>dyn</tt> type.
@@ -82,13 +82,13 @@ for (let i = 0; i < 50000000; ++i) { }
 
 </pre>
 
-<h4> Data Types and Arithmetic</h4>
+<h2> Data Types and Arithmetic</h2>
 <p>
   *JS has 6 integral types: <tt>int -> i32</tt>, <tt>uint -> u32</tt>, <tt>i16</tt>, <tt>u16</tt>, <tt>i8</tt>,
   <tt>u8</tt>, which behave as they do in C, and two additional types: <tt>num</tt> (the JavaScript number type)
   and <tt>dyn</tt> (any type) which are used to interoperate with the JavaScript type system.
   Arithmetic operations usually produce the <tt>num</tt> type even if their operands are integral types.
-  *JS emits the appropriate coersions for assignments and cast operations.
+  *JS emits the appropriate coercions for assignments and cast operations.
 </p>
 
 <pre class="example">
@@ -109,7 +109,7 @@ trace("i32: " + (i32) -1);
 let int x = 3;
 let int y = 2;
 
-// Arithmetic follows JavaScript semantics, coersions only happen during
+// Arithmetic follows JavaScript semantics, coercions only happen during
 // assignments and cast operations, so beware.
 
 trace("Result is not an integer: " + x / y);
@@ -199,7 +199,7 @@ function car (int x, y, int z) { }
 car("123", 2, 123.456);
 
 // The type system is not smart enough to track types that leak into the dynamic
-// type system. Safety is your responsability.
+// type system. Safety is your responsibility.
 let val = car;
 
 // Calling 'var' is not safe.
@@ -228,7 +228,7 @@ trace("x = " + x + ", y = " + y);
 </pre>
 
 
-<h4>Objects and Memory</h4>
+<h2>Objects and Memory</h2>
 
 <p>
   *JS has two object models: C style <tt>malloc</tt> and <tt>free</tt>, and the JavaScript object model.
@@ -248,8 +248,13 @@ trace("x = " + x + ", y = " + y);
 </pre>
 <p>
   This is inefficient for several reasons. Objects in JavaScript are not cheap, they need to carry around lots of extra information and can be
-  many times larger than their C style counterparts, moreover property access is slow. In *JS you can write a much more space efficient linked
-  list using pointers and structs. The code below uses <tt>malloc</tt> to manage memory (more on that later).
+  many times larger than their C style counterparts, moreover property access can be slow.
+  Chaining several property accesses together <tt>x.y.z.w</tt> usually results in several memory indirections, in *JS this compiles into a single memory access with a computed offset.
+  <br>
+  Usually, when you use a garbage collector you can design a very fast bump allocator which is probably more efficient than *JS's <tt>malloc</tt>, but nothing is free, you pay for it later during
+  garbage collection. If you have explicit control over memory, you can always do better (if you put in the effort).
+
+  In *JS you can write a much more space efficient linked list using pointers and structs.
   <!-- With great power comes great responsibility, so what is malloc'ed must be freed, even in JavaScript. -->
 </p>
 
@@ -304,8 +309,38 @@ trace(x);
 
 </pre>
 
+<h3>Memory</h3>
 <p>
-  <tt>malloc</tt> and <tt>free</tt> are themselves implemented in *JS, see below:
+*JS manages memory using <a href="https://developer.mozilla.org/en/JavaScript_typed_arrays">Typed Arrays</a>. It allocates one large <tt>ArrayBuffer</tt> ahead of time,
+and creates several typed array views on this buffer, one for each of the primitive data types.
+For instance: <tt>U4</tt>, <tt>U2</tt> and <tt>U1</tt> for <tt>u32</tt>, <tt>u16</tt> and <tt>u8</tt> respectively (see figure below).
+(For a more in-depth discussion, see how <a href="https://github.com/kripken/emscripten/wiki/Code-Generation-Modes">Emscripten</a> does it.)
+This really is the same thing as the scaled/indexed addressing mode in x86.
+The only drawback is that you can't read unaligned data, but this is actually a good thing, since unaligned access is usually slower, or not even possible on some platforms.
+
+<img src="images/arrays.png" style="display: block;   margin-left: auto;   margin-right: auto;">
+</p>
+<h3>Pointers</h3>
+<p>
+  Since our managed memory is actually byte addressable, there is no reason to store pointers as byte addresses, instead we store them as indices, implicitly scaled by their own base type.
+  For example, the pointer dereference <tt>*p</tt>, where <tt>p</tt> is of type <tt>int*</tt>, gets compiled into <tt>U4[p]</tt>.
+  (Had we stored pointers as byte addresses, we would have compiled it to <tt>U32[p >> 2]</tt>.)
+  This eliminates address computations at each memory access, but requires that we perform pointer conversions whenever we cast from one pointer type to another, see below:
+</p>
+
+<pre class="example">
+  let int * x = (void *) 8;
+  let u16 * y = x;
+  let int z = *x + *y;
+</pre>
+
+<h3>Malloc & Free</h3>
+<p>
+  The *JS memory allocator, transcribed from the K&R C implementation, is itself implemented in *JS. For now, we allocate one large chunk of memory <tt>32 MB</tt> and let
+  <tt>malloc</tt> and <tt>free</tt> manage it. We reserve the first two words in memory for the Heap Pointer <tt>HP</tt> that points to the latest allocated page by <tt>sbrk</tt>
+  and the Stack Pointer <tt>SP</tt> which always points to the top of the stack. The heap grows downward (towards higher addresses) and the stack grows upward.
+  For now, when the two meet we run out of memory, but we could resize the array buffer copy the heap over and resume.
+  <img src="images/heap.png" style="display: block;   margin-left: auto;   margin-right: auto;">
 </p>
 
 <pre class="example">
