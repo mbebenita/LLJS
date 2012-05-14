@@ -2,7 +2,7 @@ var modules = {};
 var modulesInstances = {};
 
 function require(name) {
-  assert (name in modules, "Module " + quote(name) + " is not loaded.");
+  // assert (name in modules, "Module \"" + name + "\" is not loaded.");
   var module = modulesInstances[name];
   if (module) {
     return module;

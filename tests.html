@@ -15,9 +15,6 @@
   }
 </script>
 <script src="jc/util.js"></script>
-<script>
-  var options = new OptionSet("option(s)");
-</script>
 <script src="vendor/jquery-1.6.4.js"></script>
 <script src="jc/modules.js"></script>
 <script src="jc/esprima.js"></script>
@@ -69,7 +66,7 @@ function compileExample(id) {
   var result = document.getElementById("ex:" + number + ":result");
   try {
     var node = esprima.parse(this.getValue(), {loc: true});
-    compile(node, "EX_" + number);
+    compiler.compile(node, "EX_" + number);
     result.innerHTML = escodegen.generate(node, {base: "", indent: "  "});
   } catch (x) {
     result.innerHTML = x.message;
@@ -133,7 +130,7 @@ function executeExample(id) {
     result.innerHTML += "Parser: " + (new Date() - start) + " ms, ";
 
     start = new Date();
-    node = compile(node, "EX_" + number);
+    node = compiler.compile(node, "EX_" + number);
     result.innerHTML += "Compiler: " + (new Date() - start) + " ms, ";
 
     start = new Date();
