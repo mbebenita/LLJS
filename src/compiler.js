@@ -12,7 +12,7 @@
   var mapObject = util.mapObject;
 
   var options = new OptionSet("Compiler Options");
-  
+
   var trace = options.register(new Option("t", "t", false, "Trace compiler execution."));
 
   function isInteger(x) {
@@ -1119,7 +1119,7 @@
         this.property = walk(this.property, scope, compileFunctions);
         var oType = this.object.cType;
         var pType = this.property.cType;
-        if (oType === types.dyn) {
+        if (oType === types.dyn || oType instanceof FunctionType) {
           this.cType = types.dyn;
           return;
         }
