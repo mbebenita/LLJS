@@ -12,13 +12,42 @@
  * This is done using a |bit| map that keeps track of available object IDs. Searching for
  * a new ID is done using a wrap-around linear scan through the bit map, starting at the
  * |nextWord| position which is updated whenever an ID is freed or found.
+ *
+ * The pool provides three functions:
+ *
+ * acquire (obj) adds the |obj| to the pool, increments the reference count and returns its ID.
+ * release (obj) decrements the reference count and removes the object if the count is zero.
+ * get (id) returns the object with the given |id|.
+ *
  */
 
-var Pool = (function (maxSize) {
+var Pool = (function (initialSize) {
 
   var obj = []; /* ID to Object Map */
-  var ref = new Uint32Array(maxSize); /* Reference Count Map */
-  var bit = new Uint32Array(Math.ceil(maxSize / 32)); /* Used ID Bit Map */
+  var ref; /* Reference Count Map */
+  var bit; /* Used ID Bit Map */
+
+  var size = 0;
+  var resizeCount = 0;
+
+  const MIN_SIZE = 1024;
+
+  function resize(newSize) {
+    var oldRef = ref;
+    ref = new Uint16Array(newSize);
+    if (oldRef) {
+      ref.set(oldRef);
+    }
+    var oldBit = bit;
+    bit = new Uint32Array(Math.ceil(newSize / 32));
+    if (oldBit) {
+      bit.set(oldBit);
+    }
+    size = newSize;
+    resizeCount ++;
+  }
+
+  resize(Math.max(initialSize, MIN_SIZE));
 
   /**
    * Tidy uses defineProperty to add IDs to objects when they are aquired and delete to
@@ -86,7 +115,10 @@ var Pool = (function (maxSize) {
         }
       }
       if (end === nextWord) {
-        return -1;
+        /* Double the size if we can't find a free ID */
+        nextWord = size;
+        resize(size * 2);
+        return nextID();
       }
       end = cur;
       cur = 0;
@@ -130,7 +162,11 @@ var Pool = (function (maxSize) {
    * Decrements an objects reference count by one, and removes it from the pool if
    * the reference count is zero.
    */
-  function release(id) {
+  function release(o) {
+    releaseByID(o[OBJECT_ID_NAME]);
+  }
+
+  function releaseByID(id) {
     if (id === undefined) {
       return;
     }
@@ -151,9 +187,24 @@ var Pool = (function (maxSize) {
   }
 
   function trace() {
-    print("    ID Map: " + bit.length);
-    print(" Count Map: " + ref.length);
-    print("Object Map: " + obj.length);
+
+    function getSizeName(v) {
+      var KB = 1024;
+      var MB = 1024 * KB;
+
+      if (v / MB > 1) {
+        return (v / MB).toFixed(2) + " M";
+      } else if (v / KB > 1) {
+        return (v / KB).toFixed(2) + " K";
+      } else {
+        return v + " ";
+      }
+    }
+
+    print("      ID Map: " + getSizeName(bit.length * 4) + "B");
+    print("   Count Map: " + getSizeName(ref.length * 2) + "B");
+    print("  Object Map: " + obj.length);
+    print("Resize Count: " + resizeCount);
 
     var count = 0;
     for (var i = 0; i < bit.length; i++) {
@@ -165,11 +216,12 @@ var Pool = (function (maxSize) {
   return {
     acquire: acquire,
     release: release,
+    releaseByID: releaseByID,
     trace: trace,
     get: get
   };
 
-})(100000 * 10);
+})(1024);
 
 if (true) {
   var acquire = Pool.acquire;
@@ -185,7 +237,7 @@ if (true) {
     var k = acquire(test[j]);
 
     j = (Math.random() * test.length) | 0;
-    k = test[j]["OBJECT ID"];
+    k = test[j];
     release(k);
   }
 
