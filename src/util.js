@@ -96,7 +96,7 @@
   }
 
   function quote(s) {
-    return "\"" + s + "\"";
+    return "`" + s + "'";
   }
 
   function paren(s) {

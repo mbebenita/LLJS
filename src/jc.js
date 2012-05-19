@@ -15,11 +15,13 @@ if (mode === NODE_JS) {
   var util = require("./util.js");
   var esprima = require("./esprima.js");
   var escodegen = require("./escodegen.js");
+  var estransform = require("./estransform.js");
   var compiler = require("./compiler.js");
 } else if (mode === JS_SHELL) {
   load("./util.js");
   load("./esprima.js");
   load("./escodegen.js");
+  load("./estransform.js");
   load("./compiler.js");
 }
 
