@@ -961,6 +961,12 @@
     }
   };
 
+  VariableDeclaration.prototype.transformNode = function (o) {
+    if (this.kind === "extern") {
+      return null;
+    }
+  };
+
   VariableDeclarator.prototype.transformNode = function (o) {
     var variable = this.id.variable;
     var ty = this.id.ty;
@@ -1082,7 +1088,9 @@
   };
 
   SequenceExpression.prototype.transformNode = function (o) {
-    return cast(this, ty);
+    assert(this.expressions.length);
+    var last = this.expressions[this.expressions.length - 1];
+    return cast(this, last.ty);
   };
 
   UpdateExpression.prototype.transformNode = function (o) {
