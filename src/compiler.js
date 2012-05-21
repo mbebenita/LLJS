@@ -1041,6 +1041,7 @@
 
     if (op === "*") {
       check(this, ty instanceof PointerType, "cannot dereference non-pointer type " + quote(tystr(ty, 0)));
+      check(this, ty.base, "cannot dereference " + quote(tystr(ty, 0)));
       return cast(this, ty.base);
     }
 
