@@ -262,15 +262,12 @@
     float:  f32ty,
     double: f64ty,
 
+    byte:   u8ty,
+    word:   u32ty,
+
     void:   voidTy,
     dyn:    undefined
   };
-  builtinTypes.num = builtinTypes.f64;
-  builtinTypes.int = builtinTypes.i32;
-  builtinTypes.word = builtinTypes.u32;
-  builtinTypes.uint = builtinTypes.u32;
-  builtinTypes.float = builtinTypes.f32;
-  builtinTypes.double = builtinTypes.f64;
 
   PointerType.prototype.align = u32ty;
 
@@ -579,24 +576,35 @@
     return this;
   };
 
-  TypeAlias.prototype.resolve = function (types) {
+  TypeAlias.prototype.resolve = function (types, inPointer) {
     startResolving(this);
     if (!(this.name in types)) {
       reportError(this.node, "unable to resolve type name `" + this.name + "'");
     }
     var ty = types[this.name];
     finishResolving(this);
-    return ty ? ty.resolve(types) : ty;
+    if (inPointer && ty instanceof TypeAlias) {
+      ty = ty.resolve(types, inPointer);
+    }
+    return ty;
   };
 
   PointerType.prototype.resolve = function (types) {
-    if (!this.base._resolved && !this.base._resolving) {
-      this.base = this.base.resolve(types);
+    if (this._resolved) {
+      return this;
     }
+
+    startResolving(this);
+    this.base = this.base.resolve(types, true);
+    finishResolving(this);
     return this;
   };
 
   StructType.prototype.resolve = function (types) {
+    if (this._resolved) {
+      return this;
+    }
+
     startResolving(this);
     var field, fields = this.fields;
     for (var i = 0, j = fields.length; i < j; i++) {
@@ -610,6 +618,10 @@
   };
 
   ArrowType.prototype.resolve = function (types) {
+    if (this._resolved) {
+      return this;
+    }
+
     var paramTypes = this.paramTypes;
     for (var i = 0, j = paramTypes.length; i < j; i++) {
       if (paramTypes[i]) {
@@ -719,6 +731,8 @@
     scope.addVariable(new Variable("load"), true);
 
     scanList(this.body, o);
+
+    return this;
   };
 
   FunctionExpression.prototype.scan =
@@ -749,6 +763,8 @@
 
     assert(this.body instanceof BlockStatement);
     scanList(this.body.body, o);
+
+    return this;
   };
 
   VariableDeclaration.prototype.scan = function (o) {
@@ -761,6 +777,8 @@
     }
 
     scanList(this.declarations, extend(o, { declkind: this.kind }));
+
+    return this;
   };
 
   VariableDeclarator.prototype.scanNode = function (o) {
@@ -779,12 +797,14 @@
     o = extend(o);
     o.scope = this.scope = new Scope(o.scope, "ForStatement", "block");
     Node.prototype.scan.call(this, o);
+    return this;
   };
 
   BlockStatement.prototype.scan = function (o) {
     o = extend(o);
     o.scope = this.scope = new Scope(o.scope, "BlockStatement", "block");
     scanList(this.body, o);
+    return this;
   };
 
   /**
@@ -961,7 +981,7 @@
     var ty = arg ? arg.ty : undefined;
     if (returnType) {
       check(this, returnType.assignableFrom(ty), "incompatible types: returning " +
-            quote(tystr(aty, 0)) + " as " + quote(tystr(returnType, 0)));
+            quote(tystr(ty, 0)) + " as " + quote(tystr(returnType, 0)));
       if (arg) {
         this.argument = cast(arg, returnType);
       }
