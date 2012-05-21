@@ -1713,7 +1713,7 @@
         var token = lookahead();
         if (token.type === Token.Identifier) {
           expr = parseInlineableType();
-          if (expr.type === Syntax.TypeIdentifier) {
+          if (!expr || expr.type === Syntax.TypeIdentifier) {
             reset(m);
             expr = parsePrimaryExpression();
           } else {

@@ -372,7 +372,6 @@
 
   Scope.prototype.MEMORY = function MEMORY() {
     return this.root.MEMORY();
-
   };
 
   Scope.prototype.getView = function getView(type) {
@@ -415,7 +414,7 @@
     var cachedLocals = frame.cachedLocals;
     if (!cachedLocals[name]) {
       var id = cast(new Identifier(frame.freshVariable(name, ty).name), ty);
-      var init = new MemberExpression(frame.MEMORY(), new Identifier(name), false);
+      var init = new MemberExpression(frame.root.MEMORY(), new Identifier(name), false);
       cachedLocals[name] = new VariableDeclarator(id, init, false);
     }
     return cachedLocals[name].id;
@@ -455,7 +454,7 @@
 
   Frame.prototype.SP = function SP() {
     if (!this.cachedSP) {
-      this.cachedSP = cast(new Identifier(this.freshVariable("SP").name),
+      this.cachedSP = cast(new Identifier(this.freshVariable("$SP").name),
                            new PointerType(u32ty));
     }
     return this.cachedSP;
@@ -1000,7 +999,7 @@
 
     if (lty instanceof PointerType && (op === "+" || op === "-")) {
       if (rty instanceof PrimitiveType && rty.integral) {
-        var scale = ltype.size / wordTy.size;
+        var scale = lty.size / lty.align.size;
         if (scale > 1) {
           this.right = new BinaryExpression(this.right, "*", new Literal(scale));
         }
@@ -1083,7 +1082,7 @@
   UpdateExpression.prototype.transformNode = function (o) {
     var arg = this.argument;
     var ty = arg.ty
-    if (ty.integral) {
+    if (ty.integral || ty instanceof PointerType) {
       var scope = o.scope;
       var op = this.operator === "++" ? "+" : "-";
       var ref = scope.cacheReference(arg);
