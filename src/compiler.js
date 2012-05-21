@@ -527,34 +527,6 @@
     return new Program([new ExpressionStatement(new CallExpression(module, [new ThisExpression()]))]);
   }
 
-  var binaryOperators = {
-    "+":   {name: "+", computeType: function (l, r) { return types.dyn; }},
-    "-":   {name: "-", computeType: function (l, r) { return types.dyn; }},
-    "*":   {name: "*", computeType: function (l, r) { return types.dyn; }},
-    "/":   {name: "/", computeType: function (l, r) { return types.dyn; }},
-    "&":   {name: "&", computeType: function (l, r) { return types.int; }},
-    "<<":  {name: "<<", computeType: function (l, r) { return types.int; }},
-    ">>":  {name: ">>", computeType: function (l, r) { return types.int; }},
-    ">>>": {name: ">>>", computeType: function (l, r) { return types.uint; }},
-    "|":   {name: "|", computeType: function (l, r) { return types.int; }},
-    "^":   {name: "^", computeType: function (l, r) { return types.int; }},
-    "&":   {name: "&", computeType: function (l, r) { return types.int; }}
-  };
-
-  var assignmentOperators = {
-    "+=":   binaryOperators["+"],
-    "-=":   binaryOperators["-"],
-    "*=":   binaryOperators["*"],
-    "/=":   binaryOperators["/"],
-    "&=":   binaryOperators["&"],
-    "<<=":  binaryOperators["<<"],
-    ">>=":  binaryOperators[">>"],
-    ">>>=": binaryOperators[">>>"],
-    "|=":   binaryOperators["|"],
-    "^=":   binaryOperators["^"],
-    "&=":   binaryOperators["&"]
-  };
-
   /**
    * Pass 1: resolve type synonyms and do some type sanity checking.
    */
