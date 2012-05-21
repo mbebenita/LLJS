@@ -278,8 +278,19 @@
     return false;
   }
 
-  function isType(id) {
-    return id in Types;
+  function toType(expr) {
+    if (expr.type === Syntax.Identifier && expr.name in Types) {
+      return {
+        type: Syntax.TypeIdentifier,
+        name: expr.name
+      };
+    }
+
+    if (expr.type === Syntax.PointerType) {
+      return expr;
+    }
+
+    return null;
   }
 
   function isStrictModeReservedWord(id) {
@@ -1690,7 +1701,7 @@
   }
 
   function parseLeftHandSideExpressionAllowCall() {
-    var useNew, expr, m, cast = false;
+    var useNew, expr, m, cast = false, args;
 
     useNew = matchKeyword('new');
     if (useNew) {
@@ -1699,7 +1710,8 @@
       if (match('(')) {
         m = mark();
         lex();
-        if (lookahead().type === Syntax.Identifier) {
+        var token = lookahead();
+        if (token.type === Token.Identifier) {
           expr = parseInlineableType();
           if (expr.type === Syntax.TypeIdentifier) {
             reset(m);
@@ -1737,8 +1749,11 @@
       }
     }
 
-    if (cast && expr.type !== Syntax.CallExpression) {
-      throwUnexpected(lookahead());
+    if (cast) {
+      if (expr.type !== Syntax.CallExpression) {
+        throwUnexpected(lookahead());
+      }
+      disambiguateCast(expr);
     }
 
     return expr;
@@ -3770,14 +3785,9 @@
     callee = call.callee;
     args = call.arguments;
     length = args.length;
-    if (!isType(callee.name)) {
+    if (!(as = toType(callee))) {
       return;
     }
-
-    as = {
-      type: Syntax.TypeIdentifier,
-      name: callee.name
-    };
 
     call.type = Syntax.CastExpression;
     call.as = as;
