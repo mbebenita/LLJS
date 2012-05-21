@@ -918,7 +918,7 @@
 
   Literal.prototype.transformNode = function (o) {
     if (this.value === null) {
-      this.ty = anyPointerType;
+      this.ty = anyPointerTy;
     } else if (typeof this.value === "number") {
       this.ty = isInteger(this.value) ? i32ty : f64ty;
     }
