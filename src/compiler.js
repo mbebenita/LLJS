@@ -166,10 +166,10 @@
   }
 
   StructType.prototype.toString = function (lvl) {
+    lvl = lvl || 0;
     if (lvl > 0) {
       return this.name;
     }
-
     var s = "struct" + (this.name ? (" " + this.name) : " ") + " { ";
     s += this.fields.map(function (f) {
       return tystr(f.type, lvl + 1) + " " + f.name;
@@ -199,6 +199,7 @@
   PointerType.prototype.size = 4;
 
   PointerType.prototype.toString = function (lvl) {
+    lvl = lvl || 0;
     return tystr(this.base, lvl + 1) + "*";
   };
 
@@ -833,6 +834,10 @@
   };
 
   PointerType.prototype.assignableFrom = function (other) {
+    if (!other) {
+      return false;
+    }
+
     if (other instanceof PointerType) {
       if (!this.base || !other.base) {
         return true;
