@@ -1,5 +1,15 @@
+extern ArrayBuffer;
+extern Uint8Array;
+extern Int8Array;
+extern Uint16Array;
+extern Int16Array;
+extern Uint32Array;
+extern Int32Array;
+extern Float32Array;
+extern Float64Array;
+
 const MB = 1024 * 1024;
-const WORD_SIZE = 4;
+const WORD_SIZE = sizeof(word);
 const SIZE = (32 * MB) / WORD_SIZE;
 const STACK_SIZE = (2 * MB) / WORD_SIZE;
 const HEAP_SIZE = SIZE - STACK_SIZE;
@@ -25,89 +35,112 @@ const HEAP_SIZE = SIZE - STACK_SIZE;
    +---------------+ <- Stack Pointer (SP)
 */
 
-function int * memoryCopy(int *dst, int *src, int length) {
+function byte *memcpy(byte *dst, byte *src, uint length) {
   for (let int i = 0; i < length; ++i) {
     *dst++ = *src++;
   }
   return dst;
 }
 
-function int * memoryZero(int *dst, int length) {
+function u16 *memcpy2(u16 *dst, u16 *src, uint length) {
   for (let int i = 0; i < length; ++i) {
-    *dst++ = 0;
+    *dst++ = *src++;
   }
   return dst;
 }
 
+function u32 *memcpy4(u32 *dst, u32 *src, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *dst++ = *src++;
+  }
+  return dst;
+}
+
+function void memset(byte *s, byte b, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *s = b;
+  }
+}
+
+function void memset2(u16 *s, u16 b, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *s = b;
+  }
+}
+
+function void memset4(u32 *s, u32 b, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *s = b;
+  }
+}
 
 /* K&R Malloc */
 
 struct Header {
-  let Header * next;
-  let uint size;
-}
+  Header *next;
+  uint size;
+};
 
-let Header * base = NULL;
-let Header * freep = NULL;
+let Header *base = null;
+let Header *freep = null;
 
-function resetMemory() {
+function reset() {
   let M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
   exports.U1 = new Uint8Array(M);
   exports.I1 = new Int8Array(M);
   exports.U2 = new Uint16Array(M);
   exports.I2 = new Int16Array(M);
-  U4 = new Uint32Array(M);
-  I4 = new Int32Array(M);
-  exports.U4 = U4;
-  exports.I4 = I4;
+  exports.U4 = new Uint32Array(M);
+  exports.I4 = new Int32Array(M);
   exports.F4 = new Float32Array(M);
   exports.F8 = new Float64Array(M);
 
-  U4[0] = 4;
-  U4[1] = SIZE;
+  exports.U4[0] = 4;
+  exports.U4[1] = SIZE;
 
-  base = (Header *)2;
-  freep = NULL;
+  base = (Header *)(2);
+  freep = null;
 }
 
-resetMemory();
+reset();
 
-function void * sbrk(int nBytes) {
-  let int nWords = nBytes / sizeof (u32);
+function byte *sbrk(int nBytes) {
+  let U4 = exports.U4;
+  let int nWords = nBytes / sizeof(word);
   if (U4[0] + nWords > HEAP_SIZE) {
-    trace("Out of Memory");
-    return NULL;
+    return null;
   }
-  let void * address = (int *)U4[0];
+  let byte *address = (int *)(U4[0]);
   U4[0] += nWords;
   return address;
 }
 
 let uint nUnitsMin = 1024;
 
-function Header * morecore(int nUnits) {
+function Header *morecore(int nUnits) {
   if (nUnits < nUnitsMin) {
     nUnits = nUnitsMin;
   }
-  let void * buffer = sbrk(nUnits * sizeof (Header));
+  let byte *buffer = sbrk(nUnits * sizeof(Header));
 
-  if (buffer === 0) {
-    return NULL;
+  if (buffer === null) {
+    return null;
   }
-  let Header * header = (Header *)buffer;
+  let Header *header = (Header *)(buffer);
   header->size = nUnits;
   free(header + 1);
   return freep;
 }
 
-function void * malloc(int nBytes) {
+function byte *malloc(int nBytes) {
   let Header *p, *prevp;
   let int nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
 
-  if ((prevp = freep) === NULL) {
+  if ((prevp = freep) === null) {
     base->next = freep = prevp = base;
     base->size = 0;
   }
+
   for (p = prevp->next; true; prevp = p, p = p->next) {
     if (p->size >= nUnits) {
       if (p->size === nUnits) {
@@ -121,16 +154,16 @@ function void * malloc(int nBytes) {
       return p + 1;
     }
     if (p === freep) {
-      if ((p = morecore(nUnits)) == NULL) {
-        return NULL;
+      if ((p = morecore(nUnits)) === null) {
+        return null;
       }
     }
   }
-  return NULL;
+  return null;
 }
 
-function void free(void *ap) {
-  let Header *bp = (Header *)ap - 1, *p;
+function void free(byte *ap) {
+  let Header *bp = (Header *)(ap - 1), *p;
   for (p = freep; !(bp > p && bp < p->next); p = p->next) {
     if (p >= p->next && (bp > p || bp < p->next)) {
       break;
@@ -151,8 +184,14 @@ function void free(void *ap) {
   freep = p;
 }
 
-exports.resetMemory = resetMemory;
-exports.memoryCopy = memoryCopy;
-exports.memoryZero = memoryZero;
+exports.reset = reset;
+
+exports.memcpy = memcpy;
+exports.memcpy2 = memcpy2;
+exports.memcpy4 = memcpy4;
+exports.memset = memset;
+exports.memset2 = memset2;
+exports.memset4 = memset4;
+
 exports.malloc = malloc;
 exports.free = free;

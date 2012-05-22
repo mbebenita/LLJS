@@ -181,7 +181,7 @@
 
     ConditionalExpression: {
       extends: "Expression",
-      fields:  ["@test", "@alternate", "@consequent"]
+      fields:  ["@test", "@consequent", "@alternate"]
     },
 
     NewExpression: {
