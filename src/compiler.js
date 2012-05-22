@@ -58,10 +58,6 @@
     return x && ((x & (x - 1)) === 0);
   }
 
-  function wordAlignment(x) {
-    return (x + 3) & ~0x3;
-  }
-
   function log2(x) {
     assert (isPowerOfTwo(x), "Value " + x + " is not a power of two.");
     return Math.log(x) / Math.LN2;
@@ -72,8 +68,12 @@
     return x / 4;
   }
 
+  function isAlignedTo(offset, alignment) {
+    return offset & ~(alignment - 1);
+  }
+
   function alignTo(offset, alignment) {
-    return (((offset - 1) / alignment + 1) | 0) * alignment;
+    return (offset + (alignment - 1)) & ~(alignment - 1);
   }
 
   function extend(old, props) {
@@ -234,11 +234,25 @@
   const wordTy = u32ty;
   const voidTy = new PrimitiveType("void", 0, 0, undefined);
   const bytePointerTy = new PointerType(u8ty);
+  const spTy = new PointerType(u32ty);
 
   const mallocTy = new ArrowType([u32ty], bytePointerTy);
   const freeTy = new ArrowType([bytePointerTy], voidTy);
-  const memcpyTy = new ArrowType([bytePointerTy, bytePointerTy, u32ty], bytePointerTy);
-  const memsetTy = new ArrowType([bytePointerTy, u32ty, u32ty], voidTy);
+
+  function createMemcpyType(pointerTy) {
+    return new ArrowType([pointerTy, pointerTy, u32ty], pointerTy);
+  }
+
+  function createMemsetType(pointerTy) {
+    return new ArrowType([pointerTy, pointerTy.base, u32ty], voidTy);
+  }
+
+  const memcpyTy  = createMemcpyType(bytePointerTy);
+  const memcpy2Ty = createMemcpyType(new PointerType(u16ty));
+  const memcpy4Ty = createMemcpyType(new PointerType(u32ty));
+  const memsetTy  = createMemsetType(bytePointerTy);
+  const memset2Ty = createMemsetType(new PointerType(u16ty));
+  const memset4Ty = createMemsetType(new PointerType(u32ty));
 
   u8ty.integral = u8ty.numeric = true;
   i8ty.integral = i8ty.numeric = true;
@@ -391,12 +405,12 @@
     return this.frame.FREE();
   };
 
-  Scope.prototype.MEMCPY = function MEMCPY() {
-    return this.frame.MEMCPY();
+  Scope.prototype.MEMCPY = function MEMCPY(size) {
+    return this.frame.MEMCPY(size);
   };
 
-  Scope.prototype.MEMSET = function MEMSET() {
-    return this.frame.MEMSET();
+  Scope.prototype.MEMSET = function MEMSET(size) {
+    return this.frame.MEMSET(size);
   };
 
   Scope.prototype.toString = Scope.prototype.toJSON = function () {
@@ -442,12 +456,26 @@
     return getCachedLocal(this, "free", freeTy);
   };
 
-  Frame.prototype.MEMCPY = function MEMCPY() {
-    return getCachedLocal(this, "memcpy", memcpyTy);
+  Frame.prototype.MEMCPY = function MEMCPY(size) {
+    assert(size === 1 || size === 2 || size === 4);
+    var name, ty;
+    switch (size) {
+    case 1: name = "memcpy"; ty = memcpyTy; break;
+    case 2: name = "memcpy2"; ty = memcpy2Ty; break;
+    case 4: name = "memcpy4"; ty = memcpy4Ty; break;
+    }
+    return getCachedLocal(this, name, ty);
   };
 
-  Frame.prototype.MEMSET = function MEMSET() {
-    return getCachedLocal(this, "memset", memsetTy);
+  Frame.prototype.MEMSET = function MEMSET(size) {
+    assert(size === 1 || size === 2 || size === 4);
+    var name, ty;
+    switch (size) {
+    case 1: name = "memset"; ty = memsetTy; break;
+    case 2: name = "memset2"; ty = memset2Ty; break;
+    case 4: name = "memset4"; ty = memset4Ty; break;
+    }
+    return getCachedLocal(this, name, ty);
   };
 
   Frame.prototype.getView = function getView(ty) {
@@ -460,25 +488,26 @@
 
   Frame.prototype.SP = function SP() {
     if (!this.cachedSP) {
-      this.cachedSP = cast(new Identifier(this.freshVariable("$SP").name),
-                           new PointerType(u32ty));
+      this.cachedSP = cast(new Identifier(this.freshVariable("$SP").name), spTy);
     }
     return this.cachedSP;
   };
 
   Frame.prototype.realSP = function realSP() {
-    return cast(new MemberExpression(this.getView(builtinTypes.uint), new Literal(1), true),
-                new PointerType(u32ty));
+    return cast(new MemberExpression(this.getView(builtinTypes.uint), new Literal(1), true), spTy);
   };
 
   Frame.prototype.close = function close() {
+    const wordSize = wordTy.size;
     var wordOffset = 0;
     var mangles = this.mangles;
+    // The SP and frame sizes are in *words*, since we expect most accesses
+    // are to ints, but the alignment is by *double word*, to fit doubles.
     for (var name in mangles) {
       var variable = mangles[name];
       if (mangles[name].isStackAllocated) {
         variable.wordOffset = wordOffset;
-        wordOffset += wordAlignment(variable.type.align.size) / 4;
+        wordOffset += alignTo(variable.type.size, wordSize * 2) / wordSize;
       }
     }
 
@@ -1182,7 +1211,19 @@
           quote(tystr(rty, 0)) + " to " + quote(tystr(lty, 0)));
 
     if (lty instanceof StructType) {
-      return cast(new CallExpression(scope.MEMCPY(), [this.left, this.right, lty.size]), lty);
+      // Emit a memcpy using the largest alignment size we can.
+      var mc, size;
+      if (isAlignedTo(lty.size, 4)) {
+        mc = scope.MEMCPY(4);
+        size = lty.size / 4;
+      } else if (isAlignedTo(lty.size, 2)) {
+        mc = scope.MEMCPY(2);
+        size = lty.size / 2;
+      } else {
+        mc = scope.MEMCPY(1);
+        size = lty.size;
+      }
+      return cast(new CallExpression(mc, [this.left, this.right, new Literal(size)]), lty);
     } else {
       this.right = cast(this.right, lty);
       return cast(this, lty);
@@ -1266,8 +1307,20 @@
       return expr;
     }
 
-    var lalign = this.base.align.size;
-    var ralign = rty.base.align.size;
+    return realign(expr, this.base.align.size);
+  };
+
+  StructType.prototype.convert = function (expr) {
+    return expr;
+  };
+
+  ArrowType.prototype.convert = function (expr) {
+    return expr;
+  };
+
+  function realign(expr, lalign) {
+    assert(expr.ty instanceof PointerType);
+    var ralign = expr.ty.base.align.size;
 
     if (lalign === ralign) {
       return expr;
@@ -1283,20 +1336,13 @@
     }
 
     return new BinaryExpression(op, expr, new Literal(log2(ratio)));
-  };
-
-  StructType.prototype.convert = function (expr) {
-    return expr;
-  };
-
-  ArrowType.prototype.convert = function (expr) {
-    return expr;
-  };
+  }
 
   function alignAddress(base, byteOffset, ty) {
-    var address = base;
+    var address = realign(base, ty.align.size);
     if (byteOffset !== 0) {
-      assert(byteOffset % ty.align.size === 0, "Unaligned byte offset " + byteOffset + " for type " + quote(ty) + " with alignment " + ty.align.size);
+      assert(isAlignedTo(byteOffset, ty.align.size), "unaligned byte offset " + byteOffset +
+             " for type " + quote(ty) + " with alignment " + ty.align.size);
       var offset = byteOffset / ty.align.size;
       address = new BinaryExpression("+", address, new Literal(offset));
     }
@@ -1306,7 +1352,10 @@
   function dereference(address, byteOffset, ty, scope) {
     assert(scope);
     address = alignAddress(address, byteOffset, ty);
-    return new MemberExpression(scope.getView(ty), address, true);
+    var expr = new MemberExpression(scope.getView(ty), address, true);
+    // Remember (coerce) the type so we can realign, but *do not* cast.
+    expr.ty = ty;
+    return expr;
   }
 
   function createPrologue(node, o) {
@@ -1426,6 +1475,12 @@
     var variable = this.variable;
     if (variable && variable.isStackAllocated) {
       return variable.getStackAccess(o.scope);
+    }
+  };
+
+  VariableDeclaration.prototype.lowerNode = function (o) {
+    if (this.declarations.length === 0) {
+      return null;
     }
   };
 
