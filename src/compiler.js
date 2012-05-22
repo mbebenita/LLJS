@@ -690,7 +690,7 @@
 
   StructType.prototype.lint = function () {
     var maxSize = 1;
-    var maxSizeType;
+    var maxSizeType = u8ty;
     var fields = this.fields
     var field, type;
     var prev = { offset: 0, type: { size: 0 } };
@@ -1212,18 +1212,20 @@
 
     if (lty instanceof StructType) {
       // Emit a memcpy using the largest alignment size we can.
-      var mc, size;
-      if (isAlignedTo(lty.size, 4)) {
+      var mc, size, pty;
+      if (lty.align === u32ty) {
         mc = scope.MEMCPY(4);
         size = lty.size / 4;
-      } else if (isAlignedTo(lty.size, 2)) {
+      } else if (lty.align === u16ty) {
         mc = scope.MEMCPY(2);
         size = lty.size / 2;
       } else {
-        mc = scope.MEMCPY(1);
+        mc = scope.MEMCPY(u8ty.size);
         size = lty.size;
       }
-      return cast(new CallExpression(mc, [this.left, this.right, new Literal(size)]), lty);
+      var left = new UnaryExpression("&", this.left);
+      var right = new UnaryExpression("&", this.right);
+      return cast(new CallExpression(mc, [left, right, new Literal(size)]), lty).transform(o);
     } else {
       this.right = cast(this.right, lty);
       return cast(this, lty);
