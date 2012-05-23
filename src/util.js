@@ -140,7 +140,7 @@
 
   var Logger = (function () {
     var info, warn, error;
-    if (!console) {
+    if (typeof console === "undefined") {
       info = warn = error = print;
     } else {
       info = console.info;

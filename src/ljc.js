@@ -13,13 +13,15 @@
     mode = BROWSER;
   }
 
+  var util, esprima, escodegen, estransform, compiler;
   var argv;
+
   if (mode === NODE_JS) {
-    var util = require("./util.js");
-    var esprima = require("./esprima.js");
-    var escodegen = require("./escodegen.js");
-    var estransform = require("./estransform.js");
-    var compiler = require("./compiler.js");
+    util = require("./util.js");
+    esprima = require("./esprima.js");
+    escodegen = require("./escodegen.js");
+    estransform = require("./estransform.js");
+    compiler = require("./compiler.js");
 
     snarf = require('fs').readFileSync;
     argv = process.argv.slice(2);
@@ -32,7 +34,13 @@
     load("./estransform.js");
     load("./compiler.js");
 
-    argv = arguments;
+    util = this.util;
+    esprima = this.esprima;
+    escodegen = this.escodegen;
+    estransform = this.estransform;
+    compiler = this.compiler
+
+    argv = this.arguments;
   }
 
   function cli() {
@@ -113,5 +121,9 @@
 
   exports.cli = cli;
   exports.compile = compile;
+
+  if (mode === JS_SHELL) {
+    cli();
+  }
 
 }).call(this, typeof exports === "undefined" ? (LJC = {}) : exports);
