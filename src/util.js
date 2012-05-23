@@ -217,8 +217,8 @@
             var c;
             if (i === loc.start.column) {
               underline += "^";
-            } else if (i > loc.start.column && i <= loc.end.column &&
-                       !(c = line.charAt(i)).match(/\s/) && c !== ";") {
+            } else if (i > loc.start.column && i <= loc.end.column - 1 &&
+                       !(c = line.charAt(i)).match(/\s/)) {
               underline += "~";
             } else {
               underline += " ";

@@ -69,7 +69,8 @@
     // emit .js.
     if (mode === NODE_JS) {
       var suffix = options["emit-ast"] ? ".json" : ".js";
-      require('fs').writeFileSync(basename + suffix, code);
+      // Escodegen doesn't emit a final newline for some reason, so add one.
+      require('fs').writeFileSync(basename + suffix, code + "\n");
     } else {
       print(code);
     }

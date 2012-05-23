@@ -71,11 +71,11 @@
     if (U4[0] + nWords > HEAP_SIZE) {
       return 0;
     }
-    var address = U4[0];
+    var address = U4[0] << 2;
     U4[0] += nWords;
     return address;
   }
-  var nUnitsMin = 1024 >>> 0;
+  var nUnitsMin = 1024;
   function morecore(nUnits) {
     const $U4 = $M.U4;
     if (nUnits < nUnitsMin) {
@@ -96,7 +96,7 @@
     var nUnits = (nBytes + 8 - 1) / 8 + 1 | 0;
     if ((prevp = freep) === 0) {
       $U4[base] = freep = prevp = base;
-      $U4[base + 1] = 0 >>> 0;
+      $U4[base + 1] = 0;
     }
     for (p = $U4[prevp]; true; prevp = p, p = $U4[p]) {
       if ($U4[p + 1] >= nUnits) {
