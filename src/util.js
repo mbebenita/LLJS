@@ -179,10 +179,13 @@
       return startANSI + modifiers.join(";") + 'm' + s + clearANSI;
     }
 
-    function Logger(program, name, source, verbosity) {
+    function Logger(program, name, source, options) {
+      this.id = 1;
       this.program = program;
       this.name = name;
-      this.verbosity = verbosity;
+      this.options = options;
+      this.verbosity = options.trace ? 3 : (options.warn ? 2 : 1);
+      this.buffer = [];
       this.context = [];
       if (typeof source !== "string" && !(source instanceof String)) {
         this.source = String(source).split("\n");
@@ -190,6 +193,22 @@
         this.source = source.split("\n");
       }
     }
+
+    function compareLocations(a, b) {
+      var cmp = a.start.line - b.start.line;
+      if (cmp === 0) {
+        cmp = a.end.line - b.end.line;
+        if (cmp === 0) {
+          cmp = a.start.column - b.start.column;
+          if (cmp === 0) {
+            cmp = a.end.column - b.end.column;
+          }
+        }
+      }
+      return cmp;
+    }
+
+    const severity = { info: 1, warn: 2, error: 3 };
 
     Logger.prototype = {
       push: function (node) {
@@ -200,70 +219,137 @@
         this.context.pop();
       },
 
-      format: function (loc, kind, kcolor, message) {
-        var prefix = this.name;
-        if (loc) {
-          prefix += ":" + loc.start.line + ":" + loc.start.column;
+      _format: function (prefix, kind, message) {
+        if (this.options["simple-log"]) {
+          return prefix + " " + kind + " " + message;
         }
 
-        var header = ansi(prefix + ": ", bold) + ansi(kind + ": ", bold, kcolor) + ansi(message, bold);
+        switch (kind) {
+        case "info":
+          kind = ansi("info:", bold);
+        case "warn":
+          kind = ansi("warning:", bold, magenta);
+          break;
+        case "error":
+          kind = ansi("error:", bold, red);
+          break;
+        }
 
-        if (loc) {
-          const indent = "  ";
-          var underline = "";
-          var line = this.source[loc.start.line - 1];
+        return ansi(prefix, bold) + " " + kind + " " + ansi(message, bold);
+      },
 
-          for (var i = 0, j = line.length; i < j; i++) {
-            var c;
-            if (i === loc.start.column) {
-              underline += "^";
-            } else if (i > loc.start.column && i <= loc.end.column - 1 &&
-                       !(c = line.charAt(i)).match(/\s/)) {
-              underline += "~";
-            } else {
-              underline += " ";
-            }
+      _underlinedSnippet: function (loc) {
+        const indent = "  ";
+        var underline = "";
+        var line = this.source[loc.start.line - 1];
+
+        for (var i = 0, j = line.length; i < j; i++) {
+          var c;
+          if (i === loc.start.column) {
+            underline += "^";
+          } else if (i > loc.start.column && i <= loc.end.column - 1 &&
+                     !(c = line.charAt(i)).match(/\s/)) {
+            underline += "~";
+          } else {
+            underline += " ";
           }
-
-          return header + "\n" + indent + line + "\n" + indent + ansi(underline, bold, green);
         }
 
-        return header;
+        return indent + line + "\n" + indent + ansi(underline, bold, green);
+      },
+
+      _bufferMessage: function (kind, message, loc) {
+        if (!loc) {
+          var node = this.context[this.context.length - 1];
+          if (node && node.loc) {
+            loc = node.loc;
+          }
+        }
+        this.buffer.push({ loc: loc, kind: kind, message: message, id: this.id++ });
       },
 
       info: function (message, loc) {
         if (this.verbosity >= 3) {
-          if (!loc) {
-            var node = this.context[this.context.length - 1];
-            if (node) {
-              loc = node.loc;
-            }
-          }
-          info(this.format(loc, "info", undefined, message));
+          this._bufferMessage("info", message, loc);
         }
       },
 
       warn: function (message, loc) {
         if (this.verbosity >= 2) {
-          if (!loc) {
-            var node = this.context[this.context.length - 1];
-            if (node) {
-              loc = node.loc;
-            }
-          }
-          warn(this.format(loc, "warning", magenta, message));
+          this._bufferMessage("warn", message, loc);
         }
       },
 
       error: function (message, loc) {
         if (this.verbosity >= 1) {
-          if (!loc) {
-            var node = this.context[this.context.length - 1];
-            if (node) {
-              loc = node.loc;
+          this._bufferMessage("error", message, loc);
+        }
+      },
+
+      flush: function () {
+        const humanReadable = !this.options["simple-log"];
+
+        // Sort by location. Messages without location are sorted by the order
+        // in which they're added.
+        var buf = this.buffer.sort(function (a, b) {
+          var aloc = a.loc, bloc = b.loc;
+
+          if (!aloc && !bloc) {
+            return a.id - b.id;
+          }
+          if (!aloc && bloc) {
+            return -1;
+          }
+          if (aloc && !bloc) {
+            return 1;
+          }
+
+          var cmp = compareLocations(aloc, bloc);
+          if (cmp === 0) {
+            cmp = severity[a.kind] - severity[b.kind];
+          }
+          return cmp;
+        });
+
+        var prev;
+        for (var i = 0, buflen = buf.length; i < buflen; i++) {
+          var b = buf[i];
+          var loc = b.loc;
+
+          var prefix = this.name + ":";
+          if (loc) {
+            prefix += loc.start.line + ":" + loc.start.column + ":";
+
+            if (prev && compareLocations(loc, prev.loc) === 0 && humanReadable) {
+              var spacer = "";
+              for (var j = 0, k = prefix.length; j < k; j++) {
+                spacer += " ";
+              }
+              prefix = spacer;
             }
           }
-          error(this.format(loc, "error", red, message));
+
+          var formatted = this._format(prefix, b.kind, b.message);
+          switch (b.kind) {
+          case "info":
+            info(formatted);
+            break;
+          case "warn":
+            warn(formatted);
+            break;
+          case "error":
+            error(formatted);
+            break;
+          }
+
+          if (humanReadable) {
+            var next = buf[i + 1];
+            if (loc && !next || (next.loc && compareLocations(loc, next.loc) !== 0)) {
+              info(this._underlinedSnippet(loc));
+            }
+          }
+
+          prev = b;
         }
       }
     };

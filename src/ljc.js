@@ -49,7 +49,8 @@
       ["A", "emit-ast",     false, "Do not generate JS, emit AST"],
       ["P", "pretty-print", false, "Pretty-print AST instead of emitting JSON (with -A)"],
       ["b", "bare",         false, "Do not wrap in a module"],
-      ["W", "warn",         true,  "Print warnings (enabled by default)"],
+      ["W", "warn",         false, "Print warnings"],
+      ["0", "simple-log",   false, "Log simple messages. No colors and snippets."],
       ["t", "trace",        false, "Trace compiler execution"],
       ["h", "help",         false, "Print this message"]
     ]);
@@ -71,7 +72,7 @@
     var filename = files[0];
     var basename = filename.substr(0, filename.lastIndexOf('.')) || filename;
     var source = snarf(filename);
-    var code = compile(basename, source, options);
+    var code = compile(basename, filename, source, options);
 
     // SpiderMonkey has no way to write to a file, but if we're on node we can
     // emit .js.
@@ -84,8 +85,8 @@
     }
   }
 
-  function compile(name, source, options) {
-    var logger = new util.Logger("ljc", name, source, options.trace ? 3 : (options.warn ? 2 : 1));
+  function compile(name, logName, source, options) {
+    var logger = new util.Logger("ljc", logName, source, options);
     try {
       var code;
       var node = esprima.parse(source, { loc: true });
@@ -111,11 +112,14 @@
       }
 
       if (e.logged) {
-        // Compiler error thta has already been logged, so just quit.
+        // Compiler error thta has already been logged, so just flush and
+        // quit.
         quit();
       }
 
       throw e;
+    } finally {
+      logger.flush();
     }
   }
 
