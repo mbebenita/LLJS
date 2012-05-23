@@ -1208,12 +1208,12 @@
         );
 
     if (typeof token.lineNumber === 'number') {
-      error = new Error('Line ' + token.lineNumber + ': ' + msg);
+      error = new Error(msg);
       error.index = token.range[0];
       error.lineNumber = token.lineNumber;
       error.column = token.range[0] - lineStart + 1;
     } else {
-      error = new Error('Line ' + lineNumber + ': ' + msg);
+      error = new Error(msg);
       error.index = index;
       error.lineNumber = lineNumber;
       error.column = index - lineStart + 1;

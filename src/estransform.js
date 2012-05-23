@@ -294,7 +294,8 @@
   };
 
   function allFields(spec) {
-    var fields = [];
+    // Make the location a special last field.
+    var fields = ["loc"];
     while (spec) {
       if (spec.fields) {
         fields = spec.fields.concat(fields);
@@ -383,7 +384,13 @@
       }
 
       if (typeof this[prop] === "function") {
-        trans = this[prop](o);
+        if (o.logger) {
+          o.logger.push(this);
+          trans = this[prop](o);
+          o.logger.pop();
+        } else {
+          trans = this[prop](o);
+        }
         if (trans === null) {
           return null;
         }
