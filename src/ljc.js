@@ -43,6 +43,8 @@
     argv = this.arguments;
   }
 
+  const assert = util.assert;
+
   function cli() {
     var optparser = new util.OptParser([
       ["E", "only-parse",   false, "Only parse"],
@@ -74,14 +76,21 @@
     var source = snarf(filename);
     var code = compile(basename, filename, source, options);
 
-    // SpiderMonkey has no way to write to a file, but if we're on node we can
-    // emit .js.
-    if (mode === NODE_JS) {
-      var suffix = options["emit-ast"] ? ".json" : ".js";
-      // Escodegen doesn't emit a final newline for some reason, so add one.
-      require('fs').writeFileSync(basename + suffix, code + "\n");
+    if (options["pretty-print"]) {
+      print(PrettyPrinter.pp(code, 2));
     } else {
-      print(code);
+      // SpiderMonkey has no way to write to a file, but if we're on node we can
+      // emit .js.
+      if (mode === NODE_JS) {
+        if (options["emit-ast"]) {
+          require('fs').writeFileSync(basename + ".json", JSON.stringify(code, null, 2));
+        } else {
+          // Escodegen doesn't emit a final newline for some reason, so add one.
+          require('fs').writeFileSync(basename + ".js", code + "\n");
+        }
+      } else {
+        print(code);
+      }
     }
   }
 
@@ -91,12 +100,10 @@
       var code;
       var node = esprima.parse(source, { loc: true });
       if (options["only-parse"]) {
-        // TODO
         code = node;
       } else {
         node = compiler.compile(node, name, logger, options);
         if (options["emit-ast"]) {
-          // TODO
           code = node;
         } else {
           code = escodegen.generate(node, { base: "", indent: "  " });

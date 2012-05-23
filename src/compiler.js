@@ -1566,7 +1566,7 @@
     // Pass 4.
     node = node.lower(o);
 
-    return createModule(node, name, options.bare);
+    return T.flatten(createModule(node, name, options.bare));
   }
 
   exports.compile = compile;

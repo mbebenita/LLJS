@@ -403,10 +403,9 @@
 
   exports.lift = function lift(raw) {
     if (raw instanceof Array) {
-      for (var i = 0, j = raw.length; i < j; i++) {
-        raw[i] = lift(raw[i]);
-      }
-      return raw;
+      return raw.map(function (r) {
+        return lift(r);
+      });
     }
 
     var type = raw.type;
@@ -432,6 +431,34 @@
     }
 
     return node;
-  }
+  };
+
+  exports.flatten = function flatten(node) {
+    if (node instanceof Array) {
+      return node.map(function (n) {
+        return flatten(n);
+      });
+    }
+
+    var type = node.type;
+    var raw = { type: type };
+    var fields = allFields(Lang[type]);
+    for (var i = 0, j = fields.length; i < j; i++) {
+      var field;
+      if (fields[i].charAt(0) === "@") {
+        field = fields[i].substr(1);
+        if (node[field]) {
+          raw[field] = flatten(node[field]);
+        } else {
+          raw[field] = null;
+        }
+      } else {
+        field = fields[i];
+        raw[field] = node[field];
+      }
+    }
+
+    return raw;
+  };
 
 })(typeof exports === "undefined" ? (estransform = {}) : exports);

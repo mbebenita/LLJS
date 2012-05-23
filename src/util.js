@@ -2,7 +2,7 @@
 
   function assert(condition, message) {
     if (!condition) {
-      error(message);
+      throw new Error(message);
     }
   }
 
