@@ -1,6 +1,6 @@
 (function (exports) {
   const $M = exports;
-  const MB = 1024 * 1024;
+  const MB = 1024 * 1024 | 0;
   const WORD_SIZE = 4;
   const SIZE = 32 * MB / WORD_SIZE;
   const STACK_SIZE = 2 * MB / WORD_SIZE;
@@ -79,21 +79,21 @@
   function morecore(nUnits) {
     const $U4 = $M.U4;
     if (nUnits < nUnitsMin) {
-      nUnits = nUnitsMin | 0;
+      nUnits = nUnitsMin;
     }
     var buffer = sbrk(nUnits * 8 | 0);
     if (buffer === 0) {
       return 0;
     }
     var header = buffer >> 2;
-    $U4[header + 1] = nUnits >>> 0;
+    $U4[header + 1] = nUnits;
     free(header + 1 * 2 << 2);
     return freep;
   }
   function malloc(nBytes) {
     const $U4 = $M.U4;
     var p = 0, prevp = 0;
-    var nUnits = (nBytes + 8 - 1) / 8 + 1 | 0;
+    var nUnits = ((((nBytes + 8 | 0) - 1 | 0) / 8 | 0) + 1 | 0) >>> 0;
     if ((prevp = freep) === 0) {
       $U4[base] = freep = prevp = base;
       $U4[base + 1] = 0;
@@ -103,9 +103,9 @@
         if ($U4[p + 1] === nUnits) {
           $U4[prevp] = $U4[p];
         } else {
-          $U4[p + 1] = $U4[p + 1] - nUnits >>> 0;
+          $U4[p + 1] = ($U4[p + 1] - nUnits | 0) >>> 0;
           p = p + $U4[p + 1] * 2;
-          $U4[p + 1] = nUnits >>> 0;
+          $U4[p + 1] = nUnits;
         }
         freep = prevp;
         return p + 1 * 2 << 2;
@@ -127,13 +127,13 @@
       }
     }
     if (bp + $U4[bp + 1] * 2 === $U4[p]) {
-      $U4[bp + 1] = $U4[bp + 1] + $U4[$U4[p] + 1] >>> 0;
+      $U4[bp + 1] = ($U4[bp + 1] + $U4[$U4[p] + 1] | 0) >>> 0;
       $U4[bp] = $U4[$U4[p]];
     } else {
       $U4[bp] = $U4[p];
     }
     if (p + $U4[p + 1] * 2 == bp) {
-      $U4[p + 1] = $U4[p + 1] + $U4[bp + 1] >>> 0;
+      $U4[p + 1] = ($U4[p + 1] + $U4[bp + 1] | 0) >>> 0;
       $U4[p] = $U4[bp];
     } else {
       $U4[p] = bp;

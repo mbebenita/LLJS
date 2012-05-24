@@ -33,7 +33,6 @@
     load("./escodegen.js");
     load("./estransform.js");
     load("./compiler.js");
-    load("./pretty.js");
 
     util = this.util;
     esprima = this.esprima;
@@ -110,7 +109,8 @@
       ["A", "emit-ast",     false, "Do not generate JS, emit AST"],
       ["P", "pretty-print", false, "Pretty-print AST instead of emitting JSON (with -A)"],
       ["b", "bare",         false, "Do not wrap in a module"],
-      ["W", "warn",         false, "Print warnings"],
+      ["W", "warn",         true,  "Print warnings (enabled by default)"],
+      ["Wconversion", null, false, "Print intra-integer and pointer conversion warnings"],
       ["0", "simple-log",   false, "Log simple messages. No colors and snippets."],
       ["t", "trace",        false, "Trace compiler execution"],
       ["h", "help",         false, "Print this message"]
@@ -154,6 +154,14 @@
   }
 
   function compile(name, logName, source, options) {
+    // -W anything infers -W.
+    for (var p in options) {
+      if (p.charAt(0) === "W") {
+        options.warn = true;
+        break;
+      }
+    }
+
     var logger = new util.Logger("ljc", logName, source, options);
     try {
       var code;

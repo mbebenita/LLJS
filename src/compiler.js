@@ -52,7 +52,7 @@
    */
 
   function isInteger(x) {
-    return parseInt(x) === Number(x);
+    return (parseInt(x) | 0) === Number(x);
   }
 
   function isPowerOfTwo(x) {
@@ -94,10 +94,8 @@
       } else {
         logger.error(message);
 
-        // Throw an error anyways, might be used as a library.
         var e = new Error(message);
-        e.node = logger.context.pop();
-        e.logged = true;
+        e.node = logger.context[logger.context.length - 1];
         throw e;
       }
     }
@@ -818,9 +816,10 @@
     return this.returnType.assignableFrom(other.returnType);
   };
 
-  function cast(node, ty) {
-    if (node.ty && node.ty !== ty) {
+  function cast(node, ty, force) {
+    if ((node.ty || force) && node.ty !== ty) {
       node = new CastExpression(undefined, node, node.loc);
+      node.force = force;
     }
     node.ty = ty;
     return node;
@@ -975,6 +974,11 @@
     } else if (BINOP_BITWISE.indexOf(op) >= 0) {
       ty = i32ty;
     } else if (BINOP_ARITHMETIC.indexOf(op) >= 0 && (lty && lty.numeric) && (rty && rty.numeric)) {
+      // Arithmetic on ints now begets ints. Force a CastExpression here so we
+      // convert it during lowering without warnings.
+      if (lty.integral && rty.integral) {
+        return cast(this, i32ty, true);
+      }
       ty = f64ty;
     }
 
@@ -1161,20 +1165,25 @@
    * Pass 4: lowering
    */
 
-  PrimitiveType.prototype.convert = function (expr) {
+  PrimitiveType.prototype.convert = function (expr, force, warn) {
     assert(expr);
 
     var rty = expr.ty;
 
-    if (this === rty || !(rty instanceof PrimitiveType)) {
-      check(rty instanceof PointerType, "conversion from pointer to " + quote(tystr(rty, 0))
-            + " without cast", true);
+    if (this === rty) {
       return expr;
+    }
+
+    if (!force) {
+      check(!(rty instanceof PointerType), "conversion from pointer to " +
+            quote(tystr(rty, 0)) + " without cast", true);
     }
 
     var conversion;
     var lwidth = this.size << 3;
-    var rwidth = rty.size << 3
+    var rwidth = rty ? rty.size << 3 : 8;
+    var lsigned = this.signed;
+    var rsigned = rty ? rty.signed : undefined;
     var mask = (1 << lwidth) - 1;
     var shift = 32 - lwidth;
     var errorPrefix;
@@ -1203,11 +1212,11 @@
 
       if (lwidth !== 32 && lwidth < rwidth) {
         val2 = val & mask;
-        if (this.signed) {
+        if (lsigned) {
           val2 = (val2 << shift) >> shift;
         }
-      } else if (lwidth !== rwidth || this.signed != rty.signed) {
-        if (this.signed) {
+      } else if (lwidth !== rwidth || lsigned != rsigned) {
+        if (lsigned) {
           val2 = val | 0;
         } else {
           val2 = val >>> 0;
@@ -1225,8 +1234,11 @@
       errorPrefix = "conversion from " + quote(tystr(rty, 0)) + " to " + quote(tystr(this, 0)) + " may alter its ";
     }
 
-    check(this.size === rty.size, errorPrefix + "value", true);
-    check(this.signed === rty.signed, errorPrefix + "sign", true);
+    // Allow conversions from dyn without warning.
+    if (!force && warn.conversion) {
+      check(lwidth === rwidth, errorPrefix + "value", true);
+      check(lsigned === rsigned, errorPrefix + "sign", true);
+    }
 
     // Do we need to truncate? Bitwise operators automatically truncate to 32
     // bits in JavaScript so if the width is 32, we don't need to do manual
@@ -1235,22 +1247,20 @@
     if (lwidth !== 32 && lwidth < rwidth) {
       conversion = new BinaryExpression("&", expr, new Literal(mask), loc);
       // Do we need to sign extend?
-      if (this.signed) {
+      if (lsigned) {
         var shiftLit = new Literal(shift);
         conversion = new BinaryExpression("<<", conversion, shift, loc);
         conversion = new BinaryExpression(">>", conversion, shift, loc);
       }
-    } else if (lwidth !== rwidth || rty.signed !== this.signed) {
-      conversion = new BinaryExpression((this.signed ? "|" : ">>>"), expr,
-                                        new Literal(0), loc);
     } else {
-      conversion = expr;
+      conversion = new BinaryExpression((lsigned ? "|" : ">>>"), expr,
+                                        new Literal(0), loc);
     }
 
     return conversion;
   };
 
-  PointerType.prototype.convert = function (expr, userCast) {
+  PointerType.prototype.convert = function (expr, force, warn) {
     // This is important for TI. Returning null here would result in the site
     // being dimorphic.
     if (isNull(expr)) {
@@ -1260,14 +1270,18 @@
 
     var rty = expr.ty;
     if (this === rty || !(rty instanceof PointerType)) {
-      check(!(rty instanceof PrimitiveType && rty.integral), "conversion from " + quote(tystr(rty, 0)) +
-            " to pointer without cast", true);
+      if (!force) {
+        check(!(rty instanceof PrimitiveType && rty.integral), "conversion from " +
+              quote(tystr(rty, 0)) + " to pointer without cast", true);
+      }
       return expr;
     }
 
-    check(rty.base.align.size >= this.base.align.size, "incompatible pointer conversion from " +
-          rty.base.align.size + "-byte aligned " + quote(tystr(rty, 0)) + " to " +
-          this.base.align.size + "-byte aligned " + quote(tystr(this, 0)), true);
+    if (warn.conversion) {
+      check(rty.base.align.size >= this.base.align.size, "incompatible pointer conversion from " +
+            rty.base.align.size + "-byte aligned " + quote(tystr(rty, 0)) + " to " +
+            this.base.align.size + "-byte aligned " + quote(tystr(this, 0)), true);
+    }
 
     return realign(expr, this.base.align.size);
   };
@@ -1500,7 +1514,8 @@
   };
 
   CastExpression.prototype.lowerNode = function (o) {
-    var lowered = this.ty.convert(this.argument, !!this.as);
+    // Treat user casts as forced casts so we don't emit warnings.
+    var lowered = this.ty.convert(this.argument, (!!this.as || this.force), o.warn);
     // Remember (coerce) the type for nested conversions.
     lowered.ty = this.ty;
     return lowered;
@@ -1545,6 +1560,16 @@
     return new Program([new ExpressionStatement(new CallExpression(module, moduleArgs))]);
   }
 
+  function warningOptions(options) {
+    var warn = {};
+    for (var p in options) {
+      if (p.charAt(0) === "W") {
+        warn[p.substr(1)] = true;
+      }
+    }
+    return warn;
+  }
+
   var logger;
 
   function compile(node, name, _logger, options) {
@@ -1556,7 +1581,7 @@
 
     // Pass 1.
     var types = resolveAndLintTypes(node, clone(builtinTypes));
-    var o = { types: types, name: name, logger: _logger };
+    var o = { types: types, name: name, logger: _logger, warn: warningOptions(options) };
     // Pass 2.
     node.scan(o);
     // Pass 3.

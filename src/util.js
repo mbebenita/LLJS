@@ -36,7 +36,12 @@
       var shorts = this.shorts = {};
       this.spec = flatspec.map(function (s) {
         var o = { name: s[1], short: s[0], default: s[2], help: s[3] };
-        longs[s[1]] = shorts[s[0]] = o;
+        if (s[1]) {
+          longs[s[1]] = o;
+        }
+        if (s[0]) {
+          shorts[s[0]] = o;
+        }
         return o;
       });
     }
@@ -92,17 +97,27 @@
               opts[match[1]]++;
             }
           } else if (arg.match(/^-[^-]+/)) {
-            var letters = arg.slice(1).split('');
-            for (var j = 0, k = letters.length; j < k; j++) {
-              var sspec = this.shorts[letters[j]];
-              if (!sspec) {
-                error("unknown option -" + letters[j]);
-                return null;
+            var sspec;
+            match = arg.match(/^-(.+)/);
+            if (sspec = this.shorts[match[1]]) {
+              var optname = sspec.name ? sspec.name : match[1];
+              if (!opts[optname]) {
+                opts[optname] = 1;
               }
-              if (!opts[sspec.name]) {
-                opts[sspec.name] = 1;
+              opts[optname]++;
+            } else {
+              var letters = arg.slice(1).split('');
+              for (var j = 0, k = letters.length; j < k; j++) {
+                var sspec = this.shorts[letters[j]];
+                if (!sspec) {
+                  error("unknown option -" + letters[j]);
+                  return null;
+                }
+                if (!opts[sspec.name]) {
+                  opts[sspec.name] = 1;
+                }
+                opts[sspec.name]++;
               }
-              opts[sspec.name]++;
             }
           } else {
             finished = i;
@@ -125,7 +140,13 @@
         var indent = "  ";
         for (var i = 0, j = spec.length; i < j; i++) {
           var s = spec[i];
-          str += indent + flushLeft("-" + s.short, 4) + flushLeft("--" + s.name, 18) + s.help + "\n";
+          str += indent;
+          if (s.name) {
+            str += flushLeft("-" + s.short, 4) + flushLeft("--" + s.name, 18);
+          } else {
+            str += flushLeft("-" + s.short, 22);
+          }
+          str += s.help + "\n";
         }
         return str;
       }

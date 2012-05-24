@@ -117,7 +117,7 @@ function byte *sbrk(int nBytes) {
 
 let uint nUnitsMin = 1024;
 
-function Header *morecore(int nUnits) {
+function Header *morecore(uint nUnits) {
   if (nUnits < nUnitsMin) {
     nUnits = nUnitsMin;
   }
@@ -134,7 +134,7 @@ function Header *morecore(int nUnits) {
 
 function byte *malloc(int nBytes) {
   let Header *p, *prevp;
-  let int nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
+  let uint nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
 
   if ((prevp = freep) === null) {
     base->next = freep = prevp = base;
