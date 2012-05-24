@@ -2,6 +2,6 @@
 
 var path = require('path');
 var fs   = require('fs');
-var dir  = path.join(path.dirname(fs.realpathSync(__filename)), '..');
+var dir  = path.join(path.dirname(fs.realpathSync(__filename)), '../src');
 
 require(path.join(dir, 'ljc')).cli();

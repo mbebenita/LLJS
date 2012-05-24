@@ -190,6 +190,8 @@
     uint: true,
     void: true,
     num: true,
+    float: true,
+    double: true,
     dyn: true
   };
 

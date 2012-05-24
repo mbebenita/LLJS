@@ -96,6 +96,7 @@
 
         var e = new Error(message);
         e.node = logger.context[logger.context.length - 1];
+        e.logged = true;
         throw e;
       }
     }
@@ -875,10 +876,16 @@
     return this;
   };
 
-  CastExpression.prototype.transformNode = function (o) {
+  CastExpression.prototype.transform = function (o) {
     if (this.as && !(this.ty = this.as.reflect(o))) {
-      return this.argument;
+      return this.argument.transform(o);
     }
+
+    o = extend(o);
+    o.wantsToBe = this.ty;
+    this.argument = this.argument.transform(o);
+
+    return this;
   };
 
   Literal.prototype.transformNode = function (o) {
@@ -973,10 +980,17 @@
       ty = i32ty;
     } else if (BINOP_BITWISE.indexOf(op) >= 0) {
       ty = i32ty;
-    } else if (BINOP_ARITHMETIC.indexOf(op) >= 0 && (lty && lty.numeric) && (rty && rty.numeric)) {
-      // Arithmetic on ints now begets ints. Force a CastExpression here so we
-      // convert it during lowering without warnings.
-      if (lty.integral && rty.integral) {
+    } else if (BINOP_ARITHMETIC.indexOf(op) >= 0 &&
+               (lty instanceof PrimitiveType && lty.numeric) &&
+               (rty instanceof PrimitiveType && rty.numeric)) {
+      // Arithmetic on ints now begets ints, unless it wants to be a wider
+      // primitive from an outside cast.
+      var wantsToBe;
+      if (lty.integral && rty.integral &&
+          !(((wantsToBe = o.wantsToBe) instanceof PrimitiveType) &&
+            wantsToBe.size > i32ty.size)) {
+        // Force a CastExpression here so we convert it during lowering
+        // without warnings.
         return cast(this, i32ty, true);
       }
       ty = f64ty;
@@ -1177,6 +1191,14 @@
     if (!force) {
       check(!(rty instanceof PointerType), "conversion from pointer to " +
             quote(tystr(rty, 0)) + " without cast", true);
+    }
+
+    if (!this.numeric) {
+      return expr;
+    }
+
+    if (!this.integral) {
+      return new CallExpression(new Identifier("Number"), [expr], expr.loc);
     }
 
     var conversion;

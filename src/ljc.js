@@ -131,7 +131,11 @@
     }
 
     var filename = files[0];
-    var basename = filename.substr(0, filename.lastIndexOf('.')) || filename;
+    var path = filename.split("/");
+    var basename = path.pop();
+    var dir = path.join("/");
+    basename = basename.substr(0, basename.lastIndexOf(".")) || basename;
+
     var source = snarf(filename);
     var code = compile(basename, filename, source, options);
 
@@ -141,11 +145,12 @@
       // SpiderMonkey has no way to write to a file, but if we're on node we can
       // emit .js.
       if (mode === NODE_JS) {
+        var outname = dir + "/" + basename;
         if (options["emit-ast"]) {
-          require('fs').writeFileSync(basename + ".json", JSON.stringify(code, null, 2));
+          require('fs').writeFileSync(outname + ".json", JSON.stringify(code, null, 2));
         } else {
           // Escodegen doesn't emit a final newline for some reason, so add one.
-          require('fs').writeFileSync(basename + ".js", code + "\n");
+          require('fs').writeFileSync(outname + ".js", code + "\n");
         }
       } else {
         print(code);
@@ -163,8 +168,9 @@
     }
 
     var logger = new util.Logger("ljc", logName, source, options);
+    var code;
+
     try {
-      var code;
       var node = esprima.parse(source, { loc: true });
       if (options["only-parse"]) {
         code = node;
@@ -176,25 +182,27 @@
           code = escodegen.generate(node, { base: "", indent: "  " });
         }
       }
-      return code;
     } catch (e) {
       if (e.lineNumber) {
         // Esprima error, make a loc out of it.
         var lc = { line: e.lineNumber, column: e.column };
         logger.error(e.message, { start: lc, end: lc });
+        logger.flush();
         quit();
       }
 
       if (e.logged) {
         // Compiler error thta has already been logged, so just flush and
         // quit.
+        logger.flush();
         quit();
       }
 
       throw e;
-    } finally {
-      logger.flush();
     }
+
+    logger.flush();
+    return code;
   }
 
   exports.cli = cli;
