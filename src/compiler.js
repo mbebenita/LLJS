@@ -1250,7 +1250,7 @@
     return conversion;
   };
 
-  PointerType.prototype.convert = function (expr) {
+  PointerType.prototype.convert = function (expr, userCast) {
     // This is important for TI. Returning null here would result in the site
     // being dimorphic.
     if (isNull(expr)) {
@@ -1265,9 +1265,9 @@
       return expr;
     }
 
-
     check(rty.base.align.size >= this.base.align.size, "incompatible pointer conversion from " +
-          quote(tystr(this, 0)) + " to " + quote(tystr(rty, 0)), true);
+          rty.base.align.size + "-byte aligned " + quote(tystr(rty, 0)) + " to " +
+          this.base.align.size + "-byte aligned " + quote(tystr(this, 0)), true);
 
     return realign(expr, this.base.align.size);
   };
@@ -1500,7 +1500,7 @@
   };
 
   CastExpression.prototype.lowerNode = function (o) {
-    var lowered = this.ty.convert(this.argument);
+    var lowered = this.ty.convert(this.argument, !!this.as);
     // Remember (coerce) the type for nested conversions.
     lowered.ty = this.ty;
     return lowered;
