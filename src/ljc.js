@@ -145,7 +145,7 @@
       // SpiderMonkey has no way to write to a file, but if we're on node we can
       // emit .js.
       if (mode === NODE_JS) {
-        var outname = dir + "/" + basename;
+        var outname = (dir ? dir + "/" : "") + basename;
         if (options["emit-ast"]) {
           require('fs').writeFileSync(outname + ".json", JSON.stringify(code, null, 2));
         } else {
