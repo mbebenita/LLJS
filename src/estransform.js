@@ -1,7 +1,7 @@
 (function (exports) {
 
   // Extend as needed.
-  var Lang = {
+  var lang = exports.lang = {
     Node: {
     },
 
@@ -300,10 +300,11 @@
       if (spec.fields) {
         fields = spec.fields.concat(fields);
       }
-      spec = spec.extends ? Lang[spec.extends] : null;
+      spec = spec.extends ? lang[spec.extends] : null;
     }
     return fields;
-  }
+  };
+  exports.allFields = allFields;
 
   function prefixUnderscore(s) {
     return "_" + s;
@@ -328,7 +329,7 @@
 
       // Hook up the prototypes.
       if (spec.extends) {
-        var pnode = ensureConstructor(spec.extends, Lang[spec.extends]);
+        var pnode = ensureConstructor(spec.extends, lang[spec.extends]);
         node.prototype = Object.create(pnode.prototype);
       }
 
@@ -344,8 +345,8 @@
   }
 
   // Build constructors out of the language spec.
-  for (var name in Lang) {
-    ensureConstructor(name, Lang[name]);
+  for (var name in lang) {
+    ensureConstructor(name, lang[name]);
   }
 
   // Make a walk function (map and replace) named |name|. By default it
@@ -416,7 +417,7 @@
 
     var node = new Node();
     node.loc = raw.loc;
-    var fields = allFields(Lang[type]);
+    var fields = allFields(lang[type]);
     for (var i = 0, j = fields.length; i < j; i++) {
       var field;
       if (fields[i].charAt(0) === "@") {
@@ -442,7 +443,7 @@
 
     var type = node.type;
     var raw = { type: type };
-    var fields = allFields(Lang[type]);
+    var fields = allFields(lang[type]);
     for (var i = 0, j = fields.length; i < j; i++) {
       var field;
       if (fields[i].charAt(0) === "@") {

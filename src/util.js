@@ -227,6 +227,7 @@
         switch (kind) {
         case "info":
           kind = ansi("info:", bold);
+          break;
         case "warn":
           kind = ansi("warning:", bold, magenta);
           break;
@@ -247,8 +248,9 @@
           var c;
           if (i === loc.start.column) {
             underline += "^";
-          } else if (i > loc.start.column && i <= loc.end.column - 1 &&
-                     !(c = line.charAt(i)).match(/\s/)) {
+          } else if (loc.end.line > loc.start.line ||
+                     (i > loc.start.column && i <= loc.end.column - 1 &&
+                      !(c = line.charAt(i)).match(/\s/))) {
             underline += "~";
           } else {
             underline += " ";
@@ -320,7 +322,7 @@
           if (loc) {
             prefix += loc.start.line + ":" + loc.start.column + ":";
 
-            if (prev && compareLocations(loc, prev.loc) === 0 && humanReadable) {
+            if (prev && prev.loc && compareLocations(loc, prev.loc) === 0 && humanReadable) {
               var spacer = "";
               for (var j = 0, k = prefix.length; j < k; j++) {
                 spacer += " ";
@@ -342,9 +344,9 @@
             break;
           }
 
-          if (humanReadable) {
+          if (loc && humanReadable) {
             var next = buf[i + 1];
-            if (loc && !next || (next.loc && compareLocations(loc, next.loc) !== 0)) {
+            if (!next || (next.loc && compareLocations(loc, next.loc) !== 0)) {
               info(this._underlinedSnippet(loc));
             }
           }

@@ -127,10 +127,6 @@
     return this.name;
   };
 
-  PrimitiveType.prototype.toJSON = function () {
-    return this.name;
-  };
-
   PrimitiveType.prototype.lint = function () {};
 
   function StructType(name) {
@@ -142,17 +138,13 @@
   StructType.prototype.toString = function (lvl) {
     lvl = lvl || 0;
     if (lvl > 0) {
-      return this.name;
+      return this.name || "<anon struct>";
     }
     var s = "struct" + (this.name ? (" " + this.name) : " ") + " { ";
     s += this.fields.map(function (f) {
       return tystr(f.type, lvl + 1) + " " + f.name;
     }).join("; ");
     return s + " }";
-  };
-
-  StructType.prototype.toJSON = function () {
-    return this.toString(0);
   };
 
   StructType.prototype.getField = function getField(name) {
@@ -177,21 +169,15 @@
     return tystr(this.base, lvl + 1) + "*";
   };
 
-  PointerType.prototype.toJSON = function () {
-    return this.toString(0);
-  };
-
   function ArrowType(paramTypes, returnType) {
     this.paramTypes = paramTypes;
     this.returnType = returnType;
   }
 
   ArrowType.prototype.toString = function () {
-    return this.name || (this.name = this.returnType + "(" + this.paramTypes.join(", ") + ")");
-  };
-
-  ArrowType.prototype.toJSON = function () {
-    return this.toString();
+    return tystr(this.returnType, 0) + "(" + this.paramTypes.map(function (pty) {
+      return tystr(pty, 0);
+    }).join(", ") + ")";
   };
 
   const u8ty  = new PrimitiveType("u8",  1, 0, false);
@@ -389,7 +375,7 @@
     return this.frame.MEMSET(size);
   };
 
-  Scope.prototype.toString = Scope.prototype.toJSON = function () {
+  Scope.prototype.toString = function () {
     return this.name;
   };
 
@@ -693,6 +679,7 @@
 
   Program.prototype.scan = function (o) {
     o = extend(o);
+
     var types = o.types;
     var scope = new Frame(null, "Program");
     o.scope = this.frame = scope;
@@ -701,13 +688,16 @@
     scope.addVariable(new Variable("require"), true);
     scope.addVariable(new Variable("load"), true);
 
+    logger.push(this);
     scanList(this.body, o);
+    logger.pop();
 
     return this;
   };
 
   FunctionExpression.prototype.scan =
   FunctionDeclaration.prototype.scan = function (o) {
+    logger.push(this);
     var scope = o.scope;
 
     var ty;
@@ -715,7 +705,9 @@
       ty = this.decltype.reflect(o);
     }
     if (this.id) {
+      logger.push(this.id);
       scope.addVariable(new Variable(this.id.name, ty));
+      logger.pop();
     }
 
     o = extend(o);
@@ -727,18 +719,23 @@
     var parameters = this.parameters = [];
     var variable;
     for (var i = 0, j = params.length; i < j; i++) {
+      logger.push(params[i]);
       variable = new Variable(params[i].name, ty.paramTypes[i]);
       scope.addVariable(variable);
       parameters.push(variable);
+      logger.pop();
     }
 
     assert(this.body instanceof BlockStatement);
     scanList(this.body.body, o);
 
+    logger.pop();
     return this;
   };
 
   VariableDeclaration.prototype.scan = function (o) {
+    logger.push(this);
+
     check(this.kind === "let" || this.kind === "const" || this.kind === "extern",
           "Only block scoped variable declarations are allowed, use the " + quote("let") + " keyword instead.");
 
@@ -749,6 +746,7 @@
 
     scanList(this.declarations, extend(o, { declkind: this.kind }));
 
+    logger.pop();
     return this;
   };
 
@@ -1571,4 +1569,4 @@
 
   exports.compile = compile;
 
-}(typeof exports === 'undefined' ? (compiler = {}) : exports));
+})(typeof exports === 'undefined' ? (compiler = {}) : exports);
