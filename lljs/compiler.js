@@ -447,6 +447,9 @@
     assert(ty.align);
 
     var alignType = ty.align;
+    if (typeof alignType.signed === "undefined") {
+      return getCachedLocal(this, "F" + alignType.size);
+    }
     return getCachedLocal(this, (alignType.signed ? "I" : "U") + alignType.size);
   };
 
@@ -1007,13 +1010,13 @@
       return cast(new Literal(ty.size, this.argument.loc), i32ty);
     }
 
-    if (op === "delete" && (ty = this.argument.ty)) {
-      check(ty instanceof PointerType, "cannot free non-pointer type");
-      return new CallExpression(o.scope.FREE(), [this.argument], this.loc);
-    }
-
     var arg = this.argument = this.argument.transform(o);
     ty = arg.ty;
+
+    if (op === "delete" && ty) {
+      check(ty instanceof PointerType, "cannot free non-pointer type");
+      return (new CallExpression(o.scope.FREE(), [this.argument], this.loc)).transform(o);
+    }
 
     if (op === "*") {
       check(ty instanceof PointerType, "cannot dereference non-pointer type " + quote(tystr(ty, 0)));
@@ -1588,13 +1591,14 @@
     }
 
     body = new BlockStatement(body.concat(program.body));
+    var mname = name.replace(/[^\w]/g, "_");
     var exports = new Identifier("exports");
     var module = new MemberExpression(new FunctionExpression(null, [exports], body), new Identifier("call"));
     var moduleArgs = [
       new ThisExpression(),
       new ConditionalExpression(
         new BinaryExpression("===", new UnaryExpression("typeof", exports), new Literal("undefined")),
-        new AssignmentExpression(new Identifier(name), "=", new ObjectExpression([])),
+        new AssignmentExpression(new Identifier(mname), "=", new ObjectExpression([])),
         exports)
     ];
     return new Program([new ExpressionStatement(new CallExpression(module, moduleArgs))]);
