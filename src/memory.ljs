@@ -104,13 +104,13 @@ function reset() {
 
 reset();
 
-function byte *sbrk(int nBytes) {
+function word *sbrk(int nBytes) {
   let U4 = exports.U4;
   let int nWords = nBytes / sizeof(word);
   if (U4[0] + nWords > HEAP_SIZE) {
     return null;
   }
-  let byte *address = (int *)(U4[0]);
+  let word *address = (word *)(U4[0]);
   U4[0] += nWords;
   return address;
 }
@@ -121,7 +121,7 @@ function Header *morecore(uint nUnits) {
   if (nUnits < nUnitsMin) {
     nUnits = nUnitsMin;
   }
-  let byte *buffer = sbrk(nUnits * sizeof(Header));
+  let word *buffer = sbrk(nUnits * sizeof(Header));
 
   if (buffer === null) {
     return null;
@@ -163,7 +163,7 @@ function byte *malloc(int nBytes) {
 }
 
 function void free(byte *ap) {
-  let Header *bp = (Header *)(ap - 1), *p;
+  let Header *bp = (Header *)(ap) - 1, *p;
   for (p = freep; !(bp > p && bp < p->next); p = p->next) {
     if (p >= p->next && (bp > p || bp < p->next)) {
       break;

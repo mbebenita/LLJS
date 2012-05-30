@@ -95,7 +95,10 @@
         logger.error(message);
 
         var e = new Error(message);
-        e.node = logger.context[logger.context.length - 1];
+        var loc = logger.context[logger.context.length - 1].loc;
+        if (loc) {
+          e.lineNumber = loc.start.line;
+        }
         e.logged = true;
         throw e;
       }
@@ -529,9 +532,7 @@
 
   TypeAlias.prototype.resolve = function (types, inPointer) {
     startResolving(this);
-    if (!(this.name in types)) {
-      console.error("unable to resolve type name " + quote(this.name));
-    }
+    check(this.name in types, "unable to resolve type name " + quote(this.name));
     var ty = types[this.name];
     finishResolving(this);
     if (inPointer && ty instanceof TypeAlias) {
@@ -591,8 +592,8 @@
   };
 
   StructType.prototype.lint = function () {
-    var maxSize = 1;
-    var maxSizeType = u8ty;
+    var maxAlignSize = 1;
+    var maxAlignSizeType = u8ty;
     var fields = this.fields
     var field, type;
     var prev = { offset: 0, type: { size: 0 } };
@@ -602,15 +603,15 @@
       check(type, "cannot have untyped field");
       check(type.size, "cannot have fields of size 0 type " + quote(tystr(type, 0)));
 
-      if (type.align.size > maxSize) {
-        maxSize = type.size;
-        maxSizeType = type;
+      if (type.align.size > maxAlignSize) {
+        maxAlignSize = type.align.size;
+        maxAlignSizeType = type.align;
       }
       field.offset = alignTo(prev.offset + prev.type.size, type.size);
       prev = field;
     }
-    this.size = alignTo(field.offset + type.size, maxSize);
-    this.align = maxSizeType;
+    this.size = alignTo(field.offset + type.size, maxAlignSize);
+    this.align = maxAlignSizeType;
   };
 
   ArrowType.prototype.lint = function () {
@@ -899,7 +900,7 @@
   };
 
   Identifier.prototype.transformNode = function (o) {
-    if (this.kind === "variable") {
+    if (this.kind === "variable" && !this.variable) {
       var scope = o.scope;
       var variable = scope.getVariable(this.name);
 
@@ -961,10 +962,6 @@
 
     if (lty instanceof PointerType && (op === "+" || op === "-")) {
       if (rty instanceof PrimitiveType && rty.integral) {
-        var scale = lty.base.size / lty.base.align.size;
-        if (scale > 1) {
-          this.right = new BinaryExpression("*", this.right, new Literal(scale), this.right.loc);
-        }
         ty = lty;
       } else if (rty instanceof PointerType && op === "-") {
         if (lty.assignableFrom(rty)) {
@@ -1049,7 +1046,8 @@
     var ty;
     if (this.callee instanceof Identifier && this.arguments.length === 0 &&
         (ty = o.types[this.callee.name])) {
-      return new CallExpression(o.scope.MALLOC(), [cast(new Literal(ty.size), u32ty)], this.loc);
+      var alloc = new CallExpression(o.scope.MALLOC(), [cast(new Literal(ty.size), u32ty)], this.loc);
+      return cast(alloc.transform(o), new PointerType(ty));
     }
     return Node.prototype.transform.call(this, o);
   };
@@ -1063,7 +1061,7 @@
   UpdateExpression.prototype.transformNode = function (o) {
     var arg = this.argument;
     var ty = arg.ty
-    if (ty.integral || ty instanceof PointerType) {
+    if (ty && (ty.integral || ty instanceof PointerType)) {
       var scope = o.scope;
       var op = this.operator === "++" ? "+" : "-";
       var ref = scope.cacheReference(arg);
@@ -1344,6 +1342,8 @@
       var offset = byteOffset / ty.align.size;
       address = new BinaryExpression("+", address, new Literal(offset), address.loc);
     }
+    // Remember (coerce) the type of the address for realign, but *do not* cast.
+    address.ty = new PointerType(ty);
     return address;
   }
 
@@ -1366,6 +1366,13 @@
     var constants = [];
     var variables = [];
 
+    var frameSize = frame.frameSizeInWords;
+    if (frameSize) {
+      var allocStack = new AssignmentExpression(frame.realSP(), "-=", new Literal(frameSize));
+      var spDecl = new VariableDeclarator(frame.SP(), allocStack);
+      code.push(new VariableDeclaration("const", [spDecl]));
+    }
+
     var cachedLocals = frame.cachedLocals;
     for (local in cachedLocals) {
       v = cachedLocals[local];
@@ -1376,19 +1383,14 @@
       }
     }
 
-    if (constants.length) {
-      code.push(new VariableDeclaration("const", constants));
-    }
-
+    // Do this after the SP calculation since it might bring in U4. Since this
+    // is after, we need to unshift.
     if (variables.length) {
-      code.push(new VariableDeclaration("var", variables));
+      code.unshift(new VariableDeclaration("var", variables));
     }
 
-    var frameSize = frame.frameSizeInWords;
-    if (frameSize) {
-      var allocStack = new AssignmentExpression(frame.realSP(), "-=", new Literal(frameSize));
-      var spDecl = new VariableDeclarator(frame.SP(), allocStack);
-      code.push(new VariableDeclaration("const", [spDecl]));
+    if (constants.length) {
+      code.unshift(new VariableDeclaration("const", constants));
     }
 
     if (node.parameters) {
@@ -1505,6 +1507,22 @@
       this.argument = new SequenceExpression([assn, restoreStack, t], arg.loc);
     }
   };
+
+  BinaryExpression.prototype.lowerNode = function (o) {
+    var ty = this.ty;
+    var op = this.operator;
+
+    if (ty instanceof PointerType && (op === "+" || op === "-")) {
+      var lty = this.left.ty;
+      var rty = this.right.ty;
+      if (rty instanceof PrimitiveType && rty.integral) {
+        var scale = lty.base.size / lty.base.align.size;
+        if (scale > 1) {
+          this.right = new BinaryExpression("*", this.right, new Literal(scale), this.right.loc);
+        }
+      }
+    }
+  }
 
   UnaryExpression.prototype.lowerNode = function (o) {
     var arg = this.argument;

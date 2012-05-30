@@ -71,7 +71,7 @@
     if (U4[0] + nWords > HEAP_SIZE) {
       return 0;
     }
-    var address = U4[0] << 2;
+    var address = U4[0];
     U4[0] += nWords;
     return address;
   }
@@ -85,7 +85,7 @@
     if (buffer === 0) {
       return 0;
     }
-    var header = buffer >> 2;
+    var header = buffer;
     $U4[header + 1] = nUnits;
     free(header + 1 * 2 << 2);
     return freep;
@@ -120,7 +120,7 @@
   }
   function free(ap) {
     const $U4 = $M.U4;
-    var bp = ap - 1 >> 2, p = 0;
+    var bp = (ap >> 2) - 1 * 2, p = 0;
     for (p = freep; !(bp > p && bp < $U4[p]); p = $U4[p]) {
       if (p >= $U4[p] && (bp > p || bp < $U4[p])) {
         break;

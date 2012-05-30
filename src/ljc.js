@@ -34,13 +34,15 @@
     load("./estransform.js");
     load("./compiler.js");
 
+    argv = this.arguments;
+  }
+
+  if (mode !== NODE_JS) {
     util = this.util;
     esprima = this.esprima;
     escodegen = this.escodegen;
     estransform = this.estransform;
     compiler = this.compiler;
-
-    argv = this.arguments;
   }
 
   const assert = util.assert;
@@ -183,16 +185,21 @@
         }
       }
     } catch (e) {
-      if (e.lineNumber) {
+      if (mode === BROWSER) {
+        throw e;
+      }
+
+      if (e.index) {
         // Esprima error, make a loc out of it.
         var lc = { line: e.lineNumber, column: e.column };
+        e.loc = { start: lc, end: lc };
         logger.error(e.message, { start: lc, end: lc });
         logger.flush();
         quit();
       }
 
-      if (e.logged) {
-        // Compiler error thta has already been logged, so just flush and
+      if (e.logged && mode !== BROWSER) {
+        // Compiler error that has already been logged, so just flush and
         // quit.
         logger.flush();
         quit();

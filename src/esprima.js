@@ -3785,7 +3785,9 @@
     var callee, args, as, length;
 
     callee = call.callee;
-    args = call.arguments;
+    if (!(args = call.arguments)) {
+      return;
+    }
     length = args.length;
     if (!(as = toType(callee))) {
       return;
