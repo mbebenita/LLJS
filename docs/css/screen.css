@@ -1,0 +1,76 @@
+body {
+    font-size: 18px;
+    line-height: 30px;
+    color: #333;
+    background: #f6f6f6 url(../images/background.png);
+    font-family: "PT Serif", "Georgia", "Helvetica Neue", "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, sans-serif !important;
+}
+
+.container {
+    width: 1050px;
+    margin: 0;
+    padding: 30px 0px 40px 40px;
+    text-align: justify;
+}
+
+code, pre, tt, textarea {
+    font-family: Monaco, Consolas, "Lucida Console", monospace;
+    font-size: 14px;
+    /* font-weight: bold; */
+    line-height: 18px;
+    color: #255;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+tt {
+    display: inline-block;
+    background: #fff;
+    border: 1px solid #dedede;
+    padding: 0px 0.2em;
+}
+
+pre {
+    padding: 3px 0 3px 12px;
+    font-size: 12px;
+}
+
+.jcCode {
+    background: #f6f6f6 url(../images/background.png);
+    padding: 10px;
+}
+
+.jcResult {
+    line-height: 14px;
+    width: 78ex;
+}
+
+.example textarea {
+    resize: vertical;
+    cursor: text;
+}
+
+.example td {
+    padding: 0px;
+    vertical-align: top;
+}
+
+.example td + td {
+  border-left: 2px dotted #d8d8d8;
+}
+
+table.example {
+    position: relative;
+    background: #fff;
+    border: 2px solid #d8d8d8;
+    -webkit-box-shadow: 0px 0px 4px rgba(0,0,0,0.23);
+    -moz-box-shadow: 0px 0px 4px rgba(0,0,0,0.23);
+    box-shadow: 0px 0px 4px rgba(0,0,0,0.23);
+    zoom: 1;
+}
+
+.example .minibutton {
+    text-transform: none;
+    right: 8px; bottom: 8px;
+    width: 20px;
+}

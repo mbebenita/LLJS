@@ -1,26 +1,10 @@
 <html>
 <head>
-   <title>LLJS : Low-Level JavaScript</title>
-  <link rel="stylesheet" type="text/css" href="css/docs.css" />
-  <link rel="stylesheet" type="text/css" href="css/idle.css" />
+  <title>LLJS : Low-Level JavaScript</title>
+  <link rel="stylesheet" type="text/css" href="css/screen.css">
+  <link rel="stylesheet" href="vendor/cm/lib/codemirror.css">
 </head>
 
-<script src="vendor/lib/codemirror.js"></script>
-<link rel="stylesheet" href="vendor/lib/codemirror.css">
-<script src="vendor/mode/javascript/javascript.js"></script>
-
-<script>
-  print = function (x) {
-    console.info(x);
-  }
-</script>
-<script src="vendor/jquery-1.6.4.js"></script>
-<script src="jc/modules.js"></script>
-<script src="jc/util.js"></script>
-<script src="jc/esprima.js"></script>
-<script src="jc/escodegen.js"></script>
-<script src="jc/compiler.js"></script>
-<script src="jc/memory.js"></script>
 <body>
   <a href="https://github.com/mbebenita/LLJS"><img style="position: absolute; top: 0; right: 0; border: 0;" src="images/fork.png" alt="Fork me on GitHub"></a>
   <a href="http://mozilla.org"><img width="118" height="68" style="position: absolute; top: 0; left: 50; border: 0;" src="images/mozilla.png" alt="Mozilla"></a>
@@ -40,7 +24,7 @@
     </p>
     <p>
       This is an interactive tutorial, code is compiled as you type.
-      To execute a piece of code press <tt>Ctrl-R</tt> or <tt>Cmd-Enter</tt>.
+      To execute a piece of code press <tt>Ctrl-Enter</tt> or <tt>Cmd-Enter</tt>.
     </p>
 
 <h2>Variables</h2>
@@ -50,45 +34,44 @@
 </p>
 
 <pre class="example">
-let x;               // Declare 'x' as dyn.
+extern timer;        // Declare timer as an external variable.
 
+let x;               // Declare 'x' as dyn.
 let int y;           // Declare 'y' as int.
 
-y = (int) x;         // Assignment of 'x' to 'y' requires an explicit cast.
+y = (int)(x);        // Assignment of 'x' to 'y' requires an explicit
+                     // cast.
 
-let int z = y + 1;   // Although 'y' is of type int, the binary expression
-                     // y + 1 is of type num and requires an implicit cast.
+let int z = y + 1;   // Although 'y' is of type int, the binary
+                     // expression y + 1 is of type num and
+                     // requires an implicit cast.
 
-let uint w = z;      // Unsigned integer types are supported but are discouraged
-                     // because JavaScript engines usually store numbers that
-                     // are larger than max signed int in doubles rather than
-                     // 32 bit ints.
+let uint w = z;      // Unsigned integer types are supported but
+                     // are discouraged because JavaScript engines
+                     // usually store numbers that are larger than
+                     // max signed int in doubles rather than 32-bit
+                     // ints.
 
 timer.begin("Empty For loop with signed integers.");
-
 for (let int i = 0; i < 50000000; ++i) { }
 
 timer.begin("Empty For loop with unsigned integers.");
-
 for (let uint i = 0; i < 50000000; ++i) { }
 
 timer.begin("Empty For loop with untyped integers.");
-
-for (let i = 0; i < 50000000; ++i) { }
-
-
-</pre>
+for (let i = 0; i < 50000000; ++i) { }</pre>
 
 <h2> Data Types and Arithmetic</h2>
 <p>
   LLJS has 6 integral types: <tt>int -> i32</tt>, <tt>uint -> u32</tt>, <tt>i16</tt>, <tt>u16</tt>, <tt>i8</tt>,
   <tt>u8</tt>, which behave as they do in C, and two additional types: <tt>num</tt> (the JavaScript number type)
   and <tt>dyn</tt> (any type) which are used to interoperate with the JavaScript type system.
-  Arithmetic operations usually produce the <tt>num</tt> type even if their operands are integral types.
   LLJS emits the appropriate coercions for assignments and cast operations.
 </p>
 
 <pre class="example">
+extern trace;
+
 trace(" u8: " + sizeof (u8));
 trace(" i8: " + sizeof (i8));
 trace("u16: " + sizeof (u16));
@@ -96,34 +79,33 @@ trace("i16: " + sizeof (i16));
 trace("u32: " + sizeof (u32));
 trace("i32: " + sizeof (i32));
 
-trace(" u8: " + (u8) -1);
-trace(" i8: " + (i8) -1);
-trace("u16: " + (u16) -1);
-trace("i16: " + (i16) -1);
-trace("u32: " + (u32) -1);
-trace("i32: " + (i32) -1);
+trace(" u8: " + (u8)(-1));
+trace(" i8: " + (i8)(-1));
+trace("u16: " + (u16)(-1));
+trace("i16: " + (i16)(-1));
+trace("u32: " + (u32)(-1));
+trace("i32: " + (i32)(-1));
 
 let int x = 3;
 let int y = 2;
 
-// Arithmetic follows JavaScript semantics, coercions only happen during
-// assignments and cast operations, so beware.
-
-trace("Result is not an integer: " + x / y);
-trace("Result is an integer: " + (x += x / y));
-
-</pre>
+// Arithmetic follows C semantics. Arithmetic on integers
+// begets integers, truncated with | 0.
+trace("Result is an integer: " + x / y);</pre>
 
 <p>
   Moreover, LLJS lets you define your own struct and pointer types.
 </p>
 
 <pre class="example">
-let int x = 42;      // Declare 'x' as int and assign '42' to it.
+extern trace;
 
-let int *y = &x;     // Declare 'y' as a pointer to int and assign it the address
-                     // of x. Since JavaScript doesn't allow taking references to
-                     // to variables, we allocate 'x' on an emulated stack.
+let int x = 42;      // Declare 'x' as int and assign 42 to it.
+
+let int *y = &x;     // Declare 'y' as a pointer to int and assign it
+                     // the address of x. Since JavaScript doesn't
+                     // allow taking references to to variables, we
+                     // allocate 'x' on an emulated stack.
 
 let int **z = &y;    // Declare 'z' as a pointer to a pointer to int.
 
@@ -137,38 +119,33 @@ trace(x);
 
 trace(x);
 
-**z = ***(&z);       // You can get as fancy as you want.
-</pre>
-
+**z = ***(&z);       // You can get as fancy as you want.</pre>
 
 <p>
   Structs are defined using the <tt>struct</tt> keyword.
 </p>
 
 <pre class="example">
+extern trace;
+
 struct Point {
-  let int x, y, z;
-}
+  int x, y, z;
+};
 
 struct Line {
-  let Point start, end;
-}
+  Point start, end;
+};
 
 struct Box {
-  let Line left, top, right, bottom;
-}
+  Line left, top, right, bottom;
+};
 
 let Box b;
-
 trace(b.top.start.x);
 
-let Line * p = &b.top;
-
+let Line *p = &b.top;
 p->start.x = 42;
-
-trace(b.top.start.x);
-
-</pre>
+trace(b.top.start.x);</pre>
 
 <h4>Functions</h4>
 
@@ -180,35 +157,36 @@ trace(b.top.start.x);
 <pre class="example">
 
 // Declare 'foo' as dyn, normal JavaScript function.
-function foo () { }
+function foo() { }
 
 // Declare 'bar' as () -> void, typed LLJS function.
-function void bar () { }
+function void bar() { }
 
-// Declare 'baz' as (int, int*) -> void, typed LLJS function with typed arguments.
-function void baz (int x, int *y) { }
+// Declare 'baz' as (int, int*) -> void, typed LLJS function with typed
+// arguments.
+function void baz(int x, int *y) { }
 
-// Declare 'car' as (int, dyn, int x) -> dyn, typed LLJS function with mixed typed
-// and untyped arguments.
-function car (int x, y, int z) { }
+// Declare 'car' as (int, dyn, int x) -> dyn, typed LLJS function with
+// mixed typed and untyped arguments.
+function quux(int x, y, int z) { }
 
-// Call 'car', arguments are coerced to the callee's parameter types.
-car("123", 2, 123.456);
+// Call 'quux'. Argument passing follows the same typechecking rules as
+// assignment.
+quux(-123, 2, 123.456);
 
-// The type system is not smart enough to track types that leak into the dynamic
-// type system. Safety is your responsibility.
-let val = car;
+// The type system is not smart enough to track types that leak into
+// the dynamic type system. Safety is your responsibility.
+let unsafeQuux = quux;
 
-// Calling 'var' is not safe.
-val("123", 2, 123.456);
-
-</pre>
+// Calling 'unsafeQuux' is not type-safe.
+unsafeQuux("123", 2, 123.456);</pre>
 
 <p>
   Example: you can implement a <tt>swap</tt> function in LLJS as follows:
 </p>
 
 <pre class="example">
+extern trace;
 
 function void swap(int *a, int *b) {
   let int t = *a;
@@ -220,10 +198,7 @@ let int x = 1, y = 2;
 
 swap(&x, &y);
 
-trace("x = " + x + ", y = " + y);
-
-</pre>
-
+trace("x = " + x + ", y = " + y);</pre>
 
 <h2>Objects and Memory</h2>
 
@@ -256,15 +231,17 @@ trace("x = " + x + ", y = " + y);
 </p>
 
 <pre class="example">
+extern trace;
+
 struct Node {
-  let Node *next;
-  let int value;
-}
+  Node *next;
+  int value;
+};
 
 let Node *head = new Node, *tail = head;
 
-function Node * add (int value) {
-  let Node * next = new Node;
+function Node *add(int value) {
+  let Node *next = new Node;
   next->value = value;
   tail->next = next;
   tail = next;
@@ -277,15 +254,12 @@ trace(add(3));
 
 traceList(head->next);
 
-function void traceList(Node * p) {
+function void traceList(Node *p) {
   while (p) {
     trace("Node at address: " + p + ", has value: " + p->value);
     p = p->next;
   }
-}
-
-
-</pre>
+}</pre>
 
 <p>
   You may notice that the <tt>new</tt> operator behaves differently whenever it's applied to a type name. It computes the size of
@@ -293,18 +267,20 @@ function void traceList(Node * p) {
 </p>
 
 <pre class="example">
+extern trace;
 
-// Allocate an int on the heap using malloc().
-let int * y = malloc(sizeof (int));
+// Import malloc. The casting is annoying -- we don't have a good
+// story for typed imports yet.
+typedef byte *malloc_ty(uint);
+let malloc_ty malloc = (malloc_ty)(require('memory').malloc);
 
+// Allocate an int on the heap using new.
+let int *y = malloc(sizeof(int));
 trace(y);
 
-// Alternate syntax.
-let int * x = new int;
-
-trace(x);
-
-</pre>
+// Alternate, more convenient syntax.
+let int *x = new int;
+trace(x);</pre>
 
 <h3>Memory</h3>
 <p>
@@ -319,21 +295,20 @@ The only drawback is that you can't read unaligned data, but this is actually a 
 </p>
 <h3>Pointers</h3>
 <p>
-  Since our managed memory is actually byte addressable, there is no reason to store pointers as byte addresses, instead we store them as indices, implicitly scaled by their own base type.
+  Since our managed memory is actually addressable at byte and integer levels, there is no reason to store pointers as byte addresses. Instead we store them as indices, implicitly scaled by their own base type.
   For example, the pointer dereference <tt>*p</tt>, where <tt>p</tt> is of type <tt>int*</tt>, gets compiled into <tt>U4[p]</tt>.
-  (Had we stored pointers as byte addresses, we would have compiled it to <tt>U32[p >> 2]</tt>.)
+  Had we stored pointers as byte addresses, we would have compiled it to <tt>U32[p >> 2]</tt>.
   This eliminates address computations at each memory access, but requires that we perform pointer conversions whenever we cast from one pointer type to another, see below:
 </p>
 
 <pre class="example">
-  let int * x = (void *) 8;
-  let u16 * y = x;
-  let int z = *x + *y;
-</pre>
+let int *x = (byte *)(8);
+let u16 *y = x;
+let int z = *x + *y;</pre>
 
 <h3>Malloc & Free</h3>
 <p>
-  The LLJS memory allocator, transcribed from the K&R C implementation, is itself implemented in LLJS. For now, we allocate one large chunk of memory <tt>32 MB</tt> and let
+  The LLJS memory allocator, transcribed from the K&R C implementation, is itself implemented in LLJS. For now, we allocate one large chunk of memory 32 MB and let
   <tt>malloc</tt> and <tt>free</tt> manage it. We reserve the first two words in memory for the Heap Pointer <tt>HP</tt> that points to the latest allocated page by <tt>sbrk</tt>
   and the Stack Pointer <tt>SP</tt> which always points to the top of the stack. The heap grows downward (towards higher addresses) and the stack grows upward.
   For now, when the two meet we run out of memory, but we could resize the array buffer copy the heap over and resume.
@@ -341,10 +316,23 @@ The only drawback is that you can't read unaligned data, but this is actually a 
 </p>
 
 <pre class="example">
+extern ArrayBuffer;
+extern Uint8Array;
+extern Int8Array;
+extern Uint16Array;
+extern Int16Array;
+extern Uint32Array;
+extern Int32Array;
+extern Float32Array;
+extern Float64Array;
+
 const MB = 1024 * 1024;
-const SIZE = 32 * MB;
-const STACK_SIZE = 2 * MB;
+const WORD_SIZE = sizeof(word);
+const SIZE = (32 * MB) / WORD_SIZE;
+const STACK_SIZE = (2 * MB) / WORD_SIZE;
 const HEAP_SIZE = SIZE - STACK_SIZE;
+
+// let I4, U4;
 
 /*
    +---------------+ -
@@ -365,80 +353,112 @@ const HEAP_SIZE = SIZE - STACK_SIZE;
    +---------------+ <- Stack Pointer (SP)
 */
 
-function int * memoryCopy(int *dst, int *src, int length) {
+function byte *memcpy(byte *dst, byte *src, uint length) {
   for (let int i = 0; i < length; ++i) {
     *dst++ = *src++;
   }
   return dst;
 }
 
+function u16 *memcpy2(u16 *dst, u16 *src, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *dst++ = *src++;
+  }
+  return dst;
+}
+
+function u32 *memcpy4(u32 *dst, u32 *src, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *dst++ = *src++;
+  }
+  return dst;
+}
+
+function void memset(byte *s, byte b, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *s = b;
+  }
+}
+
+function void memset2(u16 *s, u16 b, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *s = b;
+  }
+}
+
+function void memset4(u32 *s, u32 b, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *s = b;
+  }
+}
 
 /* K&R Malloc */
 
 struct Header {
-  let Header * next;
-  let uint size;
-}
+  Header *next;
+  uint size;
+};
 
-let Header * base = NULL;
-let Header * freep = NULL;
+let Header *base = null;
+let Header *freep = null;
 
-function resetMemory() {
-  let M = exports.M = new ArrayBuffer(SIZE);
+function reset() {
+  let M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
   exports.U1 = new Uint8Array(M);
-  exports.I1 = new Int16Array(M);
+  exports.I1 = new Int8Array(M);
   exports.U2 = new Uint16Array(M);
   exports.I2 = new Int16Array(M);
-  U4 = exports.U4 = new Uint32Array(M);
-  I4 = exports.I4 = new Int32Array(M);
+  exports.U4 = new Uint32Array(M);
+  exports.I4 = new Int32Array(M);
   exports.F4 = new Float32Array(M);
   exports.F8 = new Float64Array(M);
 
-  U4[0] = 4;
-  U4[1] = SIZE;
+  exports.U4[0] = 4;
+  exports.U4[1] = SIZE;
 
-  base = (Header *)2;
-  freep = NULL;
+  base = (Header *)(2);
+  freep = null;
 }
 
-resetMemory();
+reset();
 
-function void * sbrk(int nBytes) {
-  let int nWords = nBytes / sizeof (u32);
+function word *sbrk(int nBytes) {
+  let U4 = exports.U4;
+  let int nWords = nBytes / sizeof(word);
   if (U4[0] + nWords > HEAP_SIZE) {
-    trace("Out of Memory");
-    return NULL;
+    return null;
   }
-  let void * address = (int *)U4[0];
+  let word *address = (word *)(U4[0]);
   U4[0] += nWords;
   return address;
 }
 
 let uint nUnitsMin = 1024;
 
-function Header * morecore(int nUnits) {
+function Header *morecore(uint nUnits) {
   if (nUnits < nUnitsMin) {
     nUnits = nUnitsMin;
   }
-  let void * buffer = sbrk(nUnits * sizeof (Header));
+  let word *buffer = sbrk(nUnits * sizeof(Header));
 
-  if (buffer === 0) {
-    return NULL;
+  if (buffer === null) {
+    return null;
   }
-  let Header * header = (Header *)buffer;
+  let Header *header = (Header *)(buffer);
   header->size = nUnits;
   free(header + 1);
   return freep;
 }
 
-function void * malloc(int nBytes) {
+function byte *malloc(int nBytes) {
   let Header *p, *prevp;
-  let int nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
+  let uint nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
 
-  if ((prevp = freep) === NULL) {
+  if ((prevp = freep) === null) {
     base->next = freep = prevp = base;
     base->size = 0;
   }
+
   for (p = prevp->next; true; prevp = p, p = p->next) {
     if (p->size >= nUnits) {
       if (p->size === nUnits) {
@@ -452,16 +472,16 @@ function void * malloc(int nBytes) {
       return p + 1;
     }
     if (p === freep) {
-      if ((p = morecore(nUnits)) == NULL) {
-        return NULL;
+      if ((p = morecore(nUnits)) === null) {
+        return null;
       }
     }
   }
-  return NULL;
+  return null;
 }
 
-function void free(void *ap) {
-  let Header *bp = (Header *)ap - 1, *p;
+function void free(byte *ap) {
+  let Header *bp = (Header *)(ap) - 1, *p;
   for (p = freep; !(bp > p && bp < p->next); p = p->next) {
     if (p >= p->next && (bp > p || bp < p->next)) {
       break;
@@ -481,7 +501,18 @@ function void free(void *ap) {
   }
   freep = p;
 }
-</pre>
+
+exports.reset = reset;
+
+exports.memcpy = memcpy;
+exports.memcpy2 = memcpy2;
+exports.memcpy4 = memcpy4;
+exports.memset = memset;
+exports.memset2 = memset2;
+exports.memset4 = memset4;
+
+exports.malloc = malloc;
+exports.free = free;</pre>
 
 <h4>Acknowledgements</h4>
 <p>
@@ -492,6 +523,17 @@ function void free(void *ap) {
 </p>
 </div>
 
+<script src="vendor/cm/lib/codemirror.js"></script>
+<script src="vendor/cm/mode/javascript/javascript.js"></script>
+<script src="vendor/jquery-1.7.2.min.js"></script>
+
+<script src="lljs/util.js"></script>
+<script src="lljs/esprima.js"></script>
+<script src="lljs/escodegen.js"></script>
+<script src="lljs/estransform.js"></script>
+<script src="lljs/compiler.js"></script>
+<script src="lljs/memory.js"></script>
+<script src="lljs/ljc.js"></script>
 
 <script>
 var id = 0;
@@ -499,29 +541,30 @@ $('.example').replaceWith(function() {
   var src = this.innerHTML;
   var lineCount = src.split("\n").length;
   return '<table class="example"><tr><td><textarea id="ex:' + id + ':source" class="jcCode" rows="' + lineCount + '" spellcheck="false">' + src + '</textarea></td><td valign="top"><pre id="ex:' + id++ + ':result" class="jcResult"></pre></td></tr></table>'
-  // <div class="minibutton ok run" title="Ctrl-Enter">Run</div>
 });
 
 var lastMarker;
-function compileExample(id) {
+function compileExample(ex) {
   if (lastMarker) {
     this.clearMarker(lastMarker);
   }
-  var number = id.split(":")[1];
+  var number = ex.split(":")[1];
   var result = document.getElementById("ex:" + number + ":result");
   try {
-    var node = esprima.parse(this.getValue(), {loc: true});
-    compiler.compile(node, "EX_" + number);
-    result.innerHTML = escodegen.generate(node, {base: "", indent: "  "});
+    var name;
+    if (Number(number) === id - 1) {
+      name = "memory";
+    } else {
+      name = "ex" + number;
+    }
+    result.innerHTML = LJC.compile(name, name, this.getValue(), { bare: true });
   } catch (x) {
     result.innerHTML = x.message;
-    if (x.lineNumber !== undefined) {
-      lastMarker = this.setMarker(x.lineNumber - 1, "<span style=\"color: #900\">o</span> %N%");
+    if (x.lineNumber) {
+      lastMarker = this.setMarker(x.lineNumber - 1, "<span style=\"color: #900\">x</span> %N%");
     }
   }
 }
-
-var extern = {};
 
 var Timer = (function () {
   function timer() {
@@ -532,9 +575,9 @@ var Timer = (function () {
   timer.prototype.begin = function (name) {
     if (this.start) {
       if (this.name) {
-        extern.trace("Timer: " + (new Date() - this.start) + " ms: " + this.name);
+        trace("Timer: " + (new Date() - this.start) + " ms: " + this.name);
       } else {
-        extern.trace("Timer: " + (new Date() - this.start) + " ms.");
+        trace("Timer: " + (new Date() - this.start) + " ms.");
       }
     }
     this.start = new Date();
@@ -547,37 +590,34 @@ var Timer = (function () {
 var timer;
 var trace;
 
+function require(name) {
+  if (name === "memory") {
+    return memory;
+  }
+  return null;
+}
+
 function executeExample(id) {
   var number = id.split(":")[1];
   var result = document.getElementById("ex:" + number + ":result");
   try {
-    require("memory").resetMemory();
+    memory.reset();
 
     timer = new Timer();
 
     result.innerHTML = "";
 
-    extern.trace = trace = function (x) {
+    trace = function (x) {
       result.innerHTML += x + "\n";
     };
 
-    var start = new Date();
-    var node = esprima.parse(this.getValue(), {loc: true});
-    result.innerHTML += "Parser: " + (new Date() - start) + " ms, ";
-
     start = new Date();
-    node = compiler.compile(node, "EX_" + number);
-    result.innerHTML += "Compiler: " + (new Date() - start) + " ms, ";
-
-    start = new Date();
-    var code = escodegen.generate(node, {base: "", indent: "  "});
-    result.innerHTML += "Code Generator: " + (new Date() - start) + " ms.\n";
+    var code = LJC.compile("ex" + number, "ex" + number, this.getValue(), {});
+    result.innerHTML += "Compiled in: " + (new Date() - start) + " ms\n";
     result.innerHTML += "-----------------------------------------------------\n";
 
     start = new Date();
-    new Function (code)();
-    var fn = modules["EX_" + number];
-    fn();
+    new Function(code)();
 
     timer.begin(null);
     result.innerHTML += "-----------------------------------------------------\n";
@@ -598,7 +638,7 @@ $('.jcCode').each(function() {
       compileExample.call(cm, id);
     },
     extraKeys: {
-      "Ctrl-R": function () {
+      "Ctrl-Enter": function () {
         executeExample.call(cm, id);
       },
       "Cmd-Enter": function () {
