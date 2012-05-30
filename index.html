@@ -24,7 +24,7 @@
     </p>
     <p>
       This is an interactive tutorial, code is compiled as you type.
-      To execute a piece of code press <tt>Ctrl-R</tt> or <tt>Cmd-Enter</tt>.
+      To execute a piece of code press <tt>Ctrl-Enter</tt> or <tt>Cmd-Enter</tt>.
     </p>
 
 <h2>Variables</h2>
@@ -34,20 +34,23 @@
 </p>
 
 <pre class="example">
-extern timer;        // Declare timer as an external dynamic variable.
+extern timer;        // Declare timer as an external variable.
 
 let x;               // Declare 'x' as dyn.
 let int y;           // Declare 'y' as int.
 
-y = (int)(x);        // Assignment of 'x' to 'y' requires an explicit cast.
+y = (int)(x);        // Assignment of 'x' to 'y' requires an explicit
+                     // cast.
 
-let int z = y + 1;   // Although 'y' is of type int, the binary expression
-                     // y + 1 is of type num and requires an implicit cast.
+let int z = y + 1;   // Although 'y' is of type int, the binary
+                     // expression y + 1 is of type num and
+                     // requires an implicit cast.
 
-let uint w = z;      // Unsigned integer types are supported but are discouraged
-                     // because JavaScript engines usually store numbers that
-                     // are larger than max signed int in doubles rather than
-                     // 32 bit ints.
+let uint w = z;      // Unsigned integer types are supported but
+                     // are discouraged because JavaScript engines
+                     // usually store numbers that are larger than
+                     // max signed int in doubles rather than 32-bit
+                     // ints.
 
 timer.begin("Empty For loop with signed integers.");
 for (let int i = 0; i < 50000000; ++i) { }
@@ -86,9 +89,8 @@ trace("i32: " + (i32)(-1));
 let int x = 3;
 let int y = 2;
 
-// Arithmetic follows C semantics. Arithmetic on integers begets integers,
-// truncated with | 0.
-
+// Arithmetic follows C semantics. Arithmetic on integers
+// begets integers, truncated with | 0.
 trace("Result is an integer: " + x / y);</pre>
 
 <p>
@@ -98,11 +100,12 @@ trace("Result is an integer: " + x / y);</pre>
 <pre class="example">
 extern trace;
 
-let int x = 42;      // Declare 'x' as int and assign '42' to it.
+let int x = 42;      // Declare 'x' as int and assign 42 to it.
 
-let int *y = &x;     // Declare 'y' as a pointer to int and assign it the address
-                     // of x. Since JavaScript doesn't allow taking references to
-                     // to variables, we allocate 'x' on an emulated stack.
+let int *y = &x;     // Declare 'y' as a pointer to int and assign it
+                     // the address of x. Since JavaScript doesn't
+                     // allow taking references to to variables, we
+                     // allocate 'x' on an emulated stack.
 
 let int **z = &y;    // Declare 'z' as a pointer to a pointer to int.
 
@@ -154,27 +157,29 @@ trace(b.top.start.x);</pre>
 <pre class="example">
 
 // Declare 'foo' as dyn, normal JavaScript function.
-function foo () { }
+function foo() { }
 
 // Declare 'bar' as () -> void, typed LLJS function.
-function void bar () { }
+function void bar() { }
 
-// Declare 'baz' as (int, int*) -> void, typed LLJS function with typed arguments.
-function void baz (int x, int *y) { }
+// Declare 'baz' as (int, int*) -> void, typed LLJS function with typed
+// arguments.
+function void baz(int x, int *y) { }
 
-// Declare 'car' as (int, dyn, int x) -> dyn, typed LLJS function with mixed typed
-// and untyped arguments.
-function car (int x, y, int z) { }
+// Declare 'car' as (int, dyn, int x) -> dyn, typed LLJS function with
+// mixed typed and untyped arguments.
+function quux(int x, y, int z) { }
 
-// Call 'car'. Argument passing follows the same typechecking rules as assignment.
-car(-123, 2, 123.456);
+// Call 'quux'. Argument passing follows the same typechecking rules as
+// assignment.
+quux(-123, 2, 123.456);
 
-// The type system is not smart enough to track types that leak into the dynamic
-// type system. Safety is your responsibility.
-let val = car;
+// The type system is not smart enough to track types that leak into
+// the dynamic type system. Safety is your responsibility.
+let unsafeQuux = quux;
 
-// Calling 'var' is not safe.
-val("123", 2, 123.456);</pre>
+// Calling 'unsafeQuux' is not type-safe.
+unsafeQuux("123", 2, 123.456);</pre>
 
 <p>
   Example: you can implement a <tt>swap</tt> function in LLJS as follows:
