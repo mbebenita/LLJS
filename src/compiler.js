@@ -1572,13 +1572,17 @@
     return new CallExpression(new Identifier("require"), [new Literal(name)]);
   }
 
-  function createModule(program, name, bare) {
+  function createModule(program, name, bare, loadInstead) {
     var body = [];
     var cachedMEMORY = program.frame.cachedMEMORY;
     if (cachedMEMORY) {
       var mdecl;
       if (name === "memory") {
         mdecl = new VariableDeclarator(cachedMEMORY, new Identifier("exports"));
+      } else if (loadInstead) {
+        mdecl = new VariableDeclarator(cachedMEMORY, new SequenceExpression([
+          new CallExpression(new Identifier("load"), [new Literal("memory.js")]),
+          new Identifier("memory")]));
       } else {
         mdecl = new VariableDeclarator(cachedMEMORY, createRequire("memory"));
       }
@@ -1633,7 +1637,7 @@
     // Pass 4.
     node = node.lower(o);
 
-    return T.flatten(createModule(node, name, options.bare));
+    return T.flatten(createModule(node, name, options.bare, options["load-instead"]));
   }
 
   exports.compile = compile;

@@ -111,6 +111,7 @@
       ["A", "emit-ast",     false, "Do not generate JS, emit AST"],
       ["P", "pretty-print", false, "Pretty-print AST instead of emitting JSON (with -A)"],
       ["b", "bare",         false, "Do not wrap in a module"],
+      ["l", "load-instead", false, "Emit load('memory') instead of require('memory')"],
       ["W", "warn",         true,  "Print warnings (enabled by default)"],
       ["Wconversion", null, false, "Print intra-integer and pointer conversion warnings"],
       ["0", "simple-log",   false, "Log simple messages. No colors and snippets."],
