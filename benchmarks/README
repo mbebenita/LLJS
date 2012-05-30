@@ -1,0 +1,14 @@
+Running Benchmarks
+------------------
+
+Under SpiderMonkey:
+
+  $ cp ../src/memory.js .
+  $ js -n -m ../src/ljc.js -l <bench>.ljs
+  $ js -n -m <bench>.js
+
+Under Node:
+
+  $ export NODE_PATH="../src:$NODE_PATH"
+  $ ../bin/ljc <bench>.ljs
+  $ node <bench>.js
