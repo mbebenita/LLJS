@@ -1,2 +1,0 @@
-U4 = (uint *) new Uint32Array();
-I4 = (int *) new Int32Array();
