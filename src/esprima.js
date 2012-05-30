@@ -1712,10 +1712,9 @@
       if (match('(')) {
         m = mark();
         lex();
-        var token = lookahead();
-        if (token.type === Token.Identifier) {
+        if (lookahead().type === Token.Identifier) {
           expr = parseInlineableType();
-          if (!expr || expr.type === Syntax.TypeIdentifier) {
+          if (!match(')') || !expr || expr.type === Syntax.TypeIdentifier) {
             reset(m);
             expr = parsePrimaryExpression();
           } else {
@@ -3182,7 +3181,7 @@
   }
 
   function parseFunctionExpression() {
-    var token, id = null, firstRestricted, message, param, paramType, params = [], previousStrict, paramSet, paramTypes, returnType;
+    var token, id = null, firstRestricted, message, param, paramType, params = [], body, previousStrict, paramSet, paramTypes, returnType;
 
     expectKeyword('function');
     returnType = parseInlineableType();
@@ -3205,6 +3204,7 @@
     }
 
     expect('(');
+    paramTypes = [];
 
     if (!match(')')) {
       paramSet = {};
