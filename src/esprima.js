@@ -3184,8 +3184,8 @@
     var token, id = null, firstRestricted, message, param, paramType, params = [], body, previousStrict, paramSet, paramTypes, returnType;
 
     expectKeyword('function');
-    returnType = parseInlineableType();
     if (!match('(')) {
+      returnType = parseInlineableType();
       token = lookahead();
       id = parseVariableIdentifier();
       if (strict) {

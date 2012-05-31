@@ -192,7 +192,7 @@
 
       if (e.index) {
         // Esprima error, make a loc out of it.
-        var lc = { line: e.lineNumber, column: e.column };
+        var lc = { line: e.lineNumber, column: e.column - 1 };
         e.loc = { start: lc, end: lc };
         logger.error(e.message, { start: lc, end: lc });
         logger.flush();
