@@ -106,8 +106,8 @@
         Unary: 13,
         Postfix: 14,
         Call: 15,
-        New: 16,
-        Member: 17,
+        Member: 16,
+        New: 17,
         Primary: 18
     };
 
@@ -303,6 +303,8 @@
         if (!precedence) {
             precedence = Precedence.Sequence;
         }
+
+        assert (expr);
 
         switch (expr.type) {
         case Syntax.SequenceExpression:
