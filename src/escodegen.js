@@ -106,8 +106,8 @@
         Unary: 13,
         Postfix: 14,
         Call: 15,
-        Member: 16,
-        New: 17,
+        New: 16,
+		Member: 17,
         Primary: 18
     };
 
@@ -390,8 +390,6 @@
         precedence = option.precedence;
         allowIn = option.allowIn;
         allowCall = option.allowCall;
-
-        assert (expr);
 
         switch (expr.type) {
         case Syntax.SequenceExpression:
