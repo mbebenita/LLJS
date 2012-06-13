@@ -174,7 +174,10 @@
     var code;
 
     try {
-      var node = esprima.parse(source, { loc: true });
+      var node = esprima.parse(source, { loc: true, comment: true, range: true, tokens: true });
+
+      node = escodegen.attachComments(node, node.comments, node.tokens);
+
       if (options["only-parse"]) {
         code = node;
       } else {
@@ -182,7 +185,7 @@
         if (options["emit-ast"]) {
           code = node;
         } else {
-          code = escodegen.generate(node, { base: "", indent: "  " });
+          code = escodegen.generate(node, { base: "", indent: "  ", comment: true });
         }
       }
     } catch (e) {

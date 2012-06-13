@@ -1271,7 +1271,15 @@
         VariableDeclaration: ['declarations'],
         VariableDeclarator: ['id', 'init'],
         WhileStatement: ['test', 'body'],
-        WithStatement: ['object', 'body']
+        WithStatement: ['object', 'body'],
+
+        PointerType: [],
+        StructType: [],
+        ArrowType: [],
+        TypeIdentifier: [],
+        FieldDeclarator: [],
+        TypeAliasDirective: [],
+        CastExpression: []
     };
 
     VisitorOption = {
