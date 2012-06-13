@@ -295,7 +295,7 @@
 
   function allFields(spec) {
     // Make the location a special last field.
-    var fields = ["loc"];
+    var fields = ["leadingComments", "loc"];
     while (spec) {
       if (spec.fields) {
         fields = spec.fields.concat(fields);
