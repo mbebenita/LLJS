@@ -1,0 +1,324 @@
+<html>
+<head>
+  <title>LLJS : Low-Level JavaScript</title>
+  <link rel="stylesheet" type="text/css" href="css/screen.css">
+  <link rel="stylesheet" href="vendor/cm/lib/codemirror.css">
+</head>
+
+<body>
+  <a href="https://github.com/mbebenita/LLJS"><img style="position: absolute; top: 0; right: 0; border: 0;" src="images/fork.png" alt="Fork me on GitHub"></a>
+  <a href="http://mozilla.org"><img width="118" height="68" style="position: absolute; top: 0; left: 50; border: 0;" src="images/mozilla.png" alt="Mozilla"></a>
+  <br>
+  <div class="container">
+    <h2>K&R Malloc vs. JS Object Allocation</h2>
+    <canvas id="canvas-latency" width="640" height="100"></canvas>
+    <br><br>
+    <canvas id="canvas" width="640" height="640"></canvas>
+    <script>
+      var latency = (function () {
+        var ctx = document.getElementById('canvas-latency').getContext('2d');
+        var width = 640;
+        var height = 100;
+        var sampleWidth = 4
+        var sampleCount = width / (sampleWidth + 1);
+        var last = null;
+        var samples = [];
+        var max = 0;
+
+        function computeStandardDeviation(x) {
+          var a = 0, b = 0, n = x.length;
+          for (var i = 0; i < n; i++) {
+            a += x[i] * x[i];
+            b += x[i];
+          }
+          return Math.sqrt(a / n - (b / n) * (b / n));
+        }
+
+        return {
+          tick: function () {
+            var curr = new Date();
+            if (last) {
+              if (samples.length > sampleCount) {
+                samples.shift();
+              }
+              samples.push(curr - last);
+              ctx.clearRect(0, 0, 640, 100);
+              var sum = 0;
+              for (var i = 0; i < samples.length; i++) {
+                sum += samples[i];
+                max = Math.max(max, samples[i]);
+              }
+              var avg = sum / samples.length;
+              for (var i = 0; i < samples.length; i++) {
+                var scaledSample = (samples[i] / max);
+                ctx.fillRect(i * (sampleWidth + 1), 100, sampleWidth, - scaledSample * (height - 30));
+              }
+              ctx.font = "Bold 10pt Verdana";
+              ctx.fillText("fps: " + (1000 / avg).toFixed(2) + ", std: " + computeStandardDeviation(samples).toFixed(2), 0, 25);
+            }
+            last = curr;
+          }
+        };
+      })();
+
+      var cancelAnimationFrame = ( function() {
+        return window.cancelAnimationFrame          ||
+        window.webkitCancelRequestAnimationFrame    ||
+        window.mozCancelRequestAnimationFrame       ||
+        window.oCancelRequestAnimationFrame         ||
+        window.msCancelRequestAnimationFrame        ||
+        clearTimeout
+      } )();
+
+      var requestAnimationFrame = (function() {
+        return  window.requestAnimationFrame       ||
+                window.webkitRequestAnimationFrame ||
+                window.mozRequestAnimationFrame    ||
+                window.oRequestAnimationFrame      ||
+                window.msRequestAnimationFrame     ||
+                function(/* function */ callback, /* DOMElement */ element){
+                return window.setTimeout(callback, 1000 / 60);
+        };
+      })();
+
+    </script>
+    <pre class="example">
+
+const int n = 250000; // Number of object allocations.
+const int m = 300;    // Number of balls.
+
+function drawHook() {
+  benchObject();
+  // benchStruct();
+}
+
+extern document, window, Math, Date, trace, latency, cancelAnimationFrame, requestAnimationFrame;
+
+let balls = [];
+let radius = 10, width = 640, height = 640;
+for (let i = 0; i < m; i++) {
+  let dx = 0.5 - Math.random();
+  let dy = 0.5 - Math.random();
+  balls.push({x: width / 2, y: height / 2, dx: dx, dy: dy, radius: 5 + Math.random() * 5});
+}
+
+let ctx = document.getElementById('canvas').getContext('2d');
+
+struct Node {
+  Node *next;
+  int val;
+  double pad1, pad2, pad3, pad4;
+};
+
+function ObjNode() {
+  this.next = null;
+  this.val = 0;
+  this.pad1 = 0;
+  this.pad2 = 0;
+  this.pad3 = 0;
+  this.pad4 = 0;
+}
+
+function benchStruct() {
+  let Node *head;
+  for (let int i = 0; i < n; ++i) {
+    let Node *prev = head;
+    head = new Node;
+    head->next = prev;
+    head->val = i;
+  }
+
+  let double sum = 0;
+  for (let int i = 0; i < n; ++i) {
+    let Node *prev = head;
+    sum += head->val;
+    head = head->next;
+    delete prev;
+  }
+}
+
+function benchObject() {
+  let head;
+  for (let i = 0; i < n; ++i) {
+    let prev = head;
+    head = new ObjNode();
+    head.next = prev;
+    head.val = i;
+  }
+
+  let sum = 0;
+  for (let i = 0; i < n; ++i) {
+    sum += head.val;
+    head = head.next;
+  }
+}
+
+let last = new Date();
+let request;
+function draw() {
+  latency.tick();
+  ctx.clearRect(0, 0, width, height);
+  drawHook();
+  let curr = new Date();
+  let elapsed = (curr - last) / 10;
+  last = curr;
+  for (let i = 0; i < balls.length; i++) {
+    let ball = balls[i];
+    let dx = ball.dx * elapsed;
+    let dy = ball.dy * elapsed;
+    let nx = ball.x + dx;
+    let ny = ball.y + dy;
+    if (nx < ball.radius || nx > width - ball.radius) {
+      ball.dx *= -1;
+      dx *= -1;
+    }
+    if (ny < ball.radius || ny > height - ball.radius) {
+      ball.dy *= -1;
+      dy *= -1;
+    }
+    ball.x += dx;
+    ball.y += dy;
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2, true);
+    ctx.closePath();
+    ctx.fill();
+  }
+  request = requestAnimationFrame(draw);
+}
+if (request) {
+  cancelAnimationFrame(request);
+}
+draw();
+
+    </pre>
+  </div>
+
+<script src="vendor/cm/lib/codemirror.js"></script>
+<script src="vendor/cm/mode/javascript/javascript.js"></script>
+<script src="vendor/jquery-1.7.2.min.js"></script>
+
+<script src="lljs/util.js"></script>
+<script src="lljs/esprima.js"></script>
+<script src="lljs/escodegen.js"></script>
+<script src="lljs/estransform.js"></script>
+<script src="lljs/compiler.js"></script>
+<script src="lljs/memory.js"></script>
+<script src="lljs/ljc.js"></script>
+
+<script>
+var id = 0;
+$('.example').replaceWith(function() {
+  var src = this.innerHTML;
+  var lineCount = src.split("\n").length;
+  return '<table class="example"><tr><td><textarea id="ex:' + id + ':source" class="jcCode" rows="' + lineCount + '" spellcheck="false">' + src + '</textarea></td><td valign="top"><pre id="ex:' + id++ + ':result" class="jcResult"></pre></td></tr></table>'
+});
+
+var lastMarker;
+function compileExample(ex) {
+  if (lastMarker) {
+    this.clearMarker(lastMarker);
+  }
+  var number = ex.split(":")[1];
+  var result = document.getElementById("ex:" + number + ":result");
+  try {
+    var name;
+    if (Number(number) === id - 1) {
+      name = "memory";
+    } else {
+      name = "ex" + number;
+    }
+    result.innerHTML = LJC.compile(name, name, this.getValue(), { bare: true });
+  } catch (x) {
+    result.innerHTML = x.message;
+    if (x.lineNumber) {
+      lastMarker = this.setMarker(x.lineNumber - 1, "<span style=\"color: #900\">x</span> %N%");
+    }
+  }
+}
+
+var Timer = (function () {
+  function timer() {
+    this.name = null;
+    this.start = null;
+  }
+
+  timer.prototype.begin = function (name) {
+    if (this.start) {
+      if (this.name) {
+        trace("Timer: " + (new Date() - this.start) + " ms: " + this.name);
+      } else {
+        trace("Timer: " + (new Date() - this.start) + " ms.");
+      }
+    }
+    this.start = new Date();
+    this.name = name;
+  };
+
+  return timer;
+})();
+
+var timer;
+var trace;
+
+function require(name) {
+  if (name === "memory") {
+    return memory;
+  }
+  return null;
+}
+
+function executeExample(id) {
+  var number = id.split(":")[1];
+  var result = document.getElementById("ex:" + number + ":result");
+  try {
+    memory.reset();
+
+    timer = new Timer();
+
+    result.innerHTML = "";
+
+    trace = function (x) {
+      result.innerHTML += x + "\n";
+    };
+
+    start = new Date();
+    var code = LJC.compile("ex" + number, "ex" + number, this.getValue(), {});
+    result.innerHTML += "Compiled in: " + (new Date() - start) + " ms\n";
+    result.innerHTML += "-----------------------------------------------------\n";
+
+    start = new Date();
+    new Function(code)();
+
+    timer.begin(null);
+    result.innerHTML += "-----------------------------------------------------\n";
+    result.innerHTML += "Executed in : " + (new Date() - start) + " ms.";
+
+  } catch (x) {
+    result.innerHTML = x.message;
+  }
+}
+
+$('.jcCode').each(function() {
+  var id = this.id;
+  var cm = CodeMirror.fromTextArea(this, {
+    tabSize: 2,
+    lineNumbers: true,
+    gutter: true,
+    onChange: function () {
+      compileExample.call(cm, id);
+    },
+    extraKeys: {
+      "Ctrl-Enter": function () {
+        executeExample.call(cm, id);
+      },
+      "Cmd-Enter": function () {
+        executeExample.call(cm, id);
+      }
+    }
+  });
+  compileExample.call(cm, id);
+});
+
+</script>
+</body>
+</html>

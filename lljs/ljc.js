@@ -111,6 +111,7 @@
       ["A", "emit-ast",     false, "Do not generate JS, emit AST"],
       ["P", "pretty-print", false, "Pretty-print AST instead of emitting JSON (with -A)"],
       ["b", "bare",         false, "Do not wrap in a module"],
+      ["l", "load-instead", false, "Emit load('memory') instead of require('memory')"],
       ["W", "warn",         true,  "Print warnings (enabled by default)"],
       ["Wconversion", null, false, "Print intra-integer and pointer conversion warnings"],
       ["0", "simple-log",   false, "Log simple messages. No colors and snippets."],
@@ -173,7 +174,10 @@
     var code;
 
     try {
-      var node = esprima.parse(source, { loc: true });
+      var node = esprima.parse(source, { loc: true, comment: true, range: true, tokens: true });
+
+      node = escodegen.attachComments(node, node.comments, node.tokens);
+
       if (options["only-parse"]) {
         code = node;
       } else {
@@ -181,7 +185,7 @@
         if (options["emit-ast"]) {
           code = node;
         } else {
-          code = escodegen.generate(node, { base: "", indent: "  " });
+          code = escodegen.generate(node, { base: "", indent: "  ", comment: true });
         }
       }
     } catch (e) {
@@ -191,7 +195,7 @@
 
       if (e.index) {
         // Esprima error, make a loc out of it.
-        var lc = { line: e.lineNumber, column: e.column };
+        var lc = { line: e.lineNumber, column: e.column - 1 };
         e.loc = { start: lc, end: lc };
         logger.error(e.message, { start: lc, end: lc });
         logger.flush();

@@ -2295,6 +2295,7 @@
 
     return {
       type: Syntax.TypeAliasDirective,
+      range: original.range,
       original: original,
       alias: alias
     };
@@ -3047,6 +3048,7 @@
     if (type.id) {
       return {
         type: Syntax.TypeAliasDirective,
+        range: type.range,
         original: type,
         alias: {
           type: Syntax.TypeIdentifier,
@@ -3184,8 +3186,8 @@
     var token, id = null, firstRestricted, message, param, paramType, params = [], body, previousStrict, paramSet, paramTypes, returnType;
 
     expectKeyword('function');
-    returnType = parseInlineableType();
     if (!match('(')) {
+      returnType = parseInlineableType();
       token = lookahead();
       id = parseVariableIdentifier();
       if (strict) {
@@ -3763,6 +3765,11 @@
       parseUnaryExpression = extra.parseUnaryExpression;
       parseVariableDeclaration = extra.parseVariableDeclaration;
       parseVariableIdentifier = extra.parseVariableIdentifier;
+
+      parsePointerType = extra.parsePointerType;
+      parseStructType = extra.parseStructType;
+      parseTypeIdentifier = extra.parseTypeIdentifier;
+      parseTypeDef = extra.parseTypeDef;
     }
 
     if (typeof extra.scanRegExp === 'function') {
