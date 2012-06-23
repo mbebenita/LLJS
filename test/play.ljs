@@ -1,0 +1,15 @@
+extern console;
+struct Node {
+  u8 value;
+};
+
+function int leak(int i) {
+  let Node *head = new Node;
+  head->value = 5;
+  return i;
+}
+
+for(let int i = 0; i < 100; i++) {
+  let l = leak(i);
+  // console.log(l);
+}

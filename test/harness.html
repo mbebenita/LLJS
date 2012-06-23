@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<title>Test harness</title>
+<script src="../src/esprima.js"></script>
+<script src="../src/escodegen.js"></script>
+<script src="../src/estransform.js"></script>
+<script src="../src/util.js"></script>
+<script src="../src/compiler.js"></script>
+
+<script id="test" type="text/lljs">
+  let int x = 4;
+  let float y = 10;
+  x + y;
+</script>
+
+<script type="text/javascript">
+  var source = document.getElementById("test").text.trim();
+  var logger = new util.Logger("ljc", "ljc-logger", source, {});
+  var node = esprima.parse(source, {loc: true, comment: true, range: true, tokens: true});
+  console.log(node);
+  node = escodegen.attachComments(node, node.comments, node.tokens);
+  console.log(node);
+  node = compiler.compile(node, "test", logger, {});
+  console.log(node);
+  var code = escodegen.generate(node, {base: "", indent: "  ", comment: true});
+  console.log(code);
+</script>
+
+<p>Here we go</p>
