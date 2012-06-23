@@ -7,6 +7,10 @@ extern Uint32Array;
 extern Int32Array;
 extern Float32Array;
 extern Float64Array;
+extern Proxy;
+extern Object;
+extern undefined;
+extern console;
 
 const MB = 1024 * 1024;
 const WORD_SIZE = sizeof(word);
@@ -84,9 +88,64 @@ struct Header {
 let Header *base = null;
 let Header *freep = null;
 
+function handlerMaker(obj) {  
+  return {  
+    // Fundamental traps  
+    getOwnPropertyDescriptor: function(name) {  
+      let desc = Object.getOwnPropertyDescriptor(obj, name);  
+      // a trapping proxy's properties must always be configurable  
+      if (desc !== undefined) { desc.configurable = true; }  
+      return desc;  
+    },  
+    getPropertyDescriptor:  function(name) {  
+      let desc = Object.getPropertyDescriptor(obj, name); // not in ES5  
+      // a trapping proxy's properties must always be configurable  
+      if (desc !== undefined) { desc.configurable = true; }  
+      return desc;  
+    },  
+    getOwnPropertyNames: function() {  
+      return Object.getOwnPropertyNames(obj);  
+    },  
+    getPropertyNames: function() {  
+      return Object.getPropertyNames(obj);                // not in ES5  
+    },  
+    defineProperty: function(name, desc) {  
+      Object.defineProperty(obj, name, desc);  
+    },  
+    delete:       function(name) { return delete obj[name]; },     
+    fix:          function() {  
+      if (Object.isFrozen(obj)) {  
+        return Object.getOwnPropertyNames(obj).map(function(name) {  
+          return Object.getOwnPropertyDescriptor(obj, name);  
+        });  
+      }  
+      // As long as obj is not frozen, the proxy won't allow itself to be fixed  
+      return undefined; // will cause a TypeError to be thrown  
+    },  
+     
+    // derived traps  
+    has:          function(name) { return name in obj; },  
+    hasOwn:       function(name) { return Object.prototype.hasOwnProperty.call(obj, name); },  
+    get:          function(receiver, name) {
+      console.log("hi");
+      return obj[name];
+    },  
+    set:          function(receiver, name, val) { obj[name] = val; return true; }, // bad behavior when set fails in non-strict mode  
+    enumerate:    function() {  
+      let result = [];  
+      for (let name in obj) { result.push(name); };  
+      return result;  
+    },  
+    keys: function() { return Object.keys(obj) }  
+  };  
+}  
+
 function reset() {
   let M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
-  exports.U1 = new Uint8Array(M);
+  
+  let U1 = new Uint8Array(M);
+  let pU1 = Proxy.create(handlerMaker(U1));  
+  exports.U1 = pU1;
   exports.I1 = new Int8Array(M);
   exports.U2 = new Uint16Array(M);
   exports.I2 = new Int16Array(M);
