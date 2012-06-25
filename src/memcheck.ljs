@@ -1,0 +1,131 @@
+extern undefined;
+extern print;
+extern console;
+extern snarf;
+extern process;
+extern newGlobal;
+extern setDebug;
+
+
+let NODE_JS = 1;
+let JS_SHELL = 2;
+let BROWSER = 3;
+
+let mode;
+if (typeof process !== "undefined") {
+  mode = NODE_JS;
+} else if (typeof snarf !== "undefined") {
+  mode = JS_SHELL;
+} else {
+  mode = BROWSER;
+}
+
+let ck, root, dbg;
+if (mode === NODE_JS) {
+  print = console.log;
+} 
+
+let memcheck = {
+  used: [],
+  addressable: [],
+  valid: [],
+  errors: {
+    double_free: [],
+    bad_access: [],
+    undef_access: []
+  }
+};
+
+// (byte, uint, bool) -> unit
+function setAddressable(byte *bt, uint size, value) {
+  for (let i = 0; i < size; i++) {
+    memcheck.addressable[bt + (byte *)(i)] = value;
+  }
+}
+
+// (byte) -> bool
+function isAddressable(byte *bt) {
+  return memcheck.addressable[bt];
+}
+
+// (byte, uint, bool) -> unit
+function setValid(byte *bt, uint size, value) {
+  // debugger;
+  for (let i = 0; i < size; i++) {
+    memcheck.valid[bt + (byte *) (i)] = value;
+  }
+}
+
+// (byte) -> bool
+function isValid(byte *bt) {
+  return memcheck.valid[bt];
+}
+
+// (byte, bool, str) -> unit
+function setAlloc(byte *bt, value, allocedBy) {
+  memcheck.used[bt] = [value, allocedBy];
+}
+
+// (byte) -> bool
+function isAlloc(byte *bt) {
+  if(typeof memcheck.used[bt] !== 'undefined') {
+    return memcheck.used[bt][0];
+  }
+  return false;
+}
+
+// -> [...[->, byte]]
+function getAlloced() {
+  return memcheck.used.map(function(val, idx) {
+    return [val[0], val[1], idx];
+  }).filter(function(val, idx) {
+    return val[0];
+  }).map(function(val, idx) {
+    return [val[1], val[2]];
+  });
+}
+
+// (str, str) -> unit
+function addError(kind, msg) {
+  if(memcheck.errors[kind] === undefined) {
+    memcheck.errors[kind] = [];
+  }
+  memcheck.errors[kind].push(msg);
+}
+
+function addDoubleFreeError(byte *bt) {
+  memcheck.errors.double_free.push(bt);
+} 
+
+function addBadAccessError(byte *bt) {
+  memcheck.errors.bad_access.push(bt);
+}
+
+function addUndefinedError(byte *bt) {
+  debugger;
+  memcheck.errors.undef_access.push(bt);
+}
+
+
+// unit -> str
+function report() {
+  let frees = "Double frees at memory location: " + memcheck.errors.double_free;
+  let access = "Bad access at memory location: " + memcheck.errors.bad_access;
+  let undef = "Undefined access at memory location: " + memcheck.errors.undef_access;
+  let leaks = "Leaks at: " + getAlloced();
+  return [frees, access, undef, leaks].join("\n");
+}
+
+exports.setAddressable = setAddressable;
+exports.isAddressable = isAddressable;
+exports.setValid = setValid;
+exports.isValid = isValid;
+exports.setAlloc = setAlloc;
+exports.isAlloc = isAlloc;
+exports.getAlloced = getAlloced;
+
+exports.addDoubleFreeError = addDoubleFreeError;
+exports.addBadAccessError = addBadAccessError;
+exports.addUndefinedError = addUndefinedError;
+
+exports.report = report;

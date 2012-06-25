@@ -7,16 +7,46 @@ extern Uint32Array;
 extern Int32Array;
 extern Float32Array;
 extern Float64Array;
+extern memcheck;
 extern Proxy;
 extern Object;
 extern undefined;
 extern console;
+extern parseInt;
+extern process;
+extern snarf;
+extern print;
+
+let NODE_JS = 1;
+let JS_SHELL = 2;
+let BROWSER = 3;
+
+let mode;
+if (typeof process !== "undefined") {
+  mode = NODE_JS;
+} else if (typeof snarf !== "undefined") {
+  mode = JS_SHELL;
+} else {
+  mode = BROWSER;
+}
+
+let ck;
+if (mode === NODE_JS) {
+  print = console.log;
+  ck = require('memcheck');
+} else {
+  ck = (load('memcheck.js'), memcheck);
+}
 
 const MB = 1024 * 1024;
 const WORD_SIZE = sizeof(word);
 const SIZE = (32 * MB) / WORD_SIZE;
 const STACK_SIZE = (2 * MB) / WORD_SIZE;
 const HEAP_SIZE = SIZE - STACK_SIZE;
+
+// debug
+let log = function() { };
+// let log = console.log;
 
 // let I4, U4;
 
@@ -88,7 +118,171 @@ struct Header {
 let Header *base = null;
 let Header *freep = null;
 
-function handlerMaker(obj) {  
+// ugly hack, probably doesn't really work. 
+// use the debugger api to make this more robust?
+let memFn = [free, malloc, sbrk, reset, morecore];
+function  isMemFn(fn) {
+  if (memFn.indexOf(fn) !== -1) {
+    return true;
+  }
+  return false;
+}
+
+function shadowMemory(mem, uint memsize) {
+  let handler = makeIdHandler(mem);
+  // override the identity get/set handlers
+  handler.get = function(receiver, name) {
+    let byte *loc = (byte *) ((parseInt(name, 10)) << (memsize >> 1)) ;
+    // malloc/free can get/set unallocated memory
+    if(!isMemFn(handler.get.caller)) {
+      if(!ck.isAddressable(loc)) {
+        ck.addBadAccessError(loc);
+      }
+      if(!ck.isValid(loc)) {
+        ck.addUndefinedError(loc);
+      }
+    }
+    return mem[name];
+  };
+  handler.set = function(receiver, name, val) {
+    // let byte *loc = (byte *) (parseInt(name, 10));
+    let byte *loc = (byte *) ((parseInt(name, 10)) << (memsize >> 1)) ;
+    // memory functions should be able to set unallocated addresses
+    if(!isMemFn(handler.set.caller)) {
+      if(!ck.isAddressable(loc)) {
+        ck.addBadAccessError(loc);
+      }
+      ck.setValid(loc, memsize, true);
+    }
+    mem[name] = val;
+    return true;
+  };
+  return Proxy.create(handler);
+}
+
+function reset() {
+  let M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
+  
+  exports.U1 = shadowMemory(new Uint8Array(M), sizeof(u8));
+  exports.I1 = shadowMemory(new Int8Array(M), sizeof(i8));
+  exports.U2 = shadowMemory(new Uint16Array(M), sizeof(u16));
+  exports.I2 = shadowMemory(new Int16Array(M), sizeof(i16));
+  exports.U4 = shadowMemory(new Uint32Array(M), sizeof(u32));
+  exports.I4 = shadowMemory(new Int32Array(M), sizeof(i32));
+  exports.F4 = shadowMemory(new Float32Array(M), sizeof(f32));
+  exports.F8 = shadowMemory(new Float64Array(M), sizeof(f64));
+  
+  exports.U4[0] = 4;
+  exports.U4[1] = SIZE;
+
+  base = (Header *)(2);
+  freep = null;
+}
+
+reset();
+
+function word *sbrk(int nBytes) {
+  let U4 = exports.U4;
+  let int nWords = nBytes / sizeof(word);
+  if (U4[0] + nWords > HEAP_SIZE) {
+    return null;
+  }
+  let word *address = (word *)(U4[0]);
+  U4[0] += nWords;
+  return address;
+}
+
+let uint nUnitsMin = 1024;
+
+function Header *morecore(uint nUnits) {
+  if (nUnits < nUnitsMin) {
+    nUnits = nUnitsMin;
+  }
+  let word *buffer = sbrk(nUnits * sizeof(Header));
+
+  if (buffer === null) {
+    return null;
+  }
+  let Header *header = (Header *)(buffer);
+  header->size = nUnits;
+  // prevent double free recording on morecore
+  ck.setAlloc((byte *) (header + 1), true, "morecore") 
+  // setting all the user addressable bytes as addressable in the
+  // shadow memory
+  ck.setAddressable((byte *) (header + 1), nUnits, true);
+  free(header + 1);
+  return freep;
+}
+
+function byte *malloc(int nBytes) {
+  let Header *p, *prevp;
+  let uint nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
+
+  if ((prevp = freep) === null) {
+    base->next = freep = prevp = base;
+    base->size = 0;
+  }
+
+  for (p = prevp->next; true; prevp = p, p = p->next) {
+    if (p->size >= nUnits) {
+      if (p->size === nUnits) {
+        prevp->next = p->next;
+      } else {
+        p->size -= nUnits;
+        p += p->size;
+        p->size = nUnits;
+      }
+      freep = prevp;
+      // record that this chunck of memory can be addressed
+      ck.setAddressable((byte *) (p+1), nUnits, true);
+      // recored that this byte was allocated (and should be freed later)
+      let cname = typeof malloc.caller === "undefined" ? "" : malloc.caller.name;
+      ck.setAlloc((byte *) (p+1), true, cname);
+      return p + 1;
+    }
+    if (p === freep) {
+      if ((p = morecore(nUnits)) === null) {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+function void free(byte *ap) {
+  let Header *bp = (Header *)(ap) - 1, *p;
+  if(ck.isAlloc(ap)) {
+    // this byte actually was malloced before, reset it
+    ck.setAlloc(ap, false);
+    // this memory chunk is no longer addressable
+    ck.setAddressable(ap, bp->size, false);
+  } else {
+    // this byte was never allocated, trying to free the wrong thing
+    ck.addDoubleFreeError(ap);
+  }
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+}
+
+
+
+function   makeIdHandler(obj) {  
   return {  
     // Fundamental traps  
     getOwnPropertyDescriptor: function(name) {  
@@ -127,10 +321,11 @@ function handlerMaker(obj) {
     has:          function(name) { return name in obj; },  
     hasOwn:       function(name) { return Object.prototype.hasOwnProperty.call(obj, name); },  
     get:          function(receiver, name) {
-      console.log("hi");
       return obj[name];
     },  
-    set:          function(receiver, name, val) { obj[name] = val; return true; }, // bad behavior when set fails in non-strict mode  
+    set:          function(receiver, name, val) {
+      obj[name] = val; return true;
+    }, // bad behavior when set fails in non-strict mode  
     enumerate:    function() {  
       let result = [];  
       for (let name in obj) { result.push(name); };  
@@ -139,109 +334,6 @@ function handlerMaker(obj) {
     keys: function() { return Object.keys(obj) }  
   };  
 }  
-
-function reset() {
-  let M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
-  
-  let U1 = new Uint8Array(M);
-  let pU1 = Proxy.create(handlerMaker(U1));  
-  exports.U1 = pU1;
-  exports.I1 = new Int8Array(M);
-  exports.U2 = new Uint16Array(M);
-  exports.I2 = new Int16Array(M);
-  exports.U4 = new Uint32Array(M);
-  exports.I4 = new Int32Array(M);
-  exports.F4 = new Float32Array(M);
-  exports.F8 = new Float64Array(M);
-
-  exports.U4[0] = 4;
-  exports.U4[1] = SIZE;
-
-  base = (Header *)(2);
-  freep = null;
-}
-
-reset();
-
-function word *sbrk(int nBytes) {
-  let U4 = exports.U4;
-  let int nWords = nBytes / sizeof(word);
-  if (U4[0] + nWords > HEAP_SIZE) {
-    return null;
-  }
-  let word *address = (word *)(U4[0]);
-  U4[0] += nWords;
-  return address;
-}
-
-let uint nUnitsMin = 1024;
-
-function Header *morecore(uint nUnits) {
-  if (nUnits < nUnitsMin) {
-    nUnits = nUnitsMin;
-  }
-  let word *buffer = sbrk(nUnits * sizeof(Header));
-
-  if (buffer === null) {
-    return null;
-  }
-  let Header *header = (Header *)(buffer);
-  header->size = nUnits;
-  free(header + 1);
-  return freep;
-}
-
-function byte *malloc(int nBytes) {
-  let Header *p, *prevp;
-  let uint nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
-
-  if ((prevp = freep) === null) {
-    base->next = freep = prevp = base;
-    base->size = 0;
-  }
-
-  for (p = prevp->next; true; prevp = p, p = p->next) {
-    if (p->size >= nUnits) {
-      if (p->size === nUnits) {
-        prevp->next = p->next;
-      } else {
-        p->size -= nUnits;
-        p += p->size;
-        p->size = nUnits;
-      }
-      freep = prevp;
-      return p + 1;
-    }
-    if (p === freep) {
-      if ((p = morecore(nUnits)) === null) {
-        return null;
-      }
-    }
-  }
-  return null;
-}
-
-function void free(byte *ap) {
-  let Header *bp = (Header *)(ap) - 1, *p;
-  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
-    if (p >= p->next && (bp > p || bp < p->next)) {
-      break;
-    }
-  }
-  if (bp + bp->size === p->next) {
-    bp->size += p->next->size;
-    bp->next = p->next->next;
-  } else {
-    bp->next = p->next;
-  }
-  if (p + p->size == bp) {
-    p->size += bp->size;
-    p->next = bp->next;
-  } else {
-    p->next = bp;
-  }
-  freep = p;
-}
 
 exports.reset = reset;
 
@@ -254,3 +346,5 @@ exports.memset4 = memset4;
 
 exports.malloc = malloc;
 exports.free = free;
+
+exports.checker = ck;

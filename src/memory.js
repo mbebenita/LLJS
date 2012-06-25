@@ -1,10 +1,51 @@
 (function (exports) {
   const $M = exports;
+  var NODE_JS = 1;
+  var JS_SHELL = 2;
+  var BROWSER = 3;
+  var mode;
+  if (typeof process !== 'undefined') {
+    mode = NODE_JS;
+  } else if (typeof snarf !== 'undefined') {
+    mode = JS_SHELL;
+  } else {
+    mode = BROWSER;
+  }
+  var ck;
+  if (mode === NODE_JS) {
+    print = console.log;
+    ck = require('memcheck');
+  } else {
+    ck = (load('memcheck.js'), memcheck);
+  }
   const MB = 1024 * 1024 | 0;
   const WORD_SIZE = 4;
   const SIZE = 32 * MB / WORD_SIZE;
   const STACK_SIZE = 2 * MB / WORD_SIZE;
   const HEAP_SIZE = SIZE - STACK_SIZE;
+  // debug
+  var log = function () {
+  };
+  // let log = console.log;
+  // let I4, U4;
+  /*
+   +---------------+ -
+ 0 | Heap  Pointer |
+ 1 | Stack Pointer |
+   +---------------+ <- Heap Pointer (HP)
+   |               |
+   |               | |
+   |     HEAP      | | Malloc Region
+   |               | v
+   |               |
+   +---------------+
+   |               |
+   |               | ^
+   |     STACK     | |
+   |               | |
+   |               |
+   +---------------+ <- Stack Pointer (SP)
+*/
   function memcpy(dst, src, length) {
     const $U1 = $M.U1;
     var _, _$1;
@@ -49,16 +90,62 @@
   }
   var base = 0;
   var freep = 0;
+  // ugly hack, probably doesn't really work. 
+  // use the debugger api to make this more robust?
+  var memFn = [
+      free,
+      malloc,
+      sbrk,
+      reset,
+      morecore
+    ];
+  function isMemFn(fn) {
+    if (memFn.indexOf(fn) !== -1) {
+      return true;
+    }
+    return false;
+  }
+  function shadowMemory(mem, memsize) {
+    var handler = makeIdHandler(mem);
+    // override the identity get/set handlers
+    handler.get = function (receiver, name) {
+      var loc = parseInt(name, 10) << (memsize >> 1);
+      // malloc/free can get/set unallocated memory
+      if (!isMemFn(handler.get.caller)) {
+        if (!ck.isAddressable(loc)) {
+          ck.addBadAccessError(loc);
+        }
+        if (!ck.isValid(loc)) {
+          ck.addUndefinedError(loc);
+        }
+      }
+      return mem[name];
+    };
+    handler.set = function (receiver, name, val) {
+      // let byte *loc = (byte *) (parseInt(name, 10));
+      var loc = parseInt(name, 10) << (memsize >> 1);
+      // memory functions should be able to set unallocated addresses
+      if (!isMemFn(handler.set.caller)) {
+        if (!ck.isAddressable(loc)) {
+          ck.addBadAccessError(loc);
+        }
+        ck.setValid(loc, memsize, true);
+      }
+      mem[name] = val;
+      return true;
+    };
+    return Proxy.create(handler);
+  }
   function reset() {
     var M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
-    exports.U1 = new Uint8Array(M);
-    exports.I1 = new Int8Array(M);
-    exports.U2 = new Uint16Array(M);
-    exports.I2 = new Int16Array(M);
-    exports.U4 = new Uint32Array(M);
-    exports.I4 = new Int32Array(M);
-    exports.F4 = new Float32Array(M);
-    exports.F8 = new Float64Array(M);
+    exports.U1 = shadowMemory(new Uint8Array(M), 1);
+    exports.I1 = shadowMemory(new Int8Array(M), 1);
+    exports.U2 = shadowMemory(new Uint16Array(M), 2);
+    exports.I2 = shadowMemory(new Int16Array(M), 2);
+    exports.U4 = shadowMemory(new Uint32Array(M), 4);
+    exports.I4 = shadowMemory(new Int32Array(M), 4);
+    exports.F4 = shadowMemory(new Float32Array(M), 4);
+    exports.F8 = shadowMemory(new Float64Array(M), 8);
     exports.U4[0] = 4;
     exports.U4[1] = SIZE;
     base = 2;
@@ -87,6 +174,11 @@
     }
     var header = buffer;
     $U4[header + 1] = nUnits;
+    // prevent double free recording on morecore
+    ck.setAlloc(header + 1 * 2 << 2, true, 'morecore');
+    // setting all the user addressable bytes as addressable in the
+    // shadow memory
+    ck.setAddressable(header + 1 * 2 << 2, nUnits, true);
     free(header + 1 * 2 << 2);
     return freep;
   }
@@ -108,6 +200,11 @@
           $U4[p + 1] = nUnits;
         }
         freep = prevp;
+        // record that this chunck of memory can be addressed
+        ck.setAddressable(p + 1 * 2 << 2, nUnits, true);
+        // recored that this byte was allocated (and should be freed later)
+        var cname = typeof malloc.caller === 'undefined' ? '' : malloc.caller.name;
+        ck.setAlloc(p + 1 * 2 << 2, true, cname);
         return p + 1 * 2 << 2;
       }
       if (p === freep) {
@@ -121,6 +218,15 @@
   function free(ap) {
     const $U4 = $M.U4;
     var bp = (ap >> 2) - 1 * 2, p = 0;
+    if (ck.isAlloc(ap)) {
+      // this byte actually was malloced before, reset it
+      ck.setAlloc(ap, false);
+      // this memory chunk is no longer addressable
+      ck.setAddressable(ap, $U4[bp + 1], false);
+    } else {
+      // this byte was never allocated, trying to free the wrong thing
+      ck.addDoubleFreeError(ap);
+    }
     for (p = freep; !(bp > p && bp < $U4[p]); p = $U4[p]) {
       if (p >= $U4[p] && (bp > p || bp < $U4[p])) {
         break;
@@ -140,6 +246,72 @@
     }
     freep = p;
   }
+  function makeIdHandler(obj) {
+    return {
+      getOwnPropertyDescriptor: function (name) {
+        var desc = Object.getOwnPropertyDescriptor(obj, name);
+        // a trapping proxy's properties must always be configurable  
+        if (desc !== undefined) {
+          desc.configurable = true;
+        }
+        return desc;
+      },
+      getPropertyDescriptor: function (name) {
+        var desc = Object.getPropertyDescriptor(obj, name);
+        // not in ES5  
+        // a trapping proxy's properties must always be configurable  
+        if (desc !== undefined) {
+          desc.configurable = true;
+        }
+        return desc;
+      },
+      getOwnPropertyNames: function () {
+        return Object.getOwnPropertyNames(obj);
+      },
+      getPropertyNames: function () {
+        return Object.getPropertyNames(obj);
+      },
+      defineProperty: function (name, desc) {
+        Object.defineProperty(obj, name, desc);
+      },
+      delete: function (name) {
+        return delete obj[name];
+      },
+      fix: function () {
+        if (Object.isFrozen(obj)) {
+          return Object.getOwnPropertyNames(obj).map(function (name) {
+            return Object.getOwnPropertyDescriptor(obj, name);
+          });
+        }
+        // As long as obj is not frozen, the proxy won't allow itself to be fixed  
+        return undefined;
+      },
+      has: function (name) {
+        return name in obj;
+      },
+      hasOwn: function (name) {
+        return Object.prototype.hasOwnProperty.call(obj, name);
+      },
+      get: function (receiver, name) {
+        return obj[name];
+      },
+      set: function (receiver, name, val) {
+        obj[name] = val;
+        return true;
+      },
+      enumerate: function () {
+        var result = [];
+        for (var name in obj) {
+          result.push(name);
+        }
+        ;
+        return result;
+      },
+      keys: function () {
+        return Object.keys(obj);
+      }
+    };
+  }
   exports.reset = reset;
   exports.memcpy = memcpy;
   exports.memcpy2 = memcpy2;
@@ -149,4 +321,5 @@
   exports.memset4 = memset4;
   exports.malloc = malloc;
   exports.free = free;
+  exports.checker = ck;
 }.call(this, typeof exports === 'undefined' ? memory = {} : exports));

@@ -1,0 +1,72 @@
+extern undefined;
+extern console;
+extern process;
+extern snarf;
+extern print;
+extern memory;
+
+let NODE_JS = 1;
+let JS_SHELL = 2;
+let BROWSER = 3;
+
+let mode;
+if (typeof process !== "undefined") {
+  mode = NODE_JS;
+} else if (typeof snarf !== "undefined") {
+  mode = JS_SHELL;
+} else {
+  mode = BROWSER;
+}
+
+let m;
+if (mode === NODE_JS) {
+  m = require('memory');
+  print = console.log;
+} else {
+  m = memory;
+  //(load('memory.js'), memory);
+}
+
+
+struct Node {
+  u16 value;
+  u16 other;
+};
+
+function badAccess() {
+  let u32 *x = new int;
+  *x = 5;
+  let u32 good = *x;
+  let u32 bad = *(x + 1)
+  delete x;
+}
+
+function badSet() {
+  let int *x;
+  *x = 4;
+}
+
+function accessUndefined() {
+  let int *x = new int;
+  *x;
+  delete x;
+}
+
+function doubleFree() {
+  let u32 *x = new u32;
+  delete x;
+  delete x;
+}
+
+function int leak() {
+  let int *x = new int;
+}
+
+doubleFree();
+badAccess();
+badSet();
+accessUndefined();
+leak();
+
+print("\nErrors found:");
+print(m.checker.report());
