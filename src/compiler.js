@@ -273,7 +273,7 @@
     this.name = name;
     this.parent = parent;
     this.root = parent.root;
-    this.variables = {};
+    this.variables = Object.create(null);
     this.frame = parent.frame;
     assert(this.frame instanceof Frame);
   }
@@ -339,7 +339,7 @@
   Scope.prototype.addVariable = function addVariable(variable, external) {
     assert(variable);
     assert(!variable.frame);
-    assert(!this.variables.hasOwnProperty(variable.name));
+    assert(!this.variables[variable.name]);
     variable.frame = this.frame;
 
     var variables = this.variables;
@@ -385,10 +385,10 @@
     this.name = name;
     this.parent = parent;
     this.root = parent ? parent.root : this;
-    this.variables = {};
-    this.cachedLocals = {};
+    this.variables = Object.create(null);
+    this.cachedLocals = Object.create(null);
     this.frame = this;
-    this.mangles = {};
+    this.mangles = Object.create(null);
   }
 
   Frame.prototype = Object.create(Scope.prototype);
