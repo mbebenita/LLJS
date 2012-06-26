@@ -280,7 +280,7 @@
 
   Scope.prototype.getVariable = function getVariable(name, local) {
     var variable = this.variables[name];
-    if (variable) {
+    if (variable instanceof Variable) {
       return variable;
     }
 
@@ -339,7 +339,7 @@
   Scope.prototype.addVariable = function addVariable(variable, external) {
     assert(variable);
     assert(!variable.frame);
-    assert(!this.variables[variable.name]);
+    assert(!this.variables.hasOwnProperty(variable.name));
     variable.frame = this.frame;
 
     var variables = this.variables;
