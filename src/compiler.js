@@ -47,6 +47,7 @@
   const assert = util.assert;
   const quote = util.quote;
   const clone = util.clone;
+  const extend = util.extend;
 
   /**
    * Misc utility functions.
@@ -76,16 +77,6 @@
 
   function alignTo(offset, alignment) {
     return (offset + (alignment - 1)) & ~(alignment - 1);
-  }
-
-  function extend(old, props) {
-    var newObj = Object.create(old);
-    if (props) {
-      for (var key in props) {
-        newObj[key] = props[key];
-      }
-    }
-    return newObj;
   }
 
   function check(condition, message, warn) {

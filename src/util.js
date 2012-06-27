@@ -14,6 +14,16 @@
     return o;
   }
 
+  function extend(old, props) {
+    var newObj = Object.create(old);
+    if (props) {
+      for (var key in props) {
+        newObj[key] = props[key];
+      }
+    }
+    return newObj;
+  }
+
   function quote(s) {
     return "`" + s + "'";
   }
@@ -410,5 +420,6 @@
   exports.assert = assert;
   exports.quote = quote;
   exports.clone = clone;
+  exports.extend = extend;
 
 }(typeof exports === 'undefined' ? (util = {}) : exports));
