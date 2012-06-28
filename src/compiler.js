@@ -853,6 +853,10 @@
       }
     }
 
+    if (this.returnType === undefined) {
+      return other.returnType === undefined;
+    }
+
     return this.returnType.assignableFrom(other.returnType);
   };
 
@@ -899,7 +903,7 @@
     assert(this.body instanceof BlockStatement);
     this.body.body = compileList(this.body.body, o);
 
-    return this;
+    return cast(this, this.decltype.reflect(o));
   };
 
   ForStatement.prototype.transform = function (o) {
