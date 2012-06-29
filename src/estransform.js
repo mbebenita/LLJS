@@ -35,7 +35,7 @@
 
     LabeledStatement: {
       extends: "Statement",
-      fields:  ["@label"]
+      fields:  ["@label", "@body"]
     },
 
     BreakStatement: {
