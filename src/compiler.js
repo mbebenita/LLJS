@@ -1618,6 +1618,9 @@
 
     body = new BlockStatement(body.concat(program.body));
     var mname = name.replace(/[^\w]/g, "_");
+    if (mname.match(/^[0-9]/)) {
+      mname = "_" + mname;
+    }
     var exports = new Identifier("exports");
     var module = new MemberExpression(new FunctionExpression(null, [exports], body), new Identifier("call"));
     var moduleArgs = [
