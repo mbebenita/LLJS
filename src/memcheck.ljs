@@ -25,16 +25,26 @@ if (mode === NODE_JS) {
   print = console.log;
 } 
 
-let memcheck = {
-  used: [],
-  addressable: [],
-  valid: [],
-  errors: {
-    double_free: [],
-    bad_access: [],
-    undef_access: []
-  }
-};
+let memcheck = {}; 
+
+function reset() {
+  memcheck = {
+    // {byte* => [bool, str]}
+    used: [],
+    // {byte* => bool}
+    addressable: [],
+    // {byte* => bool}
+    valid: [],
+    errors: {
+      // [byte*]
+      double_free: [],
+      // [byte*]
+      bad_access: [],
+      // [byte*]
+      undef_access: []
+    }
+  };
+}
 
 // (byte, uint, bool) -> unit
 function setAddressable(byte *bt, uint size, value) {
@@ -106,6 +116,32 @@ function addUndefinedError(byte *bt) {
   memcheck.errors.undef_access.push(bt);
 }
 
+// unit -> [byte*]
+function getBadAccesses() {
+  return memcheck.errors.bad_access;
+}
+
+// unit -> [byte*]
+function getBadUndefined() {
+  return memcheck.errors.undef_access;
+}
+
+// unit -> [byte*]
+function getBadFrees() {
+  return memcheck.errors.double_free;
+}
+
+// unit -> [byte*]
+function getLeaks() {
+  // take {byte* => [bool, str]} and return [byte*]
+  return memcheck.used.map(function(val, idx) {
+    return [val[0], idx];
+  }).filter(function(val, idx) {
+    return val[0];
+  }).map(function(val, idx) {
+    return val[1];
+  });
+}
 
 // unit -> str
 function report() {
@@ -128,4 +164,10 @@ exports.addDoubleFreeError = addDoubleFreeError;
 exports.addBadAccessError = addBadAccessError;
 exports.addUndefinedError = addUndefinedError;
 
+exports.getBadAccesses = getBadAccesses;
+exports.getBadUndefined = getBadUndefined;
+exports.getBadFrees = getBadFrees;
+exports.getLeaks = getLeaks;
+
 exports.report = report;
+exports.reset = reset;

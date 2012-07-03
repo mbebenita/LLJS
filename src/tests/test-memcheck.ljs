@@ -4,6 +4,7 @@ extern process;
 extern snarf;
 extern print;
 extern memory;
+extern assertEq;
 
 let NODE_JS = 1;
 let JS_SHELL = 2;
@@ -18,13 +19,17 @@ if (typeof process !== "undefined") {
   mode = BROWSER;
 }
 
-let m;
+let m, assert, assertTrue;
 if (mode === NODE_JS) {
   m = require('memory');
   print = console.log;
+  assert = require('assert').strictEqual;
+  assertTrue = require('assert').ok;
 } else {
   m = memory;
   //(load('memory.js'), memory);
+  assert = assertEq;
+  assertTrue = function(val) { assert(val, true); }
 }
 
 
@@ -33,40 +38,123 @@ struct Node {
   u16 other;
 };
 
-function badAccess() {
-  let u32 *x = new int;
-  *x = 5;
-  let u32 good = *x;
-  let u32 bad = *(x + 1)
-  delete x;
+function isIn(byte *x, l) {
+  return l.indexOf(x) >= 0;
 }
 
-function badSet() {
-  let int *x;
-  *x = 4;
+let checker = m.checker;
+
+function test_access() {
+  function badGet() {
+    let u32 *x = new int;
+    *x = 5;
+    let u32 *badp = x + 1;
+    let u32 good = *x;
+    let u32 bad = *badp;
+    delete x;
+    
+    assert(1, checker.getBadAccesses().length,
+          "only had one bad access");
+    assertTrue(isIn(badp, checker.getBadAccesses()),
+              "tried to access a bad pointer");
+  }
+  
+  function badSet() {
+    let int *badp;
+    *badp = 4;
+    assert(1, checker.getBadAccesses().length,
+          "only had one bad access");
+    assertTrue(isIn(badp, checker.getBadAccesses()),
+              "tried to set a bad pointer");
+  }
+
+  print("running bad access tests (gets/sets of unallocated memory)...");
+  
+  m.reset();
+  badGet();
+  
+  m.reset();
+  badSet();
+  
+  print("done");
+  m.reset();
 }
 
-function accessUndefined() {
-  let int *x = new int;
-  *x;
-  delete x;
+function test_undefined() {
+  function accessUndefined() {
+    let int *x = new int;
+    *x;
+    
+    assert(1, checker.getBadUndefined().length,
+          "only had one bad access");
+    assertTrue(isIn(x, checker.getBadUndefined()),
+              "tried to get a bad memory location");
+  }
+  print("running undefined tests (gets of allocated but undefined memory)...");
+  
+  m.reset();
+  accessUndefined();
+  
+  print("done");
+  m.reset();
 }
 
-function doubleFree() {
-  let u32 *x = new u32;
-  delete x;
-  delete x;
+function test_frees() {
+  function badFree() {
+    let u32 *x;
+    delete x;
+    
+    assert(1, checker.getBadFrees().length,
+          "only had one bad access");
+    assertTrue(isIn(x, checker.getBadFrees()),
+              "tried to get a bad memory location");
+  }
+  
+  function doubleFree() {
+    let u32 *x = new u32;
+    delete x;
+    delete x;
+    
+    assert(1, checker.getBadFrees().length,
+          "only had one bad access");
+    assertTrue(isIn(x, checker.getBadFrees()),
+              "tried to get a bad memory location");
+  }
+  
+  print("running free tests (double frees, or general frees of unalloced memory)...");
+  
+  m.reset();
+  badFree();
+  
+  m.reset();
+  doubleFree();
+  
+  print("done");
+  m.reset();
 }
 
-function int leak() {
-  let int *x = new int;
+
+function test_leak() {
+  function int leak() {
+    let int *x = new int;
+    
+    assert(1, checker.getLeaks().length,
+          "only had one leak ");
+    assertTrue(isIn(x, checker.getLeaks()),
+              "leaked an int");
+  }
+  
+  print("running leak tests (forgot to call delete)...");
+  
+  m.reset();
+  leak();
+  
+  print("done");
+  m.reset();
 }
 
-doubleFree();
-badAccess();
-badSet();
-accessUndefined();
-leak();
+test_access();
+test_undefined();
+test_frees();
+test_leak();
 
-print("\nErrors found:");
-print(m.checker.report());

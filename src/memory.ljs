@@ -162,6 +162,7 @@ function shadowMemory(mem, uint memsize) {
 
 function reset() {
   let M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
+  ck.reset();
   
   exports.U1 = shadowMemory(new Uint8Array(M), sizeof(u8));
   exports.I1 = shadowMemory(new Int8Array(M), sizeof(i8));

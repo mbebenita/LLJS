@@ -138,6 +138,7 @@
   }
   function reset() {
     var M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
+    ck.reset();
     exports.U1 = shadowMemory(new Uint8Array(M), 1);
     exports.I1 = shadowMemory(new Int8Array(M), 1);
     exports.U2 = shadowMemory(new Uint16Array(M), 2);
