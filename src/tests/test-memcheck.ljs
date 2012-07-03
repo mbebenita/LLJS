@@ -58,11 +58,42 @@ function test_access() {
               "tried to access a bad pointer");
   }
   
-  function badGet() {
+  function badGetI8() {
+    let i8 *x = new i8;
+    *x = 5;
+    let i8 *badp = x + 1;
+    let i8 good = *x;
+    let i8 bad = *badp;
+
+    assert(1, checker.getBadAccesses().length,
+          "only had one bad access");
+    assertTrue(isIn(badp, checker.getBadAccesses()),
+              "tried to access a bad pointer");
+  }
+  
+  function badGetU32() {
     let u32 *x = new int;
     *x = 5;
     let u32 *badp = x + 1;
     let u32 good = *x;
+    let u32 bad = *badp;
+    
+    assert(1, checker.getBadAccesses().length,
+          "only had one bad access");
+    assertTrue(isIn(badp, checker.getBadAccesses()),
+              "tried to access a bad pointer");
+  }
+
+  function badGetMixed() {
+    // warm up some allocs
+    for(let uint i = 0; i < 100; i++) {
+      let u32 *x = new u32;
+      // leaking all over the places but we don't care
+    }
+    let u32 *good = new u32;
+    let u32 *badp = good + 1;
+    
+    // bad dereference
     let u32 bad = *badp;
     
     assert(1, checker.getBadAccesses().length,
@@ -86,7 +117,13 @@ function test_access() {
   badGetU8();
   
   // m.reset();
-  // badGet();
+  // badGetI8();
+  
+  // m.reset();
+  // badGetU32();
+  
+  // m.reset();
+  // badGetMixed();
   
   // m.reset();
   // badSet();

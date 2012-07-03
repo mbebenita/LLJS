@@ -15,6 +15,7 @@ extern console;
 extern parseInt;
 extern process;
 extern snarf;
+extern Error;
 extern print;
 
 let NODE_JS = 1;
@@ -136,6 +137,11 @@ function shadowMemory(mem, uint memsize) {
     // malloc/free can get/set unallocated memory
     if(!isMemFn(handler.get.caller)) {
       if(!ck.isAddressable(loc)) {
+        try {
+          throw new Error("foo")
+        } catch(let e)  {
+                    print('gotya')
+                    }
         ck.addBadAccessError(loc);
       }
       if(!ck.isValid(loc)) {
