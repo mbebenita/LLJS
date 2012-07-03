@@ -110,31 +110,55 @@ function test_access() {
     assertTrue(isIn(badp, checker.getBadAccesses()),
               "tried to set a bad pointer");
   }
+  
+  function getMultiple() {
+    let u8 *x = new u8;
+    let u8 *y = new u8;
+    
+    let u8 *badx = x + 1;
+    let u8 *bady = y + 1;
+    
+    let u8 good = *x;
+    good = *y;
+    
+    let u8 bad = *badx;
+    bad = *bady
+
+    assert(2, checker.getBadAccesses().length,
+          "only had one bad access");
+    assertTrue(isIn(badx, checker.getBadAccesses()),
+              "tried to access a bad pointer");
+    assertTrue(isIn(bady, checker.getBadAccesses()),
+              "tried to access a bad pointer");
+  }
 
   print("running bad access tests (gets/sets of unallocated memory)...");
   
   m.reset();
   badGetU8();
   
-  // m.reset();
-  // badGetI8();
+  m.reset();
+  badGetI8();
   
-  // m.reset();
-  // badGetU32();
+  m.reset();
+  badGetU32();
   
-  // m.reset();
-  // badGetMixed();
+  m.reset();
+  badGetMixed();
   
-  // m.reset();
-  // badSet();
+  m.reset();
+  badSet();
+  
+  m.reset();
+  getMultiple();
   
   print("done");
   m.reset();
 }
 
 function test_undefined() {
-  function accessUndefined() {
-    let int *x = new int;
+  function undefU8() {
+    let u8 *x = new u8;
     *x;
     
     assert(1, checker.getBadUndefined().length,
@@ -142,10 +166,62 @@ function test_undefined() {
     assertTrue(isIn(x, checker.getBadUndefined()),
               "tried to get a bad memory location");
   }
+  
+  function undefU32() {
+    let u32 *x = new u32;
+    *x;
+    
+    assert(1, checker.getBadUndefined().length,
+          "only had one bad access");
+    assertTrue(isIn(x, checker.getBadUndefined()),
+              "tried to get a bad memory location");
+  }
+
+  function undefMultiple() {
+    let u32 *x = new u32;
+    let u32 *y = new u32;
+    *x;
+    *y;
+    
+    assert(2, checker.getBadUndefined().length,
+          "only had one bad access");
+    assertTrue(isIn(x, checker.getBadUndefined()),
+              "tried to get a bad memory location");
+    assertTrue(isIn(y, checker.getBadUndefined()),
+              "tried to get a bad memory location");
+  }
+
+  // we are tracking undefined memory at the byte level
+  function undefByte() {
+    let u32 *x = new u32;
+    let u8 *y = x;
+    *y = 42;
+    // can dereference both x and y now
+    *y
+    *x
+    assert(0, checker.getBadUndefined().length,
+          "nothing bad yet");
+    let u8 *z = y + 1;
+    *z
+    assert(1, checker.getBadUndefined().length,
+          "now bad");
+    assertTrue(isIn(z, checker.getBadUndefined()),
+              "tried to get a bad memory location");
+  }
+  
   print("running undefined tests (gets of allocated but undefined memory)...");
   
   m.reset();
-  accessUndefined();
+  undefU8();
+  
+  m.reset();
+  undefU32();
+  
+  m.reset();
+  undefMultiple();
+  
+  m.reset();
+  undefByte();
   
   print("done");
   m.reset();
@@ -195,18 +271,31 @@ function test_leak() {
     assertTrue(isIn(x, checker.getLeaks()),
               "leaked an int");
   }
+
+  function leakLoop() {
+    let u8 *x = new u8;
+    for(let int i = 0; i < 99; i++) {
+      x = new u8;
+    }
+
+    assert(100, checker.getLeaks().length,
+          "had one hundred leaks");
+  }
   
   print("running leak tests (forgot to call delete)...");
   
   m.reset();
   leak();
   
+  m.reset();
+  leakLoop();
+  
   print("done");
   m.reset();
 }
 
 test_access();
-// test_undefined();
-// test_frees();
-// test_leak();
+test_undefined();
+test_frees();
+test_leak();
 

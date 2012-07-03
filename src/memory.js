@@ -113,7 +113,6 @@
       // malloc/free can get/set unallocated memory
       if (!isMemFn(handler.get.caller)) {
         if (!ck.isAddressable(loc)) {
-          console.trace();
           ck.addBadAccessError(loc);
         }
         if (!ck.isValid(loc)) {
