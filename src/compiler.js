@@ -36,6 +36,7 @@
   const UpdateExpression = T.UpdateExpression;
   const ForStatement = T.ForStatement;
   const BlockStatement = T.BlockStatement;
+  const CatchClause = T.CatchClause;
   const ThisExpression = T.ThisExpression;
   const TypeAliasDirective = T.TypeAliasDirective;
   const CastExpression = T.CastExpression;
@@ -273,14 +274,14 @@
     this.name = name;
     this.parent = parent;
     this.root = parent.root;
-    this.variables = {};
+    this.variables = Object.create(null);
     this.frame = parent.frame;
     assert(this.frame instanceof Frame);
   }
 
   Scope.prototype.getVariable = function getVariable(name, local) {
     var variable = this.variables[name];
-    if (variable) {
+    if (variable instanceof Variable) {
       return variable;
     }
 
@@ -385,10 +386,10 @@
     this.name = name;
     this.parent = parent;
     this.root = parent ? parent.root : this;
-    this.variables = {};
-    this.cachedLocals = {};
+    this.variables = Object.create(null);
+    this.cachedLocals = Object.create(null);
     this.frame = this;
-    this.mangles = {};
+    this.mangles = Object.create(null);
   }
 
   Frame.prototype = Object.create(Scope.prototype);
@@ -772,6 +773,21 @@
     return this;
   };
 
+  // Note: Does not handle conditional catch clauses
+  // Then again, neither does esprima
+  CatchClause.prototype.scan = function (o) {
+    logger.push(this);
+
+    this.body.scan(o);
+
+    logger.push(this.param);
+    this.body.scope.addVariable(new Variable(this.param.name, undefined));
+    logger.pop();
+
+    logger.pop();
+    return this;
+  };
+
   BlockStatement.prototype.scan = function (o) {
     o = extend(o);
     o.scope = this.scope = new Scope(o.scope, "BlockStatement", "block");
@@ -877,6 +893,12 @@
     o = extend(o);
     o.scope = this.scope;
     this.body = compileList(this.body, o);
+    return this;
+  };
+
+  CatchClause.prototype.transform = function (o) {
+    o = extend(o);
+    this.body.transform(o);
     return this;
   };
 
@@ -1596,6 +1618,9 @@
 
     body = new BlockStatement(body.concat(program.body));
     var mname = name.replace(/[^\w]/g, "_");
+    if (mname.match(/^[0-9]/)) {
+      mname = "_" + mname;
+    }
     var exports = new Identifier("exports");
     var module = new MemberExpression(new FunctionExpression(null, [exports], body), new Identifier("call"));
     var moduleArgs = [
