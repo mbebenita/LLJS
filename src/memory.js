@@ -202,7 +202,7 @@
         }
         freep = prevp;
         // record that this chunck of memory can be addressed
-        ck.setAddressable(p + 1 * 2 << 2, nUnits, true);
+        ck.setAddressable(p + 1 * 2 << 2, nBytes, true);
         // recored that this byte was allocated (and should be freed later)
         var cname = typeof malloc.caller === 'undefined' ? '' : malloc.caller.name;
         ck.setAlloc(p + 1 * 2 << 2, true, cname);

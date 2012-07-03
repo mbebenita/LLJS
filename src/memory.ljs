@@ -235,7 +235,7 @@ function byte *malloc(int nBytes) {
       }
       freep = prevp;
       // record that this chunck of memory can be addressed
-      ck.setAddressable((byte *) (p+1), nUnits, true);
+      ck.setAddressable((byte *) (p+1), nBytes, true);
       // recored that this byte was allocated (and should be freed later)
       let cname = typeof malloc.caller === "undefined" ? "" : malloc.caller.name;
       ck.setAlloc((byte *) (p+1), true, cname);

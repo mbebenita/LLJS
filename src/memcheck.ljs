@@ -55,7 +55,7 @@ function setAddressable(byte *bt, uint size, value) {
 
 // (byte) -> bool
 function isAddressable(byte *bt) {
-  return memcheck.addressable[bt];
+  return memcheck.addressable[bt] === true;
 }
 
 // (byte, uint, bool) -> unit

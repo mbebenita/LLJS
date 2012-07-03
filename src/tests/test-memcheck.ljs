@@ -45,13 +45,25 @@ function isIn(byte *x, l) {
 let checker = m.checker;
 
 function test_access() {
+  function badGetU8() {
+    let u8 *x = new u8;
+    *x = 5;
+    let u8 *badp = x + 1;
+    let u8 good = *x;
+    let u8 bad = *badp;
+
+    assert(1, checker.getBadAccesses().length,
+          "only had one bad access");
+    assertTrue(isIn(badp, checker.getBadAccesses()),
+              "tried to access a bad pointer");
+  }
+  
   function badGet() {
     let u32 *x = new int;
     *x = 5;
     let u32 *badp = x + 1;
     let u32 good = *x;
     let u32 bad = *badp;
-    delete x;
     
     assert(1, checker.getBadAccesses().length,
           "only had one bad access");
@@ -71,10 +83,13 @@ function test_access() {
   print("running bad access tests (gets/sets of unallocated memory)...");
   
   m.reset();
-  badGet();
+  badGetU8();
   
-  m.reset();
-  badSet();
+  // m.reset();
+  // badGet();
+  
+  // m.reset();
+  // badSet();
   
   print("done");
   m.reset();
@@ -154,7 +169,7 @@ function test_leak() {
 }
 
 test_access();
-test_undefined();
-test_frees();
-test_leak();
+// test_undefined();
+// test_frees();
+// test_leak();
 
