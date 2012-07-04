@@ -38,9 +38,9 @@ function reset() {
     errors: {
       // [byte*]
       double_free: [],
-      // [byte*]
+      // [{membyte: byte*, trace: [str]]
       bad_access: [],
-      // [byte*]
+      // [{membyte: byte*, trace: [str]]
       undef_access: []
     }
   };
@@ -71,29 +71,21 @@ function isValid(byte *bt) {
   return memcheck.valid[bt];
 }
 
-// (byte, bool, str) -> unit
-function setAlloc(byte *bt, value, allocedBy) {
-  memcheck.used[bt] = [value, allocedBy];
+// (byte, bool) -> unit
+function setAlloc(byte *bt, value) {
+  memcheck.used[bt] = {isalloc:value, trace: callstack.slice(0)};
 }
+
+           
 
 // (byte) -> bool
 function isAlloc(byte *bt) {
   if(typeof memcheck.used[bt] !== 'undefined') {
-    return memcheck.used[bt][0];
+    return memcheck.used[bt].isalloc;
   }
   return false;
 }
 
-// -> [...[->, byte]]
-function getAlloced() {
-  return memcheck.used.map(function(val, idx) {
-    return [val[0], val[1], idx];
-  }).filter(function(val, idx) {
-    return val[0];
-  }).map(function(val, idx) {
-    return [val[1], val[2]];
-  });
-}
 
 // (str, str) -> unit
 function addError(kind, msg) {
@@ -104,16 +96,15 @@ function addError(kind, msg) {
 }
 
 function addDoubleFreeError(byte *bt) {
-  memcheck.errors.double_free.push(bt);
+  memcheck.errors.double_free.push({membyte: bt, trace: callstack.slice(0)});
 } 
 
 function addBadAccessError(byte *bt) {
-  memcheck.errors.bad_access.push(bt);
+  memcheck.errors.bad_access.push({membyte: bt, trace: callstack.slice(0) });
 }
 
 function addUndefinedError(byte *bt) {
-  debugger;
-  memcheck.errors.undef_access.push(bt);
+  memcheck.errors.undef_access.push({membyte: bt, trace: callstack.slice(0)});
 }
 
 // unit -> [byte*]
@@ -131,16 +122,29 @@ function getBadFrees() {
   return memcheck.errors.double_free;
 }
 
-// unit -> [byte*]
+// unit -> [{membyte: byte, trace: [str]}]
 function getLeaks() {
-  // take {byte* => [bool, str]} and return [byte*]
+  // take {byte* => {memval:bool, trace:[str]} and return [byte*]
   return memcheck.used.map(function(val, idx) {
-    return [val[0], idx];
+    return [val.isalloc, idx, val.trace];
   }).filter(function(val, idx) {
     return val[0];
   }).map(function(val, idx) {
-    return val[1];
+    return {membyte: val[1], trace: val[2]};
   });
+}
+
+let callstack = [];
+
+function call_push(name, line, col) {
+  callstack.push(name + ":" + line + ":" + col)
+}
+function call_pop() {
+  callstack.pop()
+}
+
+function getCallstack() {
+  return callstack;
 }
 
 // unit -> str
@@ -148,7 +152,7 @@ function report() {
   let frees = "Double frees at memory location: " + memcheck.errors.double_free;
   let access = "Bad access at memory location: " + memcheck.errors.bad_access;
   let undef = "Undefined access at memory location: " + memcheck.errors.undef_access;
-  let leaks = "Leaks at: " + getAlloced();
+  let leaks = "Leaks at: " + getLeaks();
   return [frees, access, undef, leaks].join("\n");
 }
 
@@ -158,7 +162,6 @@ exports.setValid = setValid;
 exports.isValid = isValid;
 exports.setAlloc = setAlloc;
 exports.isAlloc = isAlloc;
-exports.getAlloced = getAlloced;
 
 exports.addDoubleFreeError = addDoubleFreeError;
 exports.addBadAccessError = addBadAccessError;
@@ -171,3 +174,7 @@ exports.getLeaks = getLeaks;
 
 exports.report = report;
 exports.reset = reset;
+
+exports.memcheck_call_pop = call_pop;
+exports.memcheck_call_push = call_push;
+exports.getCallstack = getCallstack;

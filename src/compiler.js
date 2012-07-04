@@ -360,7 +360,7 @@
 
   Scope.prototype.getView = function getView(type) {
     return this.frame.getView(type);
-  }
+  };
 
   Scope.prototype.MALLOC = function MALLOC() {
     return this.frame.MALLOC();
@@ -376,6 +376,14 @@
 
   Scope.prototype.MEMSET = function MEMSET(size) {
     return this.frame.MEMSET(size);
+  };
+  
+  Scope.prototype.MEMCHECK_CALL_PUSH = function MEMCHECK_CALL_PUSH() {
+    return this.frame.MEMCHECK_CALL_PUSH();
+  };
+  
+  Scope.prototype.MEMCHECK_CALL_POP = function MEMCHECK_CALL_POP() {
+    return this.frame.MEMCHECK_CALL_POP();
   };
 
   Scope.prototype.toString = function () {
@@ -441,6 +449,14 @@
     case 4: name = "memset4"; ty = memset4Ty; break;
     }
     return getCachedLocal(this, name, ty);
+  };
+  
+  Frame.prototype.MEMCHECK_CALL_PUSH = function MEMCHECK_CALL_PUSH() {
+    return getCachedLocal(this, "memcheck_call_push", "dyn");
+  };
+  
+  Frame.prototype.MEMCHECK_CALL_POP = function MEMCHECK_CALL_POP() {
+    return getCachedLocal(this, "memcheck_call_pop", "dyn");
   };
 
   Frame.prototype.getView = function getView(ty) {
@@ -845,7 +861,7 @@
     node.ty = ty;
     return node;
   }
-
+  
   Node.prototype.transform = T.makePass("transform", "transformNode");
 
   function compileList(list, o) {
@@ -859,6 +875,7 @@
     }
     return translist;
   }
+  
 
   TypeAliasDirective.prototype.transform = function () {
     return null;
@@ -877,6 +894,7 @@
     o = extend(o);
     o.scope = this.frame;
 
+    
     assert(this.body instanceof BlockStatement);
     this.body.body = compileList(this.body.body, o);
 
@@ -952,7 +970,7 @@
 
     if (!this.init && ty && typeof ty.defaultValue !== "undefined") {
       this.init = new Literal(ty.defaultValue);
-    }
+   }
 
     if (this.init) {
       var a = (new AssignmentExpression(this.id, "=", this.init, this.init.loc)).transform(o);
@@ -1407,6 +1425,8 @@
         variables.push(v);
       }
     }
+    
+      
 
     // Do this after the SP calculation since it might bring in U4. Since this
     // is after, we need to unshift.
@@ -1454,6 +1474,7 @@
     }
     return translist;
   }
+  
 
   Node.prototype.lower = T.makePass("lower", "lowerNode");
 
@@ -1468,13 +1489,29 @@
 
     return this;
   };
-
+  
   FunctionExpression.prototype.lower =
   FunctionDeclaration.prototype.lower = function (o) {
+    var memcheckName;
     o = extend(o);
     o.scope = this.frame;
 
     this.body.body = lowerList(this.body.body, o);
+    if(o.memcheck) {
+      if(this.id && this.id.name) {
+        memcheckName = this.id.name;
+      } else {
+        memcheckName = "<anonymous>";
+      }
+      this.body.body.unshift(new ExpressionStatement(new CallExpression(this.frame.MEMCHECK_CALL_PUSH(), 
+                                                                        [new Literal(memcheckName),
+                                                                         new Literal(this.loc.start.line),
+                                                                         new Literal(this.loc.start.column)])));
+      
+      if(this.body.body[this.body.body.length-1].type !== 'ReturnStatement') {
+        this.body.body.push(new ExpressionStatement(new CallExpression(this.frame.MEMCHECK_CALL_POP(), [])));
+      }
+    }
     var prologue = createPrologue(this, o);
     var epilogue = createEpilogue(this, o);
     this.body.body = prologue.concat(this.body.body).concat(epilogue);
@@ -1523,13 +1560,21 @@
   ReturnStatement.prototype.lowerNode = function (o) {
     var scope = o.scope;
     var frameSize = scope.frame.frameSizeInWords;
-    if (frameSize) {
+    if (frameSize || o.memcheck) {
       var arg = this.argument;
-      var t = scope.freshTemp(ty, arg.loc);
-      var ref = scope.cacheReference(arg);
-      var assn = new AssignmentExpression(t, "=", ref.def, arg.loc);
-      var restoreStack = new AssignmentExpression(scope.frame.realSP(), "+=", new Literal(frameSize));
-      this.argument = new SequenceExpression([assn, restoreStack, t], arg.loc);
+      var t = scope.freshTemp(arg.ty, arg.loc);
+      var assn = new AssignmentExpression(t, "=", arg, arg.loc);
+      var exprList = [assn];
+      if(frameSize) {
+        var restoreStack = new AssignmentExpression(scope.frame.realSP(), "+=", new Literal(frameSize));
+        exprList.push(restoreStack);
+      }
+      if(o.memcheck) {
+        var popMemcheck = new CallExpression(scope.MEMCHECK_CALL_POP(), []);
+        exprList.push(popMemcheck);
+      }
+      exprList.push(t);
+      this.argument = new SequenceExpression(exprList, arg.loc);
     }
   };
 
@@ -1547,7 +1592,7 @@
         }
       }
     }
-  }
+  };
 
   UnaryExpression.prototype.lowerNode = function (o) {
     var arg = this.argument;
@@ -1585,7 +1630,9 @@
     lowered.ty = this.ty;
     return lowered;
   };
+  
 
+  
   /**
    * Driver
    */
@@ -1599,6 +1646,8 @@
     var cachedMEMORY = program.frame.cachedMEMORY;
     if (cachedMEMORY) {
       var mdecl;
+      // todo: causes all files named "memory.ljs" to be compiled with the memory 
+      // var pointing at exports, probably want a better way of doing that...
       if (name === "memory") {
         mdecl = new VariableDeclarator(cachedMEMORY, new Identifier("exports"));
       } else if (loadInstead) {
@@ -1615,7 +1664,7 @@
       program.body = body.concat(program.body);
       return program;
     }
-
+    
     body = new BlockStatement(body.concat(program.body));
     var mname = name.replace(/[^\w]/g, "_");
     if (mname.match(/^[0-9]/)) {
@@ -1654,7 +1703,7 @@
 
     // Pass 1.
     var types = resolveAndLintTypes(node, clone(builtinTypes));
-    var o = { types: types, name: name, logger: _logger, warn: warningOptions(options) };
+    var o = { types: types, name: name, logger: _logger, warn: warningOptions(options), memcheck: options.memcheck };
     // Pass 2.
     node.scan(o);
     // Pass 3.

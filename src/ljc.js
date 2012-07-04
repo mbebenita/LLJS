@@ -116,6 +116,7 @@
       ["Wconversion", null, false, "Print intra-integer and pointer conversion warnings"],
       ["0", "simple-log",   false, "Log simple messages. No colors and snippets."],
       ["t", "trace",        false, "Trace compiler execution"],
+      ["m", "memcheck",     false, "Compile with memcheck instrumentation"],
       ["h", "help",         false, "Print this message"]
     ]);
 

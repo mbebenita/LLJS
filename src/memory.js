@@ -176,7 +176,7 @@
     var header = buffer;
     $U4[header + 1] = nUnits;
     // prevent double free recording on morecore
-    ck.setAlloc(header + 1 * 2 << 2, true, 'morecore');
+    ck.setAlloc(header + 1 * 2 << 2, true);
     // setting all the user addressable bytes as addressable in the
     // shadow memory
     ck.setAddressable(header + 1 * 2 << 2, nUnits, true);
@@ -203,9 +203,7 @@
         freep = prevp;
         // record that this chunck of memory can be addressed
         ck.setAddressable(p + 1 * 2 << 2, nBytes, true);
-        // recored that this byte was allocated (and should be freed later)
-        var cname = typeof malloc.caller === 'undefined' ? '' : malloc.caller.name;
-        ck.setAlloc(p + 1 * 2 << 2, true, cname);
+        ck.setAlloc(p + 1 * 2 << 2, true);
         return p + 1 * 2 << 2;
       }
       if (p === freep) {
@@ -323,4 +321,6 @@
   exports.malloc = malloc;
   exports.free = free;
   exports.checker = ck;
+  exports.memcheck_call_pop = ck.memcheck_call_pop;
+  exports.memcheck_call_push = ck.memcheck_call_push;
 }.call(this, typeof exports === 'undefined' ? memory = {} : exports));

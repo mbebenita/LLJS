@@ -38,8 +38,12 @@ struct Node {
   u16 other;
 };
 
+// (byte, [{membyte: byte*}] -> bool
 function isIn(byte *x, l) {
-  return l.indexOf(x) >= 0;
+  return l.some(function(el, idx) {
+    return el.membyte === x;
+  })
+         
 }
 
 let checker = m.checker;
@@ -51,11 +55,14 @@ function test_access() {
     let u8 *badp = x + 1;
     let u8 good = *x;
     let u8 bad = *badp;
-
-    assert(1, checker.getBadAccesses().length,
-          "only had one bad access");
-    assertTrue(isIn(badp, checker.getBadAccesses()),
-              "tried to access a bad pointer");
+    let errors = checker.getBadAccesses();
+    
+    assert(1, errors.length, "only had one bad access");
+    
+    assertTrue(isIn(badp, errors),
+              "tried to get a unalloced u8 pointer");
+    let trace = errors[0].trace;
+    assertTrue(trace[trace.length-1].indexOf("badGetU8") !== -1);
   }
   
   function badGetI8() {
@@ -68,7 +75,7 @@ function test_access() {
     assert(1, checker.getBadAccesses().length,
           "only had one bad access");
     assertTrue(isIn(badp, checker.getBadAccesses()),
-              "tried to access a bad pointer");
+              "tried to get a unalloced i8 pointer");
   }
   
   function badGetU32() {
@@ -81,7 +88,7 @@ function test_access() {
     assert(1, checker.getBadAccesses().length,
           "only had one bad access");
     assertTrue(isIn(badp, checker.getBadAccesses()),
-              "tried to access a bad pointer");
+              "tried to get a unalloced u32 pointer");
   }
 
   function badGetMixed() {
@@ -99,7 +106,7 @@ function test_access() {
     assert(1, checker.getBadAccesses().length,
           "only had one bad access");
     assertTrue(isIn(badp, checker.getBadAccesses()),
-              "tried to access a bad pointer");
+              "tried to get a unalloced u32 pointer");
   }
   
   function badSet() {
@@ -108,7 +115,7 @@ function test_access() {
     assert(1, checker.getBadAccesses().length,
           "only had one bad access");
     assertTrue(isIn(badp, checker.getBadAccesses()),
-              "tried to set a bad pointer");
+              "tried to set a unalloced int pointer");
   }
   
   function getMultiple() {
@@ -127,9 +134,9 @@ function test_access() {
     assert(2, checker.getBadAccesses().length,
           "only had one bad access");
     assertTrue(isIn(badx, checker.getBadAccesses()),
-              "tried to access a bad pointer");
+              "tried to get a unalloced u8 pointer");
     assertTrue(isIn(bady, checker.getBadAccesses()),
-              "tried to access a bad pointer");
+              "tried to get a unalloced u8 pointer");
   }
 
   print("running bad access tests (gets/sets of unallocated memory)...");
@@ -161,10 +168,15 @@ function test_undefined() {
     let u8 *x = new u8;
     *x;
     
-    assert(1, checker.getBadUndefined().length,
+    let errors = checker.getBadUndefined();
+    
+    assert(1, errors.length,
           "only had one bad access");
-    assertTrue(isIn(x, checker.getBadUndefined()),
-              "tried to get a bad memory location");
+    
+    assertTrue(isIn(x, errors),
+              "tried to get a undef u8 location");
+    let trace = errors[0].trace;
+    assertTrue(trace[trace.length-1].indexOf("undefU8") !== -1);
   }
   
   function undefU32() {
@@ -174,7 +186,7 @@ function test_undefined() {
     assert(1, checker.getBadUndefined().length,
           "only had one bad access");
     assertTrue(isIn(x, checker.getBadUndefined()),
-              "tried to get a bad memory location");
+              "tried to get a undef u32 location");
   }
 
   function undefMultiple() {
@@ -186,9 +198,9 @@ function test_undefined() {
     assert(2, checker.getBadUndefined().length,
           "only had one bad access");
     assertTrue(isIn(x, checker.getBadUndefined()),
-              "tried to get a bad memory location");
+              "tried to get a undef u32 location");
     assertTrue(isIn(y, checker.getBadUndefined()),
-              "tried to get a bad memory location");
+              "tried to get a undef u32 location");
   }
 
   // we are tracking undefined memory at the byte level
@@ -206,7 +218,7 @@ function test_undefined() {
     assert(1, checker.getBadUndefined().length,
           "now bad");
     assertTrue(isIn(z, checker.getBadUndefined()),
-              "tried to get a bad memory location");
+              "tried to get a undef u8 location");
   }
   
   print("running undefined tests (gets of allocated but undefined memory)...");
@@ -235,7 +247,9 @@ function test_frees() {
     assert(1, checker.getBadFrees().length,
           "only had one bad access");
     assertTrue(isIn(x, checker.getBadFrees()),
-              "tried to get a bad memory location");
+              "tried to free unalloced memory");
+    let trace = checker.getBadFrees()[0].trace;
+    assertTrue(trace[trace.length-1].indexOf("badFree") !== -1);
   }
   
   function doubleFree() {
@@ -246,7 +260,7 @@ function test_frees() {
     assert(1, checker.getBadFrees().length,
           "only had one bad access");
     assertTrue(isIn(x, checker.getBadFrees()),
-              "tried to get a bad memory location");
+              "tried to double free");
   }
   
   print("running free tests (double frees, or general frees of unalloced memory)...");
@@ -266,10 +280,12 @@ function test_leak() {
   function int leak() {
     let int *x = new int;
     
-    assert(1, checker.getLeaks().length,
+    assert(checker.getLeaks().length, 1,
           "only had one leak ");
     assertTrue(isIn(x, checker.getLeaks()),
               "leaked an int");
+    let trace = checker.getLeaks()[0].trace;
+    assertTrue(trace[trace.length-1].indexOf("leak") !== -1);
   }
 
   function leakLoop() {

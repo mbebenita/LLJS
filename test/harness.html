@@ -9,9 +9,13 @@
 
 
 <script id="test" type="text/lljs">
-  let int x = 4;
-  let float y = 10;
-  x + y;
+function foo(a) {
+  let x = function () {
+    return 42;
+  };
+  
+  return "foo";
+}
 </script>
 
 <script type="text/JavaScript">
@@ -27,6 +31,7 @@
     var code = escodegen.generate(node, {base: "", indent: "  ", comment: true});
     console.log(code);
   }
+  main();
 </script>
 
 <p>Here we go</p>
