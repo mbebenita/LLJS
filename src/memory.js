@@ -3,7 +3,7 @@
   var NODE_JS = 1;
   var JS_SHELL = 2;
   var BROWSER = 3;
-  var enable_memcheck = true;
+  var enable_memcheck = false;
   var mode;
   if (typeof process !== 'undefined') {
     mode = NODE_JS;
@@ -16,8 +16,10 @@
   if (mode === NODE_JS) {
     print = console.log;
     ck = require('memcheck');
-  } else {
+  } else if (mode === JS_SHELL) {
     ck = (load('memcheck.js'), memcheck);
+  } else {
+    ck = memcheck;
   }
   const MB = 1024 * 1024 | 0;
   const WORD_SIZE = 4;
@@ -105,31 +107,36 @@
     }
     return false;
   }
+  var inMemory = false;
+  function setInMemory(val) {
+    if (enable_memcheck) {
+      inMemory = val;
+    }
+  }
   function shadowMemory(mem, memsize) {
     var handler = makeIdHandler(mem);
     // override the identity get/set handlers
     handler.get = function (receiver, name) {
       var loc = parseInt(name, 10) << (memsize >> 1);
       // malloc/free can get/set unallocated memory
-      if (!isMemFn(handler.get.caller)) {
+      if (!inMemory) {
         if (!ck.isAddressable(loc)) {
           ck.addBadAccessError(loc);
         }
-        if (!ck.isValid(loc)) {
+        if (!ck.isDefined(loc)) {
           ck.addUndefinedError(loc);
         }
       }
       return mem[name];
     };
     handler.set = function (receiver, name, val) {
-      // let byte *loc = (byte *) (parseInt(name, 10));
       var loc = parseInt(name, 10) << (memsize >> 1);
       // memory functions should be able to set unallocated addresses
-      if (!isMemFn(handler.set.caller)) {
+      if (!inMemory) {
         if (!ck.isAddressable(loc)) {
           ck.addBadAccessError(loc);
         }
-        ck.setValid(loc, memsize, true);
+        ck.setDefined(loc, memsize, true);
       }
       mem[name] = val;
       return true;
@@ -137,9 +144,10 @@
     return Proxy.create(handler);
   }
   function reset() {
+    setInMemory(true);
     var M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
     if (enable_memcheck) {
-      ck.reset();
+      ck.reset(SIZE * WORD_SIZE);
       exports.U1 = shadowMemory(new Uint8Array(M), 1);
       exports.I1 = shadowMemory(new Int8Array(M), 1);
       exports.U2 = shadowMemory(new Uint16Array(M), 2);
@@ -162,6 +170,7 @@
     exports.U4[1] = SIZE;
     base = 2;
     freep = 0;
+    setInMemory(false);
   }
   reset();
   function sbrk(nBytes) {
@@ -184,6 +193,7 @@
     if (buffer === 0) {
       return 0;
     }
+    // hacky way to let the proxy know not to record memory sets
     var header = buffer;
     $U4[header + 1] = nUnits;
     if (enable_memcheck) {
@@ -194,12 +204,14 @@
       ck.setAddressable(header + 1 * 2 << 2, nUnits, true);
     }
     free(header + 1 * 2 << 2);
+    setInMemory(true);
     return freep;
   }
   function malloc(nBytes) {
     const $U4 = $M.U4;
     var p = 0, prevp = 0;
     var nUnits = ((((nBytes + 8 | 0) - 1 | 0) / 8 | 0) + 1 | 0) >>> 0;
+    setInMemory(true);
     if ((prevp = freep) === 0) {
       $U4[base] = freep = prevp = base;
       $U4[base + 1] = 0;
@@ -219,25 +231,31 @@
           ck.setAddressable(p + 1 * 2 << 2, nBytes, true);
           ck.setAlloc(p + 1 * 2 << 2, true);
         }
+        setInMemory(false);
         return p + 1 * 2 << 2;
       }
       if (p === freep) {
         if ((p = morecore(nUnits)) === 0) {
+          setInMemory(false);
           return 0;
         }
       }
     }
+    setInMemory(false);
     return 0;
   }
   function free(ap) {
     const $U4 = $M.U4;
     var bp = (ap >> 2) - 1 * 2, p = 0;
     if (enable_memcheck) {
+      setInMemory(true);
       if (ck.isAlloc(ap)) {
         // this byte actually was malloced before, reset it
         ck.setAlloc(ap, false);
         // this memory chunk is no longer addressable
         ck.setAddressable(ap, $U4[bp + 1], false);
+        // this memory chunk is no longer defined
+        ck.setDefined(ap, $U4[bp + 1], false);
       } else {
         // this byte was never allocated, trying to free the wrong thing
         ck.addDoubleFreeError(ap);
@@ -261,6 +279,7 @@
       $U4[p] = bp;
     }
     freep = p;
+    setInMemory(false);
   }
   function makeIdHandler(obj) {
     return {
@@ -339,8 +358,9 @@
   exports.free = free;
   exports.set_memcheck = function (val) {
     enable_memcheck = val;
+    reset();
   };
-  exports.checker = ck;
+  exports.memcheck = ck;
   exports.memcheck_call_pop = ck.memcheck_call_pop;
   exports.memcheck_call_push = ck.memcheck_call_push;
 }.call(this, typeof exports === 'undefined' ? memory = {} : exports));

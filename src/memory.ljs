@@ -18,11 +18,13 @@ extern snarf;
 extern Error;
 extern print;
 
+extern throwError;
+
 let NODE_JS = 1;
 let JS_SHELL = 2;
 let BROWSER = 3;
 
-let enable_memcheck = true;
+let enable_memcheck = false;
 
 let mode;
 if (typeof process !== "undefined") {
@@ -37,9 +39,12 @@ let ck;
 if (mode === NODE_JS) {
   print = console.log;
   ck = require('memcheck');
-} else {
+} else if (mode === JS_SHELL) {
   ck = (load('memcheck.js'), memcheck);
+} else {
+  ck = memcheck;
 }
+
 
 const MB = 1024 * 1024;
 const WORD_SIZE = sizeof(word);
@@ -130,31 +135,35 @@ function  isMemFn(fn) {
   return false;
 }
 
+let inMemory = false;
+function setInMemory(val) {
+  if(enable_memcheck) { inMemory = val;}
+}
+
 function shadowMemory(mem, uint memsize) {
   let handler = makeIdHandler(mem);
   // override the identity get/set handlers
   handler.get = function(receiver, name) {
     let byte *loc = (byte *) ((parseInt(name, 10)) << (memsize >> 1)) ;
     // malloc/free can get/set unallocated memory
-    if(!isMemFn(handler.get.caller)) {
+    if(!inMemory) {
       if(!ck.isAddressable(loc)) {
         ck.addBadAccessError(loc);
       }
-      if(!ck.isValid(loc)) {
+      if(!ck.isDefined(loc)) {
         ck.addUndefinedError(loc);
       }
     }
     return mem[name];
   };
   handler.set = function(receiver, name, val) {
-    // let byte *loc = (byte *) (parseInt(name, 10));
     let byte *loc = (byte *) ((parseInt(name, 10)) << (memsize >> 1)) ;
     // memory functions should be able to set unallocated addresses
-    if(!isMemFn(handler.set.caller)) {
+    if(!inMemory) {
       if(!ck.isAddressable(loc)) {
         ck.addBadAccessError(loc);
       }
-      ck.setValid(loc, memsize, true);
+      ck.setDefined(loc, memsize, true);
     }
     mem[name] = val;
     return true;
@@ -163,9 +172,10 @@ function shadowMemory(mem, uint memsize) {
 }
 
 function reset() {
+  setInMemory(true);
   let M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
   if(enable_memcheck) {
-    ck.reset();
+    ck.reset(SIZE * WORD_SIZE);
     exports.U1 = shadowMemory(new Uint8Array(M), sizeof(u8));
     exports.I1 = shadowMemory(new Int8Array(M), sizeof(i8));
     exports.U2 = shadowMemory(new Uint16Array(M), sizeof(u16));
@@ -185,12 +195,13 @@ function reset() {
     exports.F8 = new Float64Array(M);
   }
   
-  
   exports.U4[0] = 4;
   exports.U4[1] = SIZE;
 
   base = (Header *)(2);
   freep = null;
+  
+  setInMemory(false);
 }
 
 reset();
@@ -217,8 +228,11 @@ function Header *morecore(uint nUnits) {
   if (buffer === null) {
     return null;
   }
+  
+  // hacky way to let the proxy know not to record memory sets
   let Header *header = (Header *)(buffer);
   header->size = nUnits;
+  
   if(enable_memcheck) {
     // prevent double free recording on morecore
     ck.setAlloc((byte *) (header + 1), true) 
@@ -227,6 +241,7 @@ function Header *morecore(uint nUnits) {
     ck.setAddressable((byte *) (header + 1), nUnits, true);
   }
   free(header + 1);
+  setInMemory(true);
   return freep;
 }
 
@@ -234,6 +249,7 @@ function byte *malloc(int nBytes) {
   let Header *p, *prevp;
   let uint nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
 
+  setInMemory(true);
   if ((prevp = freep) === null) {
     base->next = freep = prevp = base;
     base->size = 0;
@@ -254,25 +270,33 @@ function byte *malloc(int nBytes) {
         ck.setAddressable((byte *) (p+1), nBytes, true);
         ck.setAlloc((byte *) (p+1), true);
       }
+      setInMemory(false);
       return p + 1;
     }
     if (p === freep) {
+      
       if ((p = morecore(nUnits)) === null) {
+        setInMemory(false);
         return null;
       }
     }
   }
+  setInMemory(false);
   return null;
 }
+
 
 function void free(byte *ap) {
   let Header *bp = (Header *)(ap) - 1, *p;
   if(enable_memcheck) {
+    setInMemory(true);
     if(ck.isAlloc(ap)) {
       // this byte actually was malloced before, reset it
       ck.setAlloc(ap, false);
       // this memory chunk is no longer addressable
       ck.setAddressable(ap, bp->size, false);
+      // this memory chunk is no longer defined
+      ck.setDefined(ap, bp->size, false);
     } else {
       // this byte was never allocated, trying to free the wrong thing
       ck.addDoubleFreeError(ap);
@@ -296,6 +320,7 @@ function void free(byte *ap) {
     p->next = bp;
   }
   freep = p;
+  setInMemory(false);
 }
 
 
@@ -367,7 +392,8 @@ exports.free = free;
 
 exports.set_memcheck = function(val) {
   enable_memcheck = val;
+  reset();
 };
-exports.checker = ck;
+exports.memcheck = ck;
 exports.memcheck_call_pop = ck.memcheck_call_pop;
 exports.memcheck_call_push = ck.memcheck_call_push;

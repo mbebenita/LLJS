@@ -185,7 +185,8 @@ if (typeof print === "undefined") {
 function double run() {
   let double res;
 
-  for (let int n = 3; n <= 24; n *= 2) {
+  // for (let int n = 3; n <= 24; n *= 2) {
+  for (let int n = 3; n <= 12; n *= 2) {
     let bodies = new NBodySystem();
     let int max = n * 100;
 
@@ -209,3 +210,7 @@ if (res - (-0.1690693) < 0.00001)
    print("metric time " + elapsed);
 else
    print("error nbody result expecting -0.1690693 got " + res);
+
+
+extern memory;
+// print(memory.memcheck.report());

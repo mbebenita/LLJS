@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <title>Test harness</title>
+<!--
 <script src="../src/esprima.js"></script>
 <script src="../src/escodegen.js"></script>
 <script src="../src/estransform.js"></script>
 <script src="../src/util.js"></script>
 <script src="../src/compiler.js"></script>
+-->
 
+<script src="../build/sm/memcheck.js"></script>
+<script src="../build/sm/memory.js"></script>
+<script src="../build/sm/access-nbody-memcheck.js"></script>
 
 
 <script id="test" type="text/lljs">
@@ -31,7 +36,6 @@ function foo(a) {
     var code = escodegen.generate(node, {base: "", indent: "  ", comment: true});
     console.log(code);
   }
-  main();
 </script>
 
 <p>Here we go</p>

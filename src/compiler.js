@@ -1660,11 +1660,9 @@
       body.push(new VariableDeclaration("const", [mdecl]));
       // todo: broken just like above
       if(name !== "memory") {
-        var memcheckval;
-        memcheck ? memcheckval = true : memcheckval = false;
         body.push(new ExpressionStatement(
           new CallExpression(new MemberExpression(cachedMEMORY, new Identifier("set_memcheck")), 
-                             [new Literal(memcheckval)])));
+                             [new Literal(memcheck)])));
       }
       
     }

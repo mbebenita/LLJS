@@ -42,11 +42,10 @@ struct Node {
 function isIn(byte *x, l) {
   return l.some(function(el, idx) {
     return el.membyte === x;
-  })
-         
+  });
 }
 
-let checker = m.checker;
+let checker = m.memcheck;
 
 function test_access() {
   function badGetU8() {
@@ -139,6 +138,16 @@ function test_access() {
               "tried to get a unalloced u8 pointer");
   }
 
+  function getAfterDelete() {
+    let u8 *x = new u8;
+    delete x;
+    *x
+    assert(1, checker.getBadAccesses().length,
+          "only had one bad access");
+    assertTrue(isIn(x, checker.getBadAccesses()),
+              "tried to get a unalloced u8 pointer");
+  }
+
   print("running bad access tests (gets/sets of unallocated memory)...");
   
   m.reset();
@@ -158,6 +167,9 @@ function test_access() {
   
   m.reset();
   getMultiple();
+  
+  m.reset();
+  getAfterDelete();
   
   print("done");
   m.reset();

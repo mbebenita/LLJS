@@ -5,6 +5,9 @@ extern snarf;
 extern process;
 extern newGlobal;
 extern setDebug;
+extern ArrayBuffer;
+extern Uint8Array;
+extern Uint32Array;
 
 
 let NODE_JS = 1;
@@ -28,14 +31,22 @@ if (mode === NODE_JS) {
 
 let memcheck = {}; 
 
-function reset() {
+// The shadow memory (SM) is a typed array with a corresponding U1
+// view that holds a addresssable/defined flag (FLAG_ACC and FLAG_DEF)
+// for each byte of main memory.
+let u8 FLAG_ACC = 0x1;
+let u8 FLAG_DEF = 0x2;
+
+let SM;
+let viewSM;
+
+function reset(memSize) {
+  SM = new ArrayBuffer(memSize);
+  viewSM = new Uint8Array(SM);
+  
   memcheck = {
     // {byte* => [bool, str]}
     used: [],
-    // {byte* => bool}
-    addressable: [],
-    // {byte* => bool}
-    valid: [],
     errors: {
       // [byte*]
       double_free: [],
@@ -47,29 +58,53 @@ function reset() {
   };
 }
 
+function setFlag(byte *idx, uint size, uint mask) {
+  for (let uint i = 0; i < size; i++) {
+    viewSM[idx + i] |= mask;
+  }
+}
+
+function clearFlag(byte *idx, uint size, uint mask) {
+  for (let uint i = 0; i < size; i++) {
+    viewSM[idx + i] &= ~mask;
+  }
+}
+
+
 // (byte, uint, bool) -> unit
-function setAddressable(byte *bt, uint size, value) {
-  for (let i = 0; i < size; i++) {
-    memcheck.addressable[bt + (byte *)(i)] = value;
+function setAddressable(byte *bt, uint size, on) {
+  if(on) {
+    setFlag(bt, size, FLAG_ACC);
+  } else {
+    clearFlag(bt, size, FLAG_ACC);
   }
 }
 
 // (byte) -> bool
 function isAddressable(byte *bt) {
-  return memcheck.addressable[bt] === true;
+  if(viewSM[bt] & FLAG_ACC) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 // (byte, uint, bool) -> unit
-function setValid(byte *bt, uint size, value) {
-  // debugger;
-  for (let i = 0; i < size; i++) {
-    memcheck.valid[bt + (byte *) (i)] = value;
+function setDefined(byte *bt, uint size, on) {
+  if(on) {
+    setFlag(bt, size, FLAG_DEF);
+  } else {
+    clearFlag(bt, size, FLAG_DEF);
   }
 }
 
 // (byte) -> bool
-function isValid(byte *bt) {
-  return memcheck.valid[bt];
+function isDefined(byte *bt) {
+  if(viewSM[bt] & FLAG_DEF) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 // (byte, bool) -> unit
@@ -150,17 +185,28 @@ function getCallstack() {
 
 // unit -> str
 function report() {
-  let frees = "Double frees at memory location: " + memcheck.errors.double_free;
-  let access = "Bad access at memory location: " + memcheck.errors.bad_access;
-  let undef = "Undefined access at memory location: " + memcheck.errors.undef_access;
-  let leaks = "Leaks at: " + getLeaks();
-  return [frees, access, undef, leaks].join("\n");
+  function fmtLeaks(leaks) {
+    return leaks.map(function(val, idx) {
+      return val.membyte + " allocated at:\n" + val.trace.join("\n");
+    }).join("\n");
+  }
+  function fmtAccess(acc) {
+    return acc.slice(0, 10).map(function(val, idx) {
+      return val.membyte + " allocated at:\n" + val.trace.join("\n");
+    }).join("\n")
+  }
+  
+  let leaks = "Leaks found:\n" + fmtLeaks(getLeaks());
+  let access = "Access of unallocaed memory:\n" + fmtAccess(getBadAccesses());
+  let undef = "Undefined access at memory location: " + memcheck.errors.undef_access.length;
+  let frees = "Frees: " + memcheck.errors.double_free.length;
+  return [leaks, access, undef, frees].join("\n");
 }
 
 exports.setAddressable = setAddressable;
 exports.isAddressable = isAddressable;
-exports.setValid = setValid;
-exports.isValid = isValid;
+exports.setDefined = setDefined;
+exports.isDefined = isDefined;
 exports.setAlloc = setAlloc;
 exports.isAlloc = isAlloc;
 

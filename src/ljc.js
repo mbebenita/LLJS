@@ -128,8 +128,6 @@
     var options = p.options;
     var files = p.rest;
 
-    print(options);
-
     if (!files.length || options.help) {
       print("ljc: [option(s)] file");
       print(optparser.usage());
