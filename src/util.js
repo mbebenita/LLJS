@@ -35,8 +35,7 @@
       var longs = this.longs = {};
       var shorts = this.shorts = {};
       this.spec = flatspec.map(function (s) {
-        var o = { name: s[1], short: s[0], default: s[2], help: s[3],
-                  countable: typeof s[2] === "number" };
+        var o = { name: s[1], short: s[0], default: s[2], help: s[3] };
         if (s[1]) {
           longs[s[1]] = o;
         }
@@ -56,6 +55,10 @@
     }
 
     OptParser.prototype = {
+      // Count options whose default value is a number, and swallow up
+      // following argument of options whose default value is a
+      // string.
+      //
       // The regexps are lifted from node-optimist [1],
       // Copyright (c) 2010 James Halliday, MIT license.
       //
@@ -89,33 +92,38 @@
               error("unknown option --" + match[1]);
               return null;
             }
-            if (argv[i + 1] && argv[i + 1].charAt(0) !== "-") {
+            var lspec = this.longs[match[1]];
+            if (typeof lspec.default === "number") {
+              if (!opts[match[1]]) {
+                opts[match[1]] = 1;
+              } else {
+                opts[mathc[1]]++;
+              }
+            } else if (typeof lspec.default === "string" &&
+                     (argv[i + 1] && argv[i + 1].charAt(0) !== "-")) {
               opts[match[1]] = argv[i + 1];
               i++;
             } else {
-              if (!opts[match[1]]) {
-                opts[match[1]] = 1;
-              }
-              opts[match[1]]++;
+              opts[match[1]] = true;
             }
           } else if (arg.match(/^-[^-]+/)) {
             var sspec;
             match = arg.match(/^-(.+)/);
             if (sspec = this.shorts[match[1]]) {
               var optname = sspec.name ? sspec.name : match[1];
-              if (sspec.countable) {
+
+              if (typeof sspec.default === "number") {
                 if (!opts[optname]) {
                   opts[optname] = 1;
                 } else {
                   opts[optname]++;
                 }
+              } else if (typeof sspec.default === "string" &&
+                         (argv[i + 1] && argv[i + 1].charAt(0) !== "-")) {
+                opts[optname] = argv[i + 1];
+                i++;
               } else {
-                if (argv[i + 1] && argv[i + 1].charAt(0) !== "-") {
-                  opts[optname] = argv[i + 1];
-                  i++;
-                } else {
-                  opts[optname] = true;
-                }
+                opts[optname] = true;
               }
             } else {
               var letters = arg.slice(1).split('');
@@ -125,7 +133,7 @@
                   error("unknown option -" + letters[j]);
                   return null;
                 }
-                if (sspec.countable) {
+                if (typeof sspec.default === "number") {
                   if (!opts[sspec.name]) {
                     opts[sspec.name] = 1;
                   } else {
