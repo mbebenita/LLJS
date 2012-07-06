@@ -35,7 +35,8 @@
       var longs = this.longs = {};
       var shorts = this.shorts = {};
       this.spec = flatspec.map(function (s) {
-        var o = { name: s[1], short: s[0], default: s[2], help: s[3] };
+        var o = { name: s[1], short: s[0], default: s[2], help: s[3],
+                  countable: typeof s[2] === "number" };
         if (s[1]) {
           longs[s[1]] = o;
         }
@@ -60,6 +61,7 @@
       //
       // [1] https://github.com/substack/node-optimist
       parse: function (argv) {
+        var error = (typeof console === "undefined") ? print : console.error;
         var spec = this.spec;
         var opts = {};
         var argc = argv.length;
@@ -101,10 +103,20 @@
             match = arg.match(/^-(.+)/);
             if (sspec = this.shorts[match[1]]) {
               var optname = sspec.name ? sspec.name : match[1];
-              if (!opts[optname]) {
-                opts[optname] = 1;
+              if (sspec.countable) {
+                if (!opts[optname]) {
+                  opts[optname] = 1;
+                } else {
+                  opts[optname]++;
+                }
+              } else {
+                if (argv[i + 1] && argv[i + 1].charAt(0) !== "-") {
+                  opts[optname] = argv[i + 1];
+                  i++;
+                } else {
+                  opts[optname] = true;
+                }
               }
-              opts[optname]++;
             } else {
               var letters = arg.slice(1).split('');
               for (var j = 0, k = letters.length; j < k; j++) {
@@ -113,16 +125,21 @@
                   error("unknown option -" + letters[j]);
                   return null;
                 }
-                if (!opts[sspec.name]) {
-                  opts[sspec.name] = 1;
+                if (sspec.countable) {
+                  if (!opts[sspec.name]) {
+                    opts[sspec.name] = 1;
+                  } else {
+                    opts[sspec.name]++;
+                  }
+                } else {
+                  opts[sspec.name] = true;
                 }
-                opts[sspec.name]++;
               }
             }
-          } else {
-            finished = i;
           }
         }
+
+        finished = i;
 
         for (var i = 0, j = spec.length; i < j; i++) {
           var s = spec[i];
