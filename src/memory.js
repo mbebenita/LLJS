@@ -3,6 +3,7 @@
   var NODE_JS = 1;
   var JS_SHELL = 2;
   var BROWSER = 3;
+  var enable_memcheck = true;
   var mode;
   if (typeof process !== 'undefined') {
     mode = NODE_JS;
@@ -26,7 +27,6 @@
   // debug
   var log = function () {
   };
-  // let log = console.log;
   // let I4, U4;
   /*
    +---------------+ -
@@ -138,15 +138,26 @@
   }
   function reset() {
     var M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
-    ck.reset();
-    exports.U1 = shadowMemory(new Uint8Array(M), 1);
-    exports.I1 = shadowMemory(new Int8Array(M), 1);
-    exports.U2 = shadowMemory(new Uint16Array(M), 2);
-    exports.I2 = shadowMemory(new Int16Array(M), 2);
-    exports.U4 = shadowMemory(new Uint32Array(M), 4);
-    exports.I4 = shadowMemory(new Int32Array(M), 4);
-    exports.F4 = shadowMemory(new Float32Array(M), 4);
-    exports.F8 = shadowMemory(new Float64Array(M), 8);
+    if (enable_memcheck) {
+      ck.reset();
+      exports.U1 = shadowMemory(new Uint8Array(M), 1);
+      exports.I1 = shadowMemory(new Int8Array(M), 1);
+      exports.U2 = shadowMemory(new Uint16Array(M), 2);
+      exports.I2 = shadowMemory(new Int16Array(M), 2);
+      exports.U4 = shadowMemory(new Uint32Array(M), 4);
+      exports.I4 = shadowMemory(new Int32Array(M), 4);
+      exports.F4 = shadowMemory(new Float32Array(M), 4);
+      exports.F8 = shadowMemory(new Float64Array(M), 8);
+    } else {
+      exports.U1 = new Uint8Array(M);
+      exports.I1 = new Int8Array(M);
+      exports.U2 = new Uint16Array(M);
+      exports.I2 = new Int16Array(M);
+      exports.U4 = new Uint32Array(M);
+      exports.I4 = new Int32Array(M);
+      exports.F4 = new Float32Array(M);
+      exports.F8 = new Float64Array(M);
+    }
     exports.U4[0] = 4;
     exports.U4[1] = SIZE;
     base = 2;
@@ -175,11 +186,13 @@
     }
     var header = buffer;
     $U4[header + 1] = nUnits;
-    // prevent double free recording on morecore
-    ck.setAlloc(header + 1 * 2 << 2, true);
-    // setting all the user addressable bytes as addressable in the
-    // shadow memory
-    ck.setAddressable(header + 1 * 2 << 2, nUnits, true);
+    if (enable_memcheck) {
+      // prevent double free recording on morecore
+      ck.setAlloc(header + 1 * 2 << 2, true);
+      // setting all the user addressable bytes as addressable in the
+      // shadow memory
+      ck.setAddressable(header + 1 * 2 << 2, nUnits, true);
+    }
     free(header + 1 * 2 << 2);
     return freep;
   }
@@ -201,9 +214,11 @@
           $U4[p + 1] = nUnits;
         }
         freep = prevp;
-        // record that this chunck of memory can be addressed
-        ck.setAddressable(p + 1 * 2 << 2, nBytes, true);
-        ck.setAlloc(p + 1 * 2 << 2, true);
+        if (enable_memcheck) {
+          // record that this chunck of memory can be addressed
+          ck.setAddressable(p + 1 * 2 << 2, nBytes, true);
+          ck.setAlloc(p + 1 * 2 << 2, true);
+        }
         return p + 1 * 2 << 2;
       }
       if (p === freep) {
@@ -217,14 +232,16 @@
   function free(ap) {
     const $U4 = $M.U4;
     var bp = (ap >> 2) - 1 * 2, p = 0;
-    if (ck.isAlloc(ap)) {
-      // this byte actually was malloced before, reset it
-      ck.setAlloc(ap, false);
-      // this memory chunk is no longer addressable
-      ck.setAddressable(ap, $U4[bp + 1], false);
-    } else {
-      // this byte was never allocated, trying to free the wrong thing
-      ck.addDoubleFreeError(ap);
+    if (enable_memcheck) {
+      if (ck.isAlloc(ap)) {
+        // this byte actually was malloced before, reset it
+        ck.setAlloc(ap, false);
+        // this memory chunk is no longer addressable
+        ck.setAddressable(ap, $U4[bp + 1], false);
+      } else {
+        // this byte was never allocated, trying to free the wrong thing
+        ck.addDoubleFreeError(ap);
+      }
     }
     for (p = freep; !(bp > p && bp < $U4[p]); p = $U4[p]) {
       if (p >= $U4[p] && (bp > p || bp < $U4[p])) {
@@ -320,6 +337,9 @@
   exports.memset4 = memset4;
   exports.malloc = malloc;
   exports.free = free;
+  exports.set_memcheck = function (val) {
+    enable_memcheck = val;
+  };
   exports.checker = ck;
   exports.memcheck_call_pop = ck.memcheck_call_pop;
   exports.memcheck_call_push = ck.memcheck_call_push;

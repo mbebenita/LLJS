@@ -22,6 +22,8 @@ let NODE_JS = 1;
 let JS_SHELL = 2;
 let BROWSER = 3;
 
+let enable_memcheck = true;
+
 let mode;
 if (typeof process !== "undefined") {
   mode = NODE_JS;
@@ -47,7 +49,6 @@ const HEAP_SIZE = SIZE - STACK_SIZE;
 
 // debug
 let log = function() { };
-// let log = console.log;
 
 // let I4, U4;
 
@@ -163,16 +164,27 @@ function shadowMemory(mem, uint memsize) {
 
 function reset() {
   let M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
-  ck.reset();
+  if(enable_memcheck) {
+    ck.reset();
+    exports.U1 = shadowMemory(new Uint8Array(M), sizeof(u8));
+    exports.I1 = shadowMemory(new Int8Array(M), sizeof(i8));
+    exports.U2 = shadowMemory(new Uint16Array(M), sizeof(u16));
+    exports.I2 = shadowMemory(new Int16Array(M), sizeof(i16));
+    exports.U4 = shadowMemory(new Uint32Array(M), sizeof(u32));
+    exports.I4 = shadowMemory(new Int32Array(M), sizeof(i32));
+    exports.F4 = shadowMemory(new Float32Array(M), sizeof(f32));
+    exports.F8 = shadowMemory(new Float64Array(M), sizeof(f64));
+  } else {
+    exports.U1 = new Uint8Array(M);
+    exports.I1 = new Int8Array(M);
+    exports.U2 = new Uint16Array(M);
+    exports.I2 = new Int16Array(M);
+    exports.U4 = new Uint32Array(M);
+    exports.I4 = new Int32Array(M);
+    exports.F4 = new Float32Array(M);
+    exports.F8 = new Float64Array(M);
+  }
   
-  exports.U1 = shadowMemory(new Uint8Array(M), sizeof(u8));
-  exports.I1 = shadowMemory(new Int8Array(M), sizeof(i8));
-  exports.U2 = shadowMemory(new Uint16Array(M), sizeof(u16));
-  exports.I2 = shadowMemory(new Int16Array(M), sizeof(i16));
-  exports.U4 = shadowMemory(new Uint32Array(M), sizeof(u32));
-  exports.I4 = shadowMemory(new Int32Array(M), sizeof(i32));
-  exports.F4 = shadowMemory(new Float32Array(M), sizeof(f32));
-  exports.F8 = shadowMemory(new Float64Array(M), sizeof(f64));
   
   exports.U4[0] = 4;
   exports.U4[1] = SIZE;
@@ -207,11 +219,13 @@ function Header *morecore(uint nUnits) {
   }
   let Header *header = (Header *)(buffer);
   header->size = nUnits;
-  // prevent double free recording on morecore
-  ck.setAlloc((byte *) (header + 1), true) 
-  // setting all the user addressable bytes as addressable in the
-  // shadow memory
-  ck.setAddressable((byte *) (header + 1), nUnits, true);
+  if(enable_memcheck) {
+    // prevent double free recording on morecore
+    ck.setAlloc((byte *) (header + 1), true) 
+    // setting all the user addressable bytes as addressable in the
+    // shadow memory
+    ck.setAddressable((byte *) (header + 1), nUnits, true);
+  }
   free(header + 1);
   return freep;
 }
@@ -235,9 +249,11 @@ function byte *malloc(int nBytes) {
         p->size = nUnits;
       }
       freep = prevp;
-      // record that this chunck of memory can be addressed
-      ck.setAddressable((byte *) (p+1), nBytes, true);
-      ck.setAlloc((byte *) (p+1), true);
+      if(enable_memcheck) {
+        // record that this chunck of memory can be addressed
+        ck.setAddressable((byte *) (p+1), nBytes, true);
+        ck.setAlloc((byte *) (p+1), true);
+      }
       return p + 1;
     }
     if (p === freep) {
@@ -251,14 +267,16 @@ function byte *malloc(int nBytes) {
 
 function void free(byte *ap) {
   let Header *bp = (Header *)(ap) - 1, *p;
-  if(ck.isAlloc(ap)) {
-    // this byte actually was malloced before, reset it
-    ck.setAlloc(ap, false);
-    // this memory chunk is no longer addressable
-    ck.setAddressable(ap, bp->size, false);
-  } else {
-    // this byte was never allocated, trying to free the wrong thing
-    ck.addDoubleFreeError(ap);
+  if(enable_memcheck) {
+    if(ck.isAlloc(ap)) {
+      // this byte actually was malloced before, reset it
+      ck.setAlloc(ap, false);
+      // this memory chunk is no longer addressable
+      ck.setAddressable(ap, bp->size, false);
+    } else {
+      // this byte was never allocated, trying to free the wrong thing
+      ck.addDoubleFreeError(ap);
+    }
   }
   for (p = freep; !(bp > p && bp < p->next); p = p->next) {
     if (p >= p->next && (bp > p || bp < p->next)) {
@@ -282,7 +300,7 @@ function void free(byte *ap) {
 
 
 
-function   makeIdHandler(obj) {  
+function makeIdHandler(obj) {  
   return {  
     // Fundamental traps  
     getOwnPropertyDescriptor: function(name) {  
@@ -347,6 +365,9 @@ exports.memset4 = memset4;
 exports.malloc = malloc;
 exports.free = free;
 
+exports.set_memcheck = function(val) {
+  enable_memcheck = val;
+};
 exports.checker = ck;
 exports.memcheck_call_pop = ck.memcheck_call_pop;
 exports.memcheck_call_push = ck.memcheck_call_push;

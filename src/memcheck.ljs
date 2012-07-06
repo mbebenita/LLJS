@@ -11,6 +11,7 @@ let NODE_JS = 1;
 let JS_SHELL = 2;
 let BROWSER = 3;
 
+
 let mode;
 if (typeof process !== "undefined") {
   mode = NODE_JS;

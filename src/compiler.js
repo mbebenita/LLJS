@@ -1641,7 +1641,7 @@
     return new CallExpression(new Identifier("require"), [new Literal(name)]);
   }
 
-  function createModule(program, name, bare, loadInstead) {
+  function createModule(program, name, bare, loadInstead, memcheck) {
     var body = [];
     var cachedMEMORY = program.frame.cachedMEMORY;
     if (cachedMEMORY) {
@@ -1658,6 +1658,15 @@
         mdecl = new VariableDeclarator(cachedMEMORY, createRequire("memory"));
       }
       body.push(new VariableDeclaration("const", [mdecl]));
+      // todo: broken just like above
+      if(name !== "memory") {
+        var memcheckval;
+        memcheck ? memcheckval = true : memcheckval = false;
+        body.push(new ExpressionStatement(
+          new CallExpression(new MemberExpression(cachedMEMORY, new Identifier("set_memcheck")), 
+                             [new Literal(memcheckval)])));
+      }
+      
     }
 
     if (bare) {
@@ -1711,7 +1720,7 @@
     // Pass 4.
     node = node.lower(o);
 
-    return T.flatten(createModule(node, name, options.bare, options["load-instead"]));
+    return T.flatten(createModule(node, name, options.bare, options["load-instead"], options.memcheck));
   }
 
   exports.compile = compile;
