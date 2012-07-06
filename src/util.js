@@ -139,7 +139,7 @@
           }
         }
 
-        finished = i;
+        finished = i - 1;
 
         for (var i = 0, j = spec.length; i < j; i++) {
           var s = spec[i];
