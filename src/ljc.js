@@ -116,7 +116,7 @@
       ["Wconversion",  null,          false, "Print intra-integer and pointer conversion warnings"],
       ["0",           "simple-log",   false, "Log simple messages. No colors and snippets."],
       ["t",           "trace",        false, "Trace compiler execution"],
-      ["o",           "output",       false, "Output file name"],
+      ["o",           "output",       "",    "Output file name"],
       ["h",           "help",         false, "Print this message"]
     ]);
 
@@ -127,8 +127,6 @@
 
     var options = p.options;
     var files = p.rest;
-
-    print(options);
 
     if (!files.length || options.help) {
       print("ljc: [option(s)] file");
