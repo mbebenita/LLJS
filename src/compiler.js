@@ -1069,9 +1069,16 @@
 
   NewExpression.prototype.transform = function (o) {
     var ty;
+    
     if (this.callee instanceof Identifier && this.arguments.length === 0 &&
         (ty = o.types[this.callee.name])) {
       var alloc = new CallExpression(o.scope.MALLOC(), [cast(new Literal(ty.size), u32ty)], this.loc);
+      return cast(alloc.transform(o), new PointerType(ty));
+    } else if (this.callee instanceof MemberExpression &&
+               this.callee.computed &&
+               (ty = o.types[this.callee.object.name])) {
+      var size = new BinaryExpression("*", new Literal(ty.size), this.callee.property, this.loc);
+      var alloc = new CallExpression(o.scope.MALLOC(), [cast(size, u32ty)], this.loc);
       return cast(alloc.transform(o), new PointerType(ty));
     }
     return Node.prototype.transform.call(this, o);
