@@ -117,7 +117,8 @@
       ["0",           "simple-log",   false, "Log simple messages. No colors and snippets."],
       ["t",           "trace",        false, "Trace compiler execution"],
       ["o",           "output",       "",    "Output file name"],
-      ["h",           "help",         false, "Print this message"]
+      ["h",           "help",         false, "Print this message"],
+      ["w",           "nowarn",       false, "Inhibit all warning messages"]
     ]);
 
     var p = optparser.parse(argv);
@@ -172,6 +173,10 @@
         options.warn = true;
         break;
       }
+    }
+
+    if(options.nowarn) {
+      options.warn = false;
     }
 
     var logger = new util.Logger("ljc", logName, source, options);
