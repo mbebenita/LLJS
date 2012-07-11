@@ -654,7 +654,9 @@
     for (var i = 0, j = aliases.length; i < j; i++) {
       ty = types[aliases[i]];
       logger.push(ty.node);
-      ty.resolve(types).lint();
+      ty = ty.resolve(types);
+      ty.lint();
+      types[aliases[i]] = ty;
       logger.pop();
     }
 
