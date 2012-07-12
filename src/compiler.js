@@ -516,7 +516,9 @@
 
   T.Type.prototype.reflect = function (o) {
     var ty = this.construct().resolve(o.types);
-    ty.lint();
+    if (ty !== undefined) {
+      ty.lint();
+    }
     return ty;
   };
 
