@@ -1090,9 +1090,6 @@
     var lty = this.consequent.ty;
     var rty = this.alternate.ty;
 
-    print(lty);
-    print(rty);
-
     if (typeof lty === "undefined" || typeof rty === "undefined") {
       return this;
     }
