@@ -660,6 +660,10 @@
     for (var i = 0, j = fields.length; i < j; i++) {
       field = fields[i];
       type = field.type;
+      if (type.size === undefined) {
+        // inner type has no size yet, need to lint
+        type.lint();
+      }
       check(type, "cannot have untyped field");
       check(type.size, "cannot have fields of size 0 type " + quote(tystr(type, 0)));
 
