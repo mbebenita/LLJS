@@ -294,9 +294,9 @@ function test_leak() {
     
     assert(checker.getLeaks().length, 1,
           "only had one leak ");
-    assertTrue(isIn(x, checker.getLeaks()),
+    assert((byte *) (x), checker.getLeaks()[0][0],
               "leaked an int");
-    let trace = checker.getLeaks()[0].trace;
+    let trace = checker.getLeaks()[0][1];
     assertTrue(trace[trace.length-1].indexOf("leak") !== -1);
   }
 

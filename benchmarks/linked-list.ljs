@@ -80,8 +80,13 @@ for (let i = 0; i < 25; ++i) {
 }
 print("object with 4 extra properties " + dt / 25);
 
+let uint *x;
+*x
+
+let uint *leak = new uint;
 
 let m = memory
-if(m.memcheck) {
+if (m.memcheck.enabled){
+  print("\n")
   print(m.memcheck.report())
 }
