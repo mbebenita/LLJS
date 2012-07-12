@@ -160,6 +160,34 @@
     return null;
   };
 
+  function UnionType(name) {
+    this.name = name;
+    this.fields = [];
+    this.offset = 0;
+  }
+
+  UnionType.prototype.toString = function (lvl) {
+    lvl = lvl || 0;
+    if (lvl > 0) {
+      return this.name || "<anon union>";
+    }
+    var s = "union" + (this.name ? (" " + this.name) : " ") + " { ";
+    s += this.fields.map(function (f) {
+      return tystr(f.type, lvl + 1) + " " + f.name;
+    }).join("; ");
+    return s + " }";
+  };
+
+  UnionType.prototype.getField = function getField(name) {
+    var fields = this.fields;
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i].name === name) {
+        return fields[i];
+      }
+    }
+    return null;
+  };
+
   function PointerType(base) {
     this.base = base;
   };
@@ -256,7 +284,7 @@
   function Variable(name, type) {
     this.name = name;
     this.type = type;
-    this.isStackAllocated = type instanceof StructType;
+    this.isStackAllocated = type instanceof StructType || type instanceof UnionType;
   }
 
   Variable.prototype.toString = function () {
@@ -488,7 +516,9 @@
 
   T.Type.prototype.reflect = function (o) {
     var ty = this.construct().resolve(o.types);
-    ty.lint();
+    if (ty !== undefined) {
+      ty.lint();
+    }
     return ty;
   };
 
@@ -506,6 +536,15 @@
 
   T.StructType.prototype.construct = function () {
     var ty = new StructType(this.id ? this.id.name : undefined);
+    ty.node = this;
+    ty.fields = this.fields.map(function (f) {
+      return { name: f.id.name, type: f.decltype.construct() };
+    });
+    return ty;
+  };
+
+  T.UnionType.prototype.construct = function () {
+    var ty = new UnionType(this.id ? this.id.name : undefined);
     ty.node = this;
     ty.fields = this.fields.map(function (f) {
       return { name: f.id.name, type: f.decltype.construct() };
@@ -573,6 +612,23 @@
     return this;
   };
 
+  UnionType.prototype.resolve = function (types) {
+    if (this._resolved) {
+      return this;
+    }
+
+    startResolving(this);
+    var field, fields = this.fields;
+    for (var i = 0, j = fields.length; i < j; i++) {
+      field = fields[i];
+      if (field.type) {
+        field.type = field.type.resolve(types);
+      }
+    }
+    finishResolving(this);
+    return this;
+  };
+
   ArrowType.prototype.resolve = function (types) {
     if (this._resolved) {
       return this;
@@ -618,6 +674,27 @@
     this.align = maxAlignSizeType;
   };
 
+  UnionType.prototype.lint = function () {
+    var maxAlignSize = 1;
+    var maxAlignSizeType = u8ty;
+    var fields = this.fields
+    var field, type;
+    for (var i = 0, j = fields.length; i < j; i++) {
+      field = fields[i];
+      type = field.type;
+      check(type, "cannot have untyped field");
+      check(type.size, "cannot have fields of size 0 type " + quote(tystr(type, 0)));
+
+      if (type.align.size > maxAlignSize) {
+        maxAlignSize = type.align.size;
+        maxAlignSizeType = type.align;
+      }
+      field.offset = 0;
+    }
+    this.size = maxAlignSize;
+    this.align = maxAlignSizeType;
+  };
+
   ArrowType.prototype.lint = function () {
     var paramTypes = this.paramTypes;
     for (var i = 0, j = paramTypes.length; i < j; i++) {
@@ -638,14 +715,14 @@
       s = stmts[i];
       if (s instanceof TypeAliasDirective) {
         alias = s.alias.name;
-        if (s.original instanceof T.StructType && s.original.id) {
+        if ((s.original instanceof T.StructType || s.original instanceof UnionType) && s.original.id) {
           types[alias] = types[s.original.id.name] = s.original.construct();
           aliases.push(s.original.id.name);
         } else {
           types[alias] = s.original.construct();
         }
         aliases.push(alias);
-      } else if (s instanceof T.StructType && s.id) {
+      } else if ((s instanceof T.StructType || s instanceof T.UnionType) && s.id) {
         types[s.id.name] = s.construct();
         aliases.push(s.id.name);
       }
@@ -654,7 +731,9 @@
     for (var i = 0, j = aliases.length; i < j; i++) {
       ty = types[aliases[i]];
       logger.push(ty.node);
-      ty.resolve(types).lint();
+      ty = ty.resolve(types);
+      ty.lint();
+      types[aliases[i]] = ty;
       logger.pop();
     }
 
@@ -810,6 +889,10 @@
     return this === other;
   };
 
+  UnionType.prototype.assignableFrom = function (other) {
+    return this === other;
+  };
+
   PointerType.prototype.assignableFrom = function (other) {
     if (other instanceof PointerType || (other instanceof PrimitiveType && other.integral)) {
       return true;
@@ -824,14 +907,37 @@
 
     var paramTypes = this.paramTypes;
     var otherParamTypes = other.paramTypes;
-    if (otherParamTypes.length != paramTypes.length) {
-      return false;
-    }
 
     for (var i = 0, j = paramTypes.length; i < j; i++) {
-      if (!paramTypes[i].assignableFrom(otherParamTypes[i])) {
+      if (otherParamTypes.length <= i) {
+        if (paramTypes[i] !== undefined) {
+          // Other arrow has too few params, and this param isn't dyn
+          return false;
+        } else {
+          continue;
+        }
+      }
+
+      if (paramTypes[i] === undefined) {
+        if (otherParamTypes[i] !== undefined) {
+          return false;
+        }
+      } else {
+        if (!paramTypes[i].assignableFrom(otherParamTypes[i])) {
+          return false;
+        }
+      }
+    }
+
+    for (var i = paramTypes.length, j = otherParamTypes.length; i < j; i++) {
+      if (otherParamTypes[i] !== undefined) {
+        // Other arrow has more typed params
         return false;
       }
+    }
+
+    if (this.returnType === undefined) {
+      return other.returnType === undefined;
     }
 
     return this.returnType.assignableFrom(other.returnType);
@@ -880,7 +986,7 @@
     assert(this.body instanceof BlockStatement);
     this.body.body = compileList(this.body.body, o);
 
-    return this;
+    return cast(this, this.decltype.reflect(o));
   };
 
   ForStatement.prototype.transform = function (o) {
@@ -979,6 +1085,24 @@
   const BINOP_BITWISE    = ["<<", ">>", ">>>", "~", "&", "|"]
   const BINOP_COMPARISON = ["==", "!=", "===", "!==", "<", ">", "<=", ">="]
 
+  ConditionalExpression.prototype.transformNode = function (o) {
+    var ty;
+    var lty = this.consequent.ty;
+    var rty = this.alternate.ty;
+
+    if (typeof lty === "undefined" || typeof rty === "undefined") {
+      return this;
+    }
+
+    if (lty.assignableFrom(rty)) {
+      ty = lty;
+    } else if (rty.assignableFrom(lty)) {
+      ty = rty;
+    }
+
+    return cast(this, ty);
+  };
+
   BinaryExpression.prototype.transformNode = function (o) {
     var ty;
     var lty = this.left.ty;
@@ -1069,9 +1193,16 @@
 
   NewExpression.prototype.transform = function (o) {
     var ty;
+    
     if (this.callee instanceof Identifier && this.arguments.length === 0 &&
         (ty = o.types[this.callee.name])) {
       var alloc = new CallExpression(o.scope.MALLOC(), [cast(new Literal(ty.size), u32ty)], this.loc);
+      return cast(alloc.transform(o), new PointerType(ty));
+    } else if (this.callee instanceof MemberExpression &&
+               this.callee.computed &&
+               (ty = o.types[this.callee.object.name])) {
+      var size = new BinaryExpression("*", new Literal(ty.size), this.callee.property, this.loc);
+      var alloc = new CallExpression(o.scope.MALLOC(), [cast(size, u32ty)], this.loc);
       return cast(alloc.transform(o), new PointerType(ty));
     }
     return Node.prototype.transform.call(this, o);
@@ -1111,12 +1242,12 @@
     }
 
     if (this.kind === "->") {
-      check(oty instanceof PointerType && oty.base instanceof StructType,
-            "base of struct dereference must be struct type.");
+      check(oty instanceof PointerType && (oty.base instanceof StructType || oty.base instanceof UnionType),
+            "base of struct dereference must be struct or union type.");
       oty = oty.base;
     } else {
       check(!(oty instanceof PointerType), "cannot use . operator on pointer type.");
-      if (!(oty instanceof StructType)) {
+      if (!(oty instanceof StructType || oty instanceof UnionType)) {
         return;
       }
     }
@@ -1149,7 +1280,7 @@
     check(lty.assignableFrom(rty), "incompatible types: assigning " +
           quote(tystr(rty, 0)) + " to " + quote(tystr(lty, 0)));
 
-    if (lty instanceof StructType) {
+    if (lty instanceof StructType || lty instanceof UnionType) {
       // Emit a memcpy using the largest alignment size we can.
       var mc, size, pty;
       if (lty.align === u32ty) {
@@ -1332,6 +1463,10 @@
   };
 
   StructType.prototype.convert = function (expr) {
+    return expr;
+  };
+
+  UnionType.prototype.convert = function (expr) {
     return expr;
   };
 
