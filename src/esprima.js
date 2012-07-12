@@ -123,6 +123,7 @@
 
     PointerType: 'PointerType',
     StructType: 'StructType',
+    UnionType: 'UnionType',
     ArrowType: 'ArrowType',
     TypeIdentifier: 'TypeIdentifier',
     FieldDeclarator: 'FieldDeclarator',
@@ -333,7 +334,7 @@
       keyword = (id === 'this') || (id === 'else') || (id === 'case') || (id === 'void') || (id === 'with');
       break;
     case 5:
-      keyword = (id === 'while') || (id === 'break') || (id === 'catch') || (id === 'throw');
+      keyword = (id === 'while') || (id === 'break') || (id === 'catch') || (id === 'throw') || (id === 'union');
       break;
     case 6:
       keyword = (id === 'return') || (id === 'typeof') || (id === 'delete') || (id === 'switch') || (id === 'struct') || (id === 'sizeof') || (id === 'extern');
@@ -2263,6 +2264,9 @@
     if (token.type === Token.Keyword && token.value === "struct") {
       var original = parseStructType();
       var alias = parseTypeIdentifier(true);
+    } else if (token.type === Token.Keyword && token.value === "union") {
+      var original = parseUnionType();
+      var alias = parseTypeIdentifier(true);
     } else {
       var original = parseInlineableType(true);
       var alias = parseTypeIdentifier(true);
@@ -3087,6 +3091,51 @@
     };
   }
 
+  function parseUnionDeclaration() {
+    var type = parseUnionType();
+    consumeSemicolon();
+    if (type.id) {
+      return {
+        type: Syntax.TypeAliasDirective,
+        range: type.range,
+        original: type,
+        alias: {
+          type: Syntax.TypeIdentifier,
+          name: type.id.name
+        }
+      };
+    }
+
+    return parseStatement();
+  }
+
+  function parseUnionType() {
+    expectKeyword('union');
+    if (!match('{')) {
+      var id = parseTypeIdentifier(true);
+      Types[id.name] = true;
+    }
+    var statement;
+    var list = [];
+
+    expect('{');
+    while (index < length) {
+      if (match('}')) {
+        break;
+      }
+      list.push.apply(list, parseVariableDeclarationList("field", true,
+                                                         parseTypeIdentifier()));
+      consumeSemicolon();
+    }
+    expect('}');
+
+    return {
+      type: Syntax.UnionType,
+      id: id,
+      fields: list
+    };
+  }
+
   function parseFunctionDeclaration() {
     var id, param, paramType, params = [], body, token, firstRestricted, message, previousStrict, paramSet, paramTypes, returnType;
 
@@ -3294,6 +3343,11 @@
       case 'struct':
         if (inToplevel) {
           return parseStructDeclaration();
+        }
+        // FALLTHROUGH
+      case 'union':
+        if (inToplevel) {
+          return parseUnionDeclaration();
         }
         // FALLTHROUGH
       case 'typedef':
@@ -3701,11 +3755,13 @@
 
       extra.parsePointerType = parsePointerType;
       extra.parseStructType = parseStructType;
+      extra.parseUnionType = parseUnionType;
       extra.parseTypeIdentifier = parseTypeIdentifier;
       extra.parseTypeDef = parseTypeDef;
 
       parsePointerType = wrapTracking(extra.parsePointerType);
       parseStructType = wrapTracking(extra.parseStructType);
+      parseUnionType = wrapTracking(extra.parseUnionType);
       parseTypeIdentifier = wrapTracking(extra.parseTypeIdentifier);
       parseTypeDef = wrapTracking(parseTypeDef);
     }
@@ -3768,6 +3824,7 @@
 
       parsePointerType = extra.parsePointerType;
       parseStructType = extra.parseStructType;
+      parseUnionType = extra.parseUnionType;
       parseTypeIdentifier = extra.parseTypeIdentifier;
       parseTypeDef = extra.parseTypeDef;
     }
