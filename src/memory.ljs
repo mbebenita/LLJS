@@ -140,11 +140,11 @@ function setInMemory(val) {
   if(enable_memcheck) { inMemory = val;}
 }
 
-function shadowMemory(mem, uint memsize) {
+function shadowMemory(mem, uint memsize, uint shift) {
   let handler = makeIdHandler(mem);
   // override the identity get/set handlers
   handler.get = function(receiver, name) {
-    let byte *loc = (byte *) ((parseInt(name, 10)) << (memsize >> 1)) ;
+    let byte *loc = (byte *) ((parseInt(name, 10)) << shift) ;
     // malloc/free can get/set unallocated memory
     if(!inMemory) {
       if(!ck.isAddressable(loc)) {
@@ -157,7 +157,7 @@ function shadowMemory(mem, uint memsize) {
     return mem[name];
   };
   handler.set = function(receiver, name, val) {
-    let byte *loc = (byte *) ((parseInt(name, 10)) << (memsize >> 1)) ;
+    let byte *loc = (byte *) ((parseInt(name, 10)) << shift) ;
     // memory functions should be able to set unallocated addresses
     if(!inMemory) {
       if(!ck.isAddressable(loc)) {
@@ -176,14 +176,14 @@ function reset() {
   let M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
   if(enable_memcheck) {
     ck.reset(SIZE * WORD_SIZE);
-    exports.U1 = shadowMemory(new Uint8Array(M), sizeof(u8));
-    exports.I1 = shadowMemory(new Int8Array(M), sizeof(i8));
-    exports.U2 = shadowMemory(new Uint16Array(M), sizeof(u16));
-    exports.I2 = shadowMemory(new Int16Array(M), sizeof(i16));
-    exports.U4 = shadowMemory(new Uint32Array(M), sizeof(u32));
-    exports.I4 = shadowMemory(new Int32Array(M), sizeof(i32));
-    exports.F4 = shadowMemory(new Float32Array(M), sizeof(f32));
-    exports.F8 = shadowMemory(new Float64Array(M), sizeof(f64));
+    exports.U1 = shadowMemory(new Uint8Array(M), sizeof(u8), 0);
+    exports.I1 = shadowMemory(new Int8Array(M), sizeof(i8), 0);
+    exports.U2 = shadowMemory(new Uint16Array(M), sizeof(u16), 1);
+    exports.I2 = shadowMemory(new Int16Array(M), sizeof(i16), 1);
+    exports.U4 = shadowMemory(new Uint32Array(M), sizeof(u32), 2);
+    exports.I4 = shadowMemory(new Int32Array(M), sizeof(i32), 2);
+    exports.F4 = shadowMemory(new Float32Array(M), sizeof(f32), 2);
+    exports.F8 = shadowMemory(new Float64Array(M), sizeof(f64), 3);
   } else {
     exports.U1 = new Uint8Array(M);
     exports.I1 = new Int8Array(M);

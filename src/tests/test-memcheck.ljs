@@ -10,6 +10,12 @@ let NODE_JS = 1;
 let JS_SHELL = 2;
 let BROWSER = 3;
 
+
+struct Body {
+  double x, y, mass;
+};
+
+
 let mode;
 if (typeof process !== "undefined") {
   mode = NODE_JS;
@@ -148,6 +154,17 @@ function test_access() {
               "tried to get a unalloced u8 pointer");
   }
 
+  function getStruct() {
+    let Body *b = new Body;
+    
+    b->x = 5;
+    b->y = 10;
+    b->mass = 100;
+    
+    assert(0, checker.getBadAccesses().length,
+          "had no bad accesses");
+  }
+
   print("running bad access tests (gets/sets of unallocated memory)...");
   
   m.reset();
@@ -171,7 +188,10 @@ function test_access() {
   m.reset();
   getAfterDelete();
   
-  print("done");
+  m.reset();
+  getStruct();
+  
+  print("passed");
   m.reset();
 }
 
@@ -247,7 +267,7 @@ function test_undefined() {
   m.reset();
   undefByte();
   
-  print("done");
+  print("passed");
   m.reset();
 }
 
@@ -283,7 +303,7 @@ function test_frees() {
   m.reset();
   doubleFree();
   
-  print("done");
+  print("passed");
   m.reset();
 }
 
@@ -294,9 +314,9 @@ function test_leak() {
     
     assert(checker.getLeaks().length, 1,
           "only had one leak ");
-    assert((byte *) (x), checker.getLeaks()[0][0],
+    assert((byte *) (x), checker.getLeaks()[0].membyte,
               "leaked an int");
-    let trace = checker.getLeaks()[0][1];
+    let trace = checker.getLeaks()[0].trace;
     assertTrue(trace[trace.length-1].indexOf("leak") !== -1);
   }
 
@@ -318,7 +338,7 @@ function test_leak() {
   m.reset();
   leakLoop();
   
-  print("done");
+  print("passed");
   m.reset();
 }
 

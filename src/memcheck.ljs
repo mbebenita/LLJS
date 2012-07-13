@@ -168,7 +168,7 @@ function getBadFrees() {
 function getLeaks() {
   return memcheck.used.map(function(val, idx) {
     if(val) {
-      return [idx, val];
+      return {membyte: idx, trace: val};
     }
   }).filter(function (val, idx) {
     if(val) {
@@ -195,10 +195,10 @@ function report() {
   function fmtLeaks(leaks) {
     return leaks.map(function(val, idx) {
       let stack;
-      if(val[1].length === 0) {
+      if(val.trace.length === 0) {
         stack = "<empty stack>";
       } else {
-        stack = val.trace.join("\n\t");
+        stack = val.trace.reverse().join("\n\t");
       }
       return val[0] + " allocated at:\n\t" + stack;
     }).join("\n");
@@ -209,7 +209,7 @@ function report() {
       if(val.trace.length === 0) {
         stack = "<empty stack>";
       } else {
-        stack = val.trace.join("\n\t");
+        stack = val.trace.reverse().join("\n\t");
       }
       return val.membyte + " allocated at:\n\t" + stack;
     }).join("\n")

@@ -22,10 +22,9 @@ smfiles := $(addprefix $(build_sm)/, $(js_files))
 all: node sm test bench
 
 test: node sm
-	export NODE_PATH="$(build_node):$$NODE_PATH"
 	@echo "======================"
 	@echo "Running node tests..."
-	node --harmony_proxies $(build_node)/test-memcheck.js
+	(export NODE_PATH="$(build_node):$$NODE_PATH" && node --harmony_proxies $(build_node)/test-memcheck.js)
 	@echo "======================"
 	@echo "Running spidermonkey tests..."
 	(cd $(build_sm) && js -n -m test-memcheck.js)

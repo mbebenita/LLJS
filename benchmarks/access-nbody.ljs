@@ -214,3 +214,9 @@ else
 
 extern memory;
 // print(memory.memcheck.report());
+
+let m = memory
+if (m.memcheck.enabled){
+  print("\n")
+  print(m.memcheck.report())
+}
