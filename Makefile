@@ -10,7 +10,8 @@ build_node = build/node
 build_sm = build/sm
 
 js_files = memory.js memcheck.js test-memcheck.js \
-			access-nbody.js access-nbody-memcheck.js
+			access-nbody.js access-nbody-memcheck.js \
+			linked-list.js linked-list-memcheck.js
 
 nodefiles := $(addprefix $(build_node)/, $(js_files))
 smfiles := $(addprefix $(build_sm)/, $(js_files))
@@ -31,7 +32,17 @@ test: node sm
 
 bench: node sm
 	@echo "======================"
-	@echo "Running benchmarks..."
+	@echo "Running node benchmarks..."
+	@echo "== nbody =="
+	(export NODE_PATH="$(build_node):$$NODE_PATH" && node --harmony_proxies $(build_node)/access-nbody.js)
+	@echo "\n== nbody (memcheck) =="
+	(export NODE_PATH="$(build_node):$$NODE_PATH" && node --harmony_proxies $(build_node)/access-nbody-memcheck.js)
+	@echo "\n== linked list =="
+	(export NODE_PATH="$(build_node):$$NODE_PATH" && node --harmony_proxies $(build_node)/linked-list.js)
+	@echo "\n== linked list (memcheck) =="
+	(export NODE_PATH="$(build_node):$$NODE_PATH" && node --harmony_proxies $(build_node)/linked-list-memcheck.js)
+	@echo "======================"
+	@echo "Running spdiermonkey benchmarks..."
 	@echo "== nbody =="
 	(cd $(build_sm) && js -n -m access-nbody.js)
 	@echo "\n== nbody (memcheck) =="
@@ -64,7 +75,7 @@ $(build_node)/linked-list.js: $(benchdir)/linked-list.ljs
 $(build_node)/access-nbody-memcheck.js: $(benchdir)/access-nbody.ljs
 	$(LJC) $(ND_FLAGS) -m -o $@ $<
 
-$(build_node)/linked-list-memcheck.js: $(benchdir)/access-nbody.ljs
+$(build_node)/linked-list-memcheck.js: $(benchdir)/linked-list.ljs
 	$(LJC) $(ND_FLAGS) -m -o $@ $<
 
 
@@ -88,5 +99,5 @@ $(build_sm)/linked-list.js: $(benchdir)/linked-list.ljs
 $(build_sm)/access-nbody-memcheck.js: $(benchdir)/access-nbody.ljs
 	$(LJC) $(SM_FLAGS) -m -o $@ $<
 
-$(build_sm)/linked-list-memcheck.js: $(benchdir)/access-nbody.ljs
+$(build_sm)/linked-list-memcheck.js: $(benchdir)/linked-list.ljs
 	$(LJC) $(SM_FLAGS) -m -o $@ $<

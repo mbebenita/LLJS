@@ -85,8 +85,8 @@ let uint *x;
 
 let uint *leak = new uint;
 
-let m = memory
-if (m.memcheck.enabled){
-  print("\n")
-  print(m.memcheck.report())
-}
+// let m = memory
+// if (m.memcheck.enabled){
+//   print("\n")
+//   print(m.memcheck.report())
+// }
