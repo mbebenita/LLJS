@@ -35,7 +35,7 @@
 
     LabeledStatement: {
       extends: "Statement",
-      fields:  ["@label"]
+      fields:  ["@label", "@body"]
     },
 
     BreakStatement: {
@@ -263,6 +263,11 @@
     },
 
     StructType: {
+      extends: "Type",
+      fields: ["@id", "@fields"]
+    },
+
+    UnionType: {
       extends: "Type",
       fields: ["@id", "@fields"]
     },

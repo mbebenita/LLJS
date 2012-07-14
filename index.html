@@ -12,15 +12,12 @@
   <div class="container">
     <h1>LLJS : Low-Level JavaScript</h1>
     <p>
-      <b>LLJS</b> (formerly known as *JS) is a typed dialect of JavaScript that offers a C-like type system with manual memory management.
+      <b>LLJS</b> is a typed dialect of JavaScript that offers a C-like type system with manual memory management.
       It compiles to JavaScript and lets you write memory-efficient and GC pause-free code less painfully, in short, LLJS is the bastard child of JavaScript and C.
       LLJS is early research prototype work, so don't expect anything rock solid just yet.
 
       The research goal here is to explore low-level statically typed features in a high-level dynamically typed language.
       Think of it as inline assembly in C, or the <tt>unsafe</tt> keyword in C#. It's not pretty, but it gets the job done.
-    </p>
-    <p>
-      We're exploring a similar approach in CoffeeScript as well, check out <a href="http://syg.github.com/heap.coffee/">heap.coffee</a>.
     </p>
     <p>
       This is an interactive tutorial, code is compiled as you type.
@@ -39,18 +36,18 @@ extern timer;        // Declare timer as an external variable.
 let x;               // Declare 'x' as dyn.
 let int y;           // Declare 'y' as int.
 
-y = (int)(x);        // Assignment of 'x' to 'y' requires an explicit
-                     // cast.
+y = (int)(x);        /* Assignment of 'x' to 'y' requires an explicit
+                        cast. */
 
-let int z = y + 1;   // Although 'y' is of type int, the binary
-                     // expression y + 1 is of type num and
-                     // requires an implicit cast.
+let int z = y + 1;   /* Although 'y' is of type int, the binary
+                        expression y + 1 is of type num and
+                        requires an implicit cast. */
 
-let uint w = z;      // Unsigned integer types are supported but
-                     // are discouraged because JavaScript engines
-                     // usually store numbers that are larger than
-                     // max signed int in doubles rather than 32-bit
-                     // ints.
+let uint w = z;      /* Unsigned integer types are supported but
+                        are discouraged because JavaScript engines
+                        usually store numbers that are larger than
+                        max signed int in doubles rather than 32-bit
+                        ints. */
 
 timer.begin("Empty For loop with signed integers.");
 for (let int i = 0; i < 50000000; ++i) { }
@@ -61,23 +58,23 @@ for (let uint i = 0; i < 50000000; ++i) { }
 timer.begin("Empty For loop with untyped integers.");
 for (let i = 0; i < 50000000; ++i) { }</pre>
 
-<h2> Data Types and Arithmetic</h2>
+<h2>Data Types and Arithmetic</h2>
 <p>
-  LLJS has 6 integral types: <tt>int -> i32</tt>, <tt>uint -> u32</tt>, <tt>i16</tt>, <tt>u16</tt>, <tt>i8</tt>,
-  <tt>u8</tt>, which behave as they do in C, and two additional types: <tt>num</tt> (the JavaScript number type)
-  and <tt>dyn</tt> (any type) which are used to interoperate with the JavaScript type system.
-  LLJS emits the appropriate coercions for assignments and cast operations.
+  LLJS has 8 numeric types: <tt>i32 (int)</tt>, <tt>u32 (uint)</tt>, <tt>i16</tt>, <tt>u16</tt>, <tt>i8</tt>,
+  <tt>u8</tt>, <tt>float</tt> and <tt>double</tt> which behave as they do in C, and two additional types: <tt>num</tt> (the JavaScript number type) and <tt>dyn</tt> (any type) which are used to interoperate with the JavaScript type system.
 </p>
 
 <pre class="example">
 extern trace;
 
-trace(" u8: " + sizeof (u8));
-trace(" i8: " + sizeof (i8));
-trace("u16: " + sizeof (u16));
-trace("i16: " + sizeof (i16));
-trace("u32: " + sizeof (u32));
-trace("i32: " + sizeof (i32));
+trace("    u8: " + sizeof (u8));
+trace("    i8: " + sizeof (i8));
+trace("   u16: " + sizeof (u16));
+trace("   i16: " + sizeof (i16));
+trace("   u32: " + sizeof (u32));
+trace("   i32: " + sizeof (i32));
+trace(" float: " + sizeof (float));
+trace("double: " + sizeof (double));
 
 trace(" u8: " + (u8)(-1));
 trace(" i8: " + (i8)(-1));
@@ -89,38 +86,32 @@ trace("i32: " + (i32)(-1));
 let int x = 3;
 let int y = 2;
 
-// Arithmetic follows C semantics. Arithmetic on integers
-// begets integers, truncated with | 0.
-trace("Result is an integer: " + x / y);</pre>
+/* Arithmetic follows C semantics. Arithmetic on integers begets 
+   integers, truncated with | 0. */
+trace("Result is an integer: " + x / y);
+trace("Integral literals are typed as integers: " + 1 / 2);
+trace("Floating point literals are typed as double: " + 1.1 / 2);
+</pre>
 
 <p>
-  Moreover, LLJS lets you define your own struct and pointer types.
+  Moreover, LLJS lets you define your own struct, union and pointer types.
 </p>
 
 <pre class="example">
 extern trace;
 
 let int x = 42;      // Declare 'x' as int and assign 42 to it.
-
-let int *y = &x;     // Declare 'y' as a pointer to int and assign it
-                     // the address of x. Since JavaScript doesn't
-                     // allow taking references to to variables, we
-                     // allocate 'x' on an emulated stack.
-
+let int *y = &x;     /* Declare 'y' as a pointer to int and assign it
+                        the address of x. Since JavaScript doesn't
+                        allow taking references to variables, we
+                        allocate 'x' on an emulated stack. */
 let int **z = &y;    // Declare 'z' as a pointer to a pointer to int.
-
 trace(x);
-
 *y = 1;              // Assign to the variable pointed to by 'y'.
-
 trace(x);
-
 **z = 12;
-
 trace(x);
-
 **z = ***(&z);       // You can get as fancy as you want.</pre>
-
 <p>
   Structs are defined using the <tt>struct</tt> keyword.
 </p>
@@ -147,6 +138,22 @@ let Line *p = &b.top;
 p->start.x = 42;
 trace(b.top.start.x);</pre>
 
+<p>
+  Similarly, unions are defined using the <tt>union</tt> keyword.
+</p>
+
+<pre class="example">
+extern trace;
+union Box {
+  int i;
+  float f;
+};
+
+let Box box;
+box.f = 123.456;
+trace(box.i);        // Read back box.f as an integer.
+</pre>
+
 <h4>Functions</h4>
 
 <p>
@@ -166,7 +173,7 @@ function void bar() { }
 // arguments.
 function void baz(int x, int *y) { }
 
-// Declare 'car' as (int, dyn, int x) -> dyn, typed LLJS function with
+// Declare 'quux' as (int, dyn, int x) -> dyn, typed LLJS function with
 // mixed typed and untyped arguments.
 function quux(int x, y, int z) { }
 
@@ -315,207 +322,6 @@ let int z = *x + *y;</pre>
   <img src="images/heap.png" style="display: block;   margin-left: auto;   margin-right: auto;">
 </p>
 
-<!--
-<pre class="example">
-extern ArrayBuffer;
-extern Uint8Array;
-extern Int8Array;
-extern Uint16Array;
-extern Int16Array;
-extern Uint32Array;
-extern Int32Array;
-extern Float32Array;
-extern Float64Array;
-
-const MB = 1024 * 1024;
-const WORD_SIZE = sizeof(word);
-const SIZE = (32 * MB) / WORD_SIZE;
-const STACK_SIZE = (2 * MB) / WORD_SIZE;
-const HEAP_SIZE = SIZE - STACK_SIZE;
-
-// let I4, U4;
-
-/*
-   +---------------+ -
- 0 | Heap  Pointer |
- 1 | Stack Pointer |
-   +---------------+ <- Heap Pointer (HP)
-   |               |
-   |               | |
-   |     HEAP      | | Malloc Region
-   |               | v
-   |               |
-   +---------------+
-   |               |
-   |               | ^
-   |     STACK     | |
-   |               | |
-   |               |
-   +---------------+ <- Stack Pointer (SP)
-*/
-
-function byte *memcpy(byte *dst, byte *src, uint length) {
-  for (let int i = 0; i < length; ++i) {
-    *dst++ = *src++;
-  }
-  return dst;
-}
-
-function u16 *memcpy2(u16 *dst, u16 *src, uint length) {
-  for (let int i = 0; i < length; ++i) {
-    *dst++ = *src++;
-  }
-  return dst;
-}
-
-function u32 *memcpy4(u32 *dst, u32 *src, uint length) {
-  for (let int i = 0; i < length; ++i) {
-    *dst++ = *src++;
-  }
-  return dst;
-}
-
-function void memset(byte *s, byte b, uint length) {
-  for (let int i = 0; i < length; ++i) {
-    *s = b;
-  }
-}
-
-function void memset2(u16 *s, u16 b, uint length) {
-  for (let int i = 0; i < length; ++i) {
-    *s = b;
-  }
-}
-
-function void memset4(u32 *s, u32 b, uint length) {
-  for (let int i = 0; i < length; ++i) {
-    *s = b;
-  }
-}
-
-/* K&R Malloc */
-
-struct Header {
-  Header *next;
-  uint size;
-};
-
-let Header *base = null;
-let Header *freep = null;
-
-function reset() {
-  let M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
-  exports.U1 = new Uint8Array(M);
-  exports.I1 = new Int8Array(M);
-  exports.U2 = new Uint16Array(M);
-  exports.I2 = new Int16Array(M);
-  exports.U4 = new Uint32Array(M);
-  exports.I4 = new Int32Array(M);
-  exports.F4 = new Float32Array(M);
-  exports.F8 = new Float64Array(M);
-
-  exports.U4[0] = 4;
-  exports.U4[1] = SIZE;
-
-  base = (Header *)(2);
-  freep = null;
-}
-
-reset();
-
-function word *sbrk(int nBytes) {
-  let U4 = exports.U4;
-  let int nWords = nBytes / sizeof(word);
-  if (U4[0] + nWords > HEAP_SIZE) {
-    return null;
-  }
-  let word *address = (word *)(U4[0]);
-  U4[0] += nWords;
-  return address;
-}
-
-let uint nUnitsMin = 1024;
-
-function Header *morecore(uint nUnits) {
-  if (nUnits < nUnitsMin) {
-    nUnits = nUnitsMin;
-  }
-  let word *buffer = sbrk(nUnits * sizeof(Header));
-
-  if (buffer === null) {
-    return null;
-  }
-  let Header *header = (Header *)(buffer);
-  header->size = nUnits;
-  free(header + 1);
-  return freep;
-}
-
-function byte *malloc(int nBytes) {
-  let Header *p, *prevp;
-  let uint nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
-
-  if ((prevp = freep) === null) {
-    base->next = freep = prevp = base;
-    base->size = 0;
-  }
-
-  for (p = prevp->next; true; prevp = p, p = p->next) {
-    if (p->size >= nUnits) {
-      if (p->size === nUnits) {
-        prevp->next = p->next;
-      } else {
-        p->size -= nUnits;
-        p += p->size;
-        p->size = nUnits;
-      }
-      freep = prevp;
-      return p + 1;
-    }
-    if (p === freep) {
-      if ((p = morecore(nUnits)) === null) {
-        return null;
-      }
-    }
-  }
-  return null;
-}
-
-function void free(byte *ap) {
-  let Header *bp = (Header *)(ap) - 1, *p;
-  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
-    if (p >= p->next && (bp > p || bp < p->next)) {
-      break;
-    }
-  }
-  if (bp + bp->size === p->next) {
-    bp->size += p->next->size;
-    bp->next = p->next->next;
-  } else {
-    bp->next = p->next;
-  }
-  if (p + p->size == bp) {
-    p->size += bp->size;
-    p->next = bp->next;
-  } else {
-    p->next = bp;
-  }
-  freep = p;
-}
-
-exports.reset = reset;
-
-exports.memcpy = memcpy;
-exports.memcpy2 = memcpy2;
-exports.memcpy4 = memcpy4;
-exports.memset = memset;
-exports.memset2 = memset2;
-exports.memset4 = memset4;
-
-exports.malloc = malloc;
-exports.free = free;</pre>
--->
-
 <h3>Contrived Allocation Benchmark</h3>
 
 <p>Here is a contrived allocation benchmark that compares allocating linked
@@ -602,7 +408,8 @@ dt = 0;
 for (let i = 0; i < 10; ++i) {
   dt += benchObject();
 }
-trace("Objects: " + dt / 10 + " ms");</pre>
+trace("Objects: " + dt / 10 + " ms");
+</pre>
 
 <h4>Acknowledgements</h4>
 <p>
@@ -642,7 +449,11 @@ function compileExample(ex) {
   var result = document.getElementById("ex:" + number + ":result");
   try {
     var name;
-    name = "ex" + number;
+    if (Number(number) === id - 1) {
+      name = "memory";
+    } else {
+      name = "ex" + number;
+    }
     result.innerHTML = LJC.compile(name, name, this.getValue(), { bare: true });
   } catch (x) {
     result.innerHTML = x.message;

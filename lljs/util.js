@@ -55,11 +55,16 @@
     }
 
     OptParser.prototype = {
+      // Count options whose default value is a number, and swallow up
+      // following argument of options whose default value is a
+      // string.
+      //
       // The regexps are lifted from node-optimist [1],
       // Copyright (c) 2010 James Halliday, MIT license.
       //
       // [1] https://github.com/substack/node-optimist
       parse: function (argv) {
+        var error = (typeof console === "undefined") ? print : console.error;
         var spec = this.spec;
         var opts = {};
         var argc = argv.length;
@@ -87,24 +92,39 @@
               error("unknown option --" + match[1]);
               return null;
             }
-            if (argv[i + 1] && argv[i + 1].charAt(0) !== "-") {
+            var lspec = this.longs[match[1]];
+            if (typeof lspec.default === "number") {
+              if (!opts[match[1]]) {
+                opts[match[1]] = 1;
+              } else {
+                opts[mathc[1]]++;
+              }
+            } else if (typeof lspec.default === "string" &&
+                     (argv[i + 1] && argv[i + 1].charAt(0) !== "-")) {
               opts[match[1]] = argv[i + 1];
               i++;
             } else {
-              if (!opts[match[1]]) {
-                opts[match[1]] = 1;
-              }
-              opts[match[1]]++;
+              opts[match[1]] = true;
             }
           } else if (arg.match(/^-[^-]+/)) {
             var sspec;
             match = arg.match(/^-(.+)/);
             if (sspec = this.shorts[match[1]]) {
               var optname = sspec.name ? sspec.name : match[1];
-              if (!opts[optname]) {
-                opts[optname] = 1;
+
+              if (typeof sspec.default === "number") {
+                if (!opts[optname]) {
+                  opts[optname] = 1;
+                } else {
+                  opts[optname]++;
+                }
+              } else if (typeof sspec.default === "string" &&
+                         (argv[i + 1] && argv[i + 1].charAt(0) !== "-")) {
+                opts[optname] = argv[i + 1];
+                i++;
+              } else {
+                opts[optname] = true;
               }
-              opts[optname]++;
             } else {
               var letters = arg.slice(1).split('');
               for (var j = 0, k = letters.length; j < k; j++) {
@@ -113,16 +133,21 @@
                   error("unknown option -" + letters[j]);
                   return null;
                 }
-                if (!opts[sspec.name]) {
-                  opts[sspec.name] = 1;
+                if (typeof sspec.default === "number") {
+                  if (!opts[sspec.name]) {
+                    opts[sspec.name] = 1;
+                  } else {
+                    opts[sspec.name]++;
+                  }
+                } else {
+                  opts[sspec.name] = true;
                 }
-                opts[sspec.name]++;
               }
             }
-          } else {
-            finished = i;
           }
         }
+
+        finished = i - 1;
 
         for (var i = 0, j = spec.length; i < j; i++) {
           var s = spec[i];

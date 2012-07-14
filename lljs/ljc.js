@@ -107,21 +107,23 @@
 
   function cli() {
     var optparser = new util.OptParser([
-      ["E", "only-parse",   false, "Only parse"],
-      ["A", "emit-ast",     false, "Do not generate JS, emit AST"],
-      ["P", "pretty-print", false, "Pretty-print AST instead of emitting JSON (with -A)"],
-      ["b", "bare",         false, "Do not wrap in a module"],
-      ["l", "load-instead", false, "Emit load('memory') instead of require('memory')"],
-      ["W", "warn",         true,  "Print warnings (enabled by default)"],
-      ["Wconversion", null, false, "Print intra-integer and pointer conversion warnings"],
-      ["0", "simple-log",   false, "Log simple messages. No colors and snippets."],
-      ["t", "trace",        false, "Trace compiler execution"],
-      ["h", "help",         false, "Print this message"]
+      ["E",           "only-parse",   false, "Only parse"],
+      ["A",           "emit-ast",     false, "Do not generate JS, emit AST"],
+      ["P",           "pretty-print", false, "Pretty-print AST instead of emitting JSON (with -A)"],
+      ["b",           "bare",         false, "Do not wrap in a module"],
+      ["l",           "load-instead", false, "Emit load('memory') instead of require('memory')"],
+      ["W",           "warn",         true,  "Print warnings (enabled by default)"],
+      ["Wconversion",  null,          false, "Print intra-integer and pointer conversion warnings"],
+      ["0",           "simple-log",   false, "Log simple messages. No colors and snippets."],
+      ["t",           "trace",        false, "Trace compiler execution"],
+      ["o",           "output",       "",    "Output file name"],
+      ["h",           "help",         false, "Print this message"],
+      ["w",           "nowarn",       false, "Inhibit all warning messages"]
     ]);
 
     var p = optparser.parse(argv);
     if (!p) {
-      quit();
+      quit(1);
     }
 
     var options = p.options;
@@ -147,13 +149,16 @@
     } else {
       // SpiderMonkey has no way to write to a file, but if we're on node we can
       // emit .js.
-      if (mode === NODE_JS) {
-        var outname = (dir ? dir + "/" : "") + basename;
-        if (options["emit-ast"]) {
-          require('fs').writeFileSync(outname + ".json", JSON.stringify(code, null, 2));
-        } else {
-          // Escodegen doesn't emit a final newline for some reason, so add one.
-          require('fs').writeFileSync(outname + ".js", code + "\n");
+      if (options["output"] && mode === NODE_JS && !options["only-parse"]) {
+        // var outname = (dir ? dir + "/" : "") + basename;
+        // Don't overwrite the source file by mistake.
+        if (options["output"] !== filename) {
+          if (options["emit-ast"]) {
+            require('fs').writeFileSync(options["output"], JSON.stringify(code, null, 2));
+          } else {
+            // Escodegen doesn't emit a final newline for some reason, so add one.
+            require('fs').writeFileSync(options["output"], code + "\n");
+          }
         }
       } else {
         print(code);
@@ -168,6 +173,10 @@
         options.warn = true;
         break;
       }
+    }
+
+    if(options.nowarn) {
+      options.warn = false;
     }
 
     var logger = new util.Logger("ljc", logName, source, options);
@@ -199,14 +208,14 @@
         e.loc = { start: lc, end: lc };
         logger.error(e.message, { start: lc, end: lc });
         logger.flush();
-        quit();
+        quit(1);
       }
 
       if (e.logged && mode !== BROWSER) {
         // Compiler error that has already been logged, so just flush and
         // quit.
         logger.flush();
-        quit();
+        quit(1);
       }
 
       throw e;
