@@ -410,6 +410,10 @@
     return this.frame.MEMCHECK_CALL_PUSH();
   };
   
+  Scope.prototype.MEMCHECK_CALL_RESET = function MEMCHECK_CALL_RESET() {
+    return this.frame.MEMCHECK_CALL_RESET();
+  };
+  
   Scope.prototype.MEMCHECK_CALL_POP = function MEMCHECK_CALL_POP() {
     return this.frame.MEMCHECK_CALL_POP();
   };
@@ -481,6 +485,10 @@
   
   Frame.prototype.MEMCHECK_CALL_PUSH = function MEMCHECK_CALL_PUSH() {
     return getCachedLocal(this, "memcheck_call_push", "dyn");
+  };
+  
+  Frame.prototype.MEMCHECK_CALL_RESET = function MEMCHECK_CALL_RESET() {
+    return getCachedLocal(this, "memcheck_call_reset", "dyn");
   };
   
   Frame.prototype.MEMCHECK_CALL_POP = function MEMCHECK_CALL_POP() {
@@ -1631,13 +1639,13 @@
     o = extend(o);
     o.scope = this.frame;
 
-    this.body.body = lowerList(this.body.body, o);
     if(o.memcheck) {
       if(this.id && this.id.name) {
         memcheckName = this.id.name;
       } else {
         memcheckName = "<anonymous>";
       }
+      this.frame.memcheckFnLoc = {name: memcheckName, line: this.loc.start.line, column: this.loc.start.column};
       this.body.body.unshift(new ExpressionStatement(new CallExpression(this.frame.MEMCHECK_CALL_PUSH(), 
                                                                         [new Literal(memcheckName),
                                                                          new Literal(this.loc.start.line),
@@ -1647,6 +1655,7 @@
         this.body.body.push(new ExpressionStatement(new CallExpression(this.frame.MEMCHECK_CALL_POP(), [])));
       }
     }
+    this.body.body = lowerList(this.body.body, o);
     var prologue = createPrologue(this, o);
     var epilogue = createEpilogue(this, o);
     this.body.body = prologue.concat(this.body.body).concat(epilogue);
@@ -1667,6 +1676,28 @@
     this.body = lowerList(this.body, o);
     return this;
   };
+  
+  function findParentFun(scope) {
+    var name;
+    while(scope.parent) {
+      if(scope.name.indexOf("Function") === 0) {
+        name = scope.name.split(" ")[1];
+      }
+    }
+  }
+  
+  CatchClause.prototype.lower = function(o) {
+    o = extend(o);
+    if(o.memcheck) {
+      var fnLoc = o.scope.frame.memcheckFnLoc;
+      this.body.body.unshift(new ExpressionStatement(new CallExpression(o.scope.frame.MEMCHECK_CALL_RESET(), 
+                                                                        [new Literal(fnLoc.name), 
+                                                                         new Literal(fnLoc.line), 
+                                                                         new Literal(fnLoc.column)])));
+    }
+    return Node.prototype.lower.call(this, o);
+  };
+
 
   Identifier.prototype.lowerNode = function (o) {
     var variable = this.variable;

@@ -397,3 +397,4 @@ exports.set_memcheck = function(val) {
 exports.memcheck = ck;
 exports.memcheck_call_pop = ck.memcheck_call_pop;
 exports.memcheck_call_push = ck.memcheck_call_push;
+exports.memcheck_call_reset = ck.memcheck_call_reset;

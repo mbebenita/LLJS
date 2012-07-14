@@ -342,8 +342,32 @@ function test_leak() {
   m.reset();
 }
 
+function test_callstack() {
+  function a() {
+    b();
+  }
+  function b() {
+    throw "error!"
+  }
+
+  try {
+    a();
+  } catch (e) {
+    let uint *x;
+    *x;
+    
+    let errors = checker.getBadAccesses();
+    assert(1, errors.length, "only had one bad access");
+    assertTrue(errors[0].trace.pop().indexOf("test_callstack") !== -1,
+              "this function should be on the top of the callstack")
+    print("passed")
+  }
+
+}
+
 test_access();
 test_undefined();
 test_frees();
 test_leak();
 
+test_callstack();

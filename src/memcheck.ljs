@@ -186,6 +186,14 @@ function call_pop() {
   callstack.pop()
 }
 
+function call_reset(name, line, col) {
+  let fn = name + ":" + line + ":" + col;
+  let idx = callstack.lastIndexOf(fn)
+  if(idx !== -1) {
+    callstack = callstack.slice(0, idx+1);
+  }
+}
+
 function getCallstack() {
   return callstack;
 }
@@ -244,4 +252,5 @@ exports.enabled = enabled;
 
 exports.memcheck_call_pop = call_pop;
 exports.memcheck_call_push = call_push;
+exports.memcheck_call_reset = call_reset;
 exports.getCallstack = getCallstack;
