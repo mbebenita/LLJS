@@ -92,32 +92,17 @@
   }
   var base = 0;
   var freep = 0;
-  // ugly hack, probably doesn't really work. 
-  // use the debugger api to make this more robust?
-  var memFn = [
-      free,
-      malloc,
-      sbrk,
-      reset,
-      morecore
-    ];
-  function isMemFn(fn) {
-    if (memFn.indexOf(fn) !== -1) {
-      return true;
-    }
-    return false;
-  }
   var inMemory = false;
   function setInMemory(val) {
     if (enable_memcheck) {
       inMemory = val;
     }
   }
-  function shadowMemory(mem, memsize) {
+  function shadowMemory(mem, memsize, shift) {
     var handler = makeIdHandler(mem);
     // override the identity get/set handlers
     handler.get = function (receiver, name) {
-      var loc = parseInt(name, 10) << (memsize >> 1);
+      var loc = parseInt(name, 10) << shift;
       // malloc/free can get/set unallocated memory
       if (!inMemory) {
         if (!ck.isAddressable(loc)) {
@@ -130,7 +115,7 @@
       return mem[name];
     };
     handler.set = function (receiver, name, val) {
-      var loc = parseInt(name, 10) << (memsize >> 1);
+      var loc = parseInt(name, 10) << shift;
       // memory functions should be able to set unallocated addresses
       if (!inMemory) {
         if (!ck.isAddressable(loc)) {
@@ -148,14 +133,14 @@
     var M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
     if (enable_memcheck) {
       ck.reset(SIZE * WORD_SIZE);
-      exports.U1 = shadowMemory(new Uint8Array(M), 1);
-      exports.I1 = shadowMemory(new Int8Array(M), 1);
-      exports.U2 = shadowMemory(new Uint16Array(M), 2);
-      exports.I2 = shadowMemory(new Int16Array(M), 2);
-      exports.U4 = shadowMemory(new Uint32Array(M), 4);
-      exports.I4 = shadowMemory(new Int32Array(M), 4);
-      exports.F4 = shadowMemory(new Float32Array(M), 4);
-      exports.F8 = shadowMemory(new Float64Array(M), 8);
+      exports.U1 = shadowMemory(new Uint8Array(M), 1, 0);
+      exports.I1 = shadowMemory(new Int8Array(M), 1, 0);
+      exports.U2 = shadowMemory(new Uint16Array(M), 2, 1);
+      exports.I2 = shadowMemory(new Int16Array(M), 2, 1);
+      exports.U4 = shadowMemory(new Uint32Array(M), 4, 2);
+      exports.I4 = shadowMemory(new Int32Array(M), 4, 2);
+      exports.F4 = shadowMemory(new Float32Array(M), 4, 2);
+      exports.F8 = shadowMemory(new Float64Array(M), 8, 3);
     } else {
       exports.U1 = new Uint8Array(M);
       exports.I1 = new Int8Array(M);
@@ -193,7 +178,6 @@
     if (buffer === 0) {
       return 0;
     }
-    // hacky way to let the proxy know not to record memory sets
     var header = buffer;
     $U4[header + 1] = nUnits;
     if (enable_memcheck) {
@@ -363,4 +347,5 @@
   exports.memcheck = ck;
   exports.memcheck_call_pop = ck.memcheck_call_pop;
   exports.memcheck_call_push = ck.memcheck_call_push;
+  exports.memcheck_call_reset = ck.memcheck_call_reset;
 }.call(this, typeof exports === 'undefined' ? memory = {} : exports));
