@@ -9,18 +9,20 @@ benchdir = benchmarks
 build_node = build/node
 build_sm = build/sm
 
+
 js_files = memory.js memcheck.js test-memcheck.js \
 			access-nbody.js access-nbody-memcheck.js \
 			linked-list.js linked-list-memcheck.js
 
+mainfiles = $(addprefix $(srcdir)/, memory.js memcheck.js)
 nodefiles := $(addprefix $(build_node)/, $(js_files))
 smfiles := $(addprefix $(build_sm)/, $(js_files))
 
 
 
-.PHONY: all test clean node sm bench
+.PHONY: all test clean node sm bench main
 
-all: node sm test bench
+all: main node sm test bench
 
 test: node sm
 	@echo "======================"
@@ -52,8 +54,16 @@ bench: node sm
 	@echo "\n== linked list (memcheck) =="
 	(cd $(build_sm) && js -n -m linked-list-memcheck.js)
 
+main: $(mainfiles)
 node: $(nodefiles)
 sm: $(smfiles)
+
+# main
+$(srcdir)/memory.js: $(srcdir)/memory.ljs
+	$(LJC) $(ND_FLAGS) -o $@ $<
+
+$(srcdir)/memcheck.js: $(srcdir)/memcheck.ljs
+	$(LJC) $(ND_FLAGS) -o $@ $<
 
 # node
 $(build_node)/memory.js: $(srcdir)/memory.ljs
