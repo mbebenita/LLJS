@@ -219,7 +219,6 @@ function Header *morecore(uint nUnits) {
     return null;
   }
   
-  // hacky way to let the proxy know not to record memory sets
   let Header *header = (Header *)(buffer);
   header->size = nUnits;
   
