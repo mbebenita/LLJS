@@ -1728,7 +1728,7 @@
    */
 
   function createRequire(name) {
-    return new CallExpression(new Identifier("require"), [new Literal(name)]);
+    return new CallExpression(new Identifier("require"), [new Literal("./" + name)]);
   }
 
   function createModule(program, name, bare, loadInstead) {
