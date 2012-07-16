@@ -199,20 +199,15 @@ function getCallstack() {
 }
 
 // unit -> str
-function report() {
-  function fmtLeaks(leaks) {
-    return leaks.map(function(val, idx) {
-      let stack;
-      if(val.trace.length === 0) {
-        stack = "<empty stack>";
-      } else {
-        stack = val.trace.reverse().join("\n\t");
-      }
-      return val[0] + " allocated at:\n\t" + stack;
-    }).join("\n");
-  }
-  function fmtAccess(acc) {
-    return acc.slice(0, 10).map(function(val, idx) {
+function report(limit) {
+  function fmtErrors(err) {
+    let errors;
+    if(limit >= 0) {
+      errors = err.slice(0, limit);
+    } else {
+      errors = err;
+    }
+    return errors.map(function(val, idx) {
       let stack;
       if(val.trace.length === 0) {
         stack = "<empty stack>";
@@ -223,11 +218,11 @@ function report() {
     }).join("\n")
   }
   
-  let leaks = "Leaks at:\n" + fmtLeaks(getLeaks());
-  let access = "Unallocated accesses at:\n" + fmtAccess(getBadAccesses());
-  let undef = "Undefined accesses at: " + memcheck.errors.undef_access.length;
-  let frees = "Unallocated frees at: " + memcheck.errors.double_free.length;
-  return [leaks, access, undef, frees].join("\n\n");
+  let leaks = "Leaks at:\n" + fmtErrors(getLeaks());
+  let access = "Unallocated accesses at:\n" + fmtErrors(getBadAccesses());
+  let undef = "Undefined accesses at:\n" + fmtErrors(getBadUndefined());
+  let frees = "Bad frees at:\n" + fmtErrors(getBadFrees());
+  return [access, undef, frees, leaks].join("\n\n");
 }
 
 exports.setAddressable = setAddressable;
