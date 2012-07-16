@@ -125,16 +125,6 @@ struct Header {
 let Header *base = null;
 let Header *freep = null;
 
-// ugly hack, probably doesn't really work. 
-// use the debugger api to make this more robust?
-let memFn = [free, malloc, sbrk, reset, morecore];
-function  isMemFn(fn) {
-  if (memFn.indexOf(fn) !== -1) {
-    return true;
-  }
-  return false;
-}
-
 let inMemory = false;
 function setInMemory(val) {
   if(enable_memcheck) { inMemory = val;}
