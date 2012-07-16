@@ -1,6 +1,6 @@
 body {
-    font-size: 18px;
-    line-height: 30px;
+    font-size: 16px;
+    line-height: 22px;
     color: #333;
     background: #f6f6f6 url(../images/background.png);
     font-family: "PT Serif", "Georgia", "Helvetica Neue", "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, sans-serif !important;
@@ -15,7 +15,7 @@ body {
 
 code, pre, tt, textarea {
     font-family: Monaco, Consolas, "Lucida Console", monospace;
-    font-size: 14px;
+    font-size: 12px;
     /* font-weight: bold; */
     line-height: 18px;
     color: #255;
@@ -24,7 +24,7 @@ code, pre, tt, textarea {
 }
 
 tt {
-    display: inline-block;
+    // display: inline-block;
     background: #fff;
     border: 1px solid #dedede;
     padding: 0px 0.2em;
@@ -43,6 +43,7 @@ pre {
 .jcResult {
     line-height: 14px;
     width: 78ex;
+    font-size: 11px;
 }
 
 .example textarea {
