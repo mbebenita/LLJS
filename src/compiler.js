@@ -1318,10 +1318,12 @@
       var pty = paramTys[i];
       var aty = arg ? arg.ty : undefined;
       if (pty) {
-        logger.push(arg);
+        if (arg) {
+          logger.push(arg);
+        }
         check(pty.assignableFrom(aty), "incompatible types: passing " +
               quote(tystr(aty, 0)) + " to " + quote(tystr(pty, 0)));
-        logger.pop(arg);
+        logger.pop();
         args[i] = cast(arg, pty);
       }
     }
