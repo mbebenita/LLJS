@@ -38,3 +38,8 @@ any memory errors:
     // for SpiderMonkey do
     // let m = load('memory.js')
     console.log(m.memcheck.report());  
+
+The memory checker uses Proxies so if you use node.js you need to
+enable it with:
+
+    $ node --harmony-proxies myscript.ljs
