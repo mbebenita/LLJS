@@ -390,7 +390,7 @@
       }
 
       if (typeof this[prop] === "function") {
-        if (o.logger) {
+        if (o.logger && typeof this.loc !== "undefined") {
           o.logger.push(this);
           trans = this[prop](o);
           o.logger.pop();
