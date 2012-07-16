@@ -185,8 +185,7 @@ if (typeof print === "undefined") {
 function double run() {
   let double res;
 
-  // for (let int n = 3; n <= 24; n *= 2) {
-  for (let int n = 3; n <= 12; n *= 2) {
+  for (let int n = 3; n <= 24; n *= 2) {
     let bodies = new NBodySystem();
     let int max = n * 100;
 
