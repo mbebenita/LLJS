@@ -198,7 +198,7 @@ function getCallstack() {
   return callstack;
 }
 
-// unit -> str
+// uint -> str
 function report(limit) {
   function fmtErrors(err) {
     let errors;
@@ -214,14 +214,14 @@ function report(limit) {
       } else {
         stack = val.trace.reverse().join("\n\t");
       }
-      return val.membyte + " allocated at:\n\t" + stack;
+      return val.membyte + " at:\n\t" + stack;
     }).join("\n")
   }
   
-  let leaks = "Leaks at:\n" + fmtErrors(getLeaks());
-  let access = "Unallocated accesses at:\n" + fmtErrors(getBadAccesses());
-  let undef = "Undefined accesses at:\n" + fmtErrors(getBadUndefined());
-  let frees = "Bad frees at:\n" + fmtErrors(getBadFrees());
+  let leaks = "Leaks:\n" + fmtErrors(getLeaks());
+  let access = "Unallocated:\n" + fmtErrors(getBadAccesses());
+  let undef = "Undefined:\n" + fmtErrors(getBadUndefined());
+  let frees = "Bad frees:\n" + fmtErrors(getBadFrees());
   return [access, undef, frees, leaks].join("\n\n");
 }
 
