@@ -223,10 +223,10 @@ function report() {
     }).join("\n")
   }
   
-  let leaks = "Leaks found:\n" + fmtLeaks(getLeaks());
-  let access = "Access of unallocaed memory:\n" + fmtAccess(getBadAccesses());
-  let undef = "Undefined access at memory location: " + memcheck.errors.undef_access.length;
-  let frees = "Frees: " + memcheck.errors.double_free.length;
+  let leaks = "Leaks at:\n" + fmtLeaks(getLeaks());
+  let access = "Unallocated accesses at:\n" + fmtAccess(getBadAccesses());
+  let undef = "Undefined accesses at: " + memcheck.errors.undef_access.length;
+  let frees = "Unallocated frees at: " + memcheck.errors.double_free.length;
   return [leaks, access, undef, frees].join("\n\n");
 }
 
