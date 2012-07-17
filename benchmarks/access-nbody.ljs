@@ -209,3 +209,13 @@ if (res - (-0.1690693) < 0.00001)
    print("metric time " + elapsed);
 else
    print("error nbody result expecting -0.1690693 got " + res);
+
+
+extern memory;
+// print(memory.memcheck.report());
+
+// let m = memory
+// if (m.memcheck.enabled){
+//   print("\n")
+//   print(m.memcheck.report())
+// }

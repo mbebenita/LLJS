@@ -117,6 +117,7 @@
       ["0",           "simple-log",   false, "Log simple messages. No colors and snippets."],
       ["t",           "trace",        false, "Trace compiler execution"],
       ["o",           "output",       "",    "Output file name"],
+      ["m",           "memcheck",     false, "Compile with memcheck instrumentation"],
       ["h",           "help",         false, "Print this message"],
       ["w",           "nowarn",       false, "Inhibit all warning messages"]
     ]);
