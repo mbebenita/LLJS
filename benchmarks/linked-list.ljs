@@ -1,3 +1,4 @@
+extern memory;
 struct Node {
   Node *next;
   int val;
@@ -12,7 +13,7 @@ function ObjNode() {
 
 extern Date;
 
-const int n = 250000;
+const int n = 25000;
 
 function benchStruct() {
   let start = new Date();
@@ -77,3 +78,14 @@ for (let i = 0; i < 25; ++i) {
   dt += benchObject();
 }
 print("object with 4 extra properties " + dt / 25);
+
+let uint *x;
+*x
+
+let uint *leak = new uint;
+
+// let m = memory
+// if (m.memcheck.enabled){
+//   print("\n")
+//   print(m.memcheck.report())
+// }
