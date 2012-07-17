@@ -894,7 +894,8 @@
   };
 
   PointerType.prototype.assignableFrom = function (other) {
-    if (other instanceof PointerType || (other instanceof PrimitiveType && other.integral)) {
+    if ((other instanceof PointerType && this.base.assignableFrom(other.base))
+        || (other instanceof PrimitiveType && other.integral)) {
       return true;
     }
     return false;
@@ -1022,7 +1023,8 @@
 
   Literal.prototype.transformNode = function (o) {
     if (this.value === null) {
-      return cast(this, bytePointerTy);
+      //return cast(this, bytePointerTy);
+      this.value = 0;
     }
 
     if (typeof this.value === "number") {
