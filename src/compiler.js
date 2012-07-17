@@ -222,6 +222,7 @@
 
   const wordTy = u32ty;
   const voidTy = new PrimitiveType("void", 0, 0, undefined);
+  const nullTy = new PrimitiveType("null", 0, 0, undefined);
   const bytePointerTy = new PointerType(u8ty);
   const spTy = new PointerType(u32ty);
 
@@ -272,6 +273,7 @@
     word:   u32ty,
 
     void:   voidTy,
+    null:   nullTy,
     dyn:    undefined
   };
 
@@ -894,7 +896,8 @@
   };
 
   PointerType.prototype.assignableFrom = function (other) {
-    if ((other instanceof PointerType && this.base.assignableFrom(other.base))
+    if (other === nullTy
+        || (other instanceof PointerType && this.base.assignableFrom(other.base))
         || (other instanceof PrimitiveType && other.integral)) {
       return true;
     }
@@ -1023,8 +1026,7 @@
 
   Literal.prototype.transformNode = function (o) {
     if (this.value === null) {
-      //return cast(this, bytePointerTy);
-      this.value = 0;
+      return cast(this, nullTy);
     }
 
     if (typeof this.value === "number") {
