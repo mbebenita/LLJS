@@ -229,7 +229,7 @@ function Header *morecore(uint nUnits) {
     // shadow memory
     ck.setAddressable((byte *) (header + 1), nUnits, true);
   }
-  free(header + 1);
+  free((byte*)(header + 1));
   setInMemory(true);
   return freep;
 }
@@ -260,7 +260,7 @@ function byte *malloc(int nBytes) {
         ck.setAlloc((byte *) (p+1), true);
       }
       setInMemory(false);
-      return p + 1;
+      return (byte*)(p + 1);
     }
     if (p === freep) {
       
