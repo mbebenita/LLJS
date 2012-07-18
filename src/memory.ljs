@@ -48,7 +48,7 @@ if (mode === NODE_JS) {
 
 const MB = 1024 * 1024;
 const WORD_SIZE = sizeof(word);
-const SIZE = (32 * MB) / WORD_SIZE;
+const SIZE = (256 * MB) / WORD_SIZE;
 const STACK_SIZE = (2 * MB) / WORD_SIZE;
 const HEAP_SIZE = SIZE - STACK_SIZE;
 
