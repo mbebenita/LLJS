@@ -1267,8 +1267,13 @@
     var prop = this.property;
     var oty = obj.ty;
 
-    if (!oty || this.computed) {
+    if (!oty) {
       return;
+    }
+
+    if (this.computed) {
+      check(oty instanceof PointerType, "cannot use [] operator on non-pointer type.");
+      return new UnaryExpression("*", new BinaryExpression("+", obj, prop)).transform(o);
     }
 
     if (this.kind === "->") {
