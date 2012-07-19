@@ -1659,6 +1659,7 @@
       this.frame.memcheckFnLoc = {name: memcheckName, line: this.loc.start.line, column: this.loc.start.column};
       this.body.body.unshift(new ExpressionStatement(new CallExpression(this.frame.MEMCHECK_CALL_PUSH(), 
                                                                         [new Literal(memcheckName),
+                                                                         new Literal(o.name),
                                                                          new Literal(this.loc.start.line),
                                                                          new Literal(this.loc.start.column)])));
       
