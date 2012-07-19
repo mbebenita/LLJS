@@ -1837,6 +1837,7 @@
       body.push(new VariableDeclaration("const", [mdecl]));
       // todo: broken just like above
       if(name !== "memory") {
+        assert (memcheck !== undefined);
         body.push(new ExpressionStatement(
           new CallExpression(new MemberExpression(cachedMEMORY, new Identifier("set_memcheck")), 
                              [new Literal(memcheck)])));

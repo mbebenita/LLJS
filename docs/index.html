@@ -31,7 +31,7 @@
 </p>
 
 <pre class="example">
-extern timer;        // Declare timer as an external variable.
+extern timer;
 
 let x;               // Declare 'x' as dyn.
 let int y;           // Declare 'y' as int.
@@ -65,8 +65,6 @@ for (let i = 0; i < 50000000; ++i) { }</pre>
 </p>
 
 <pre class="example">
-extern trace;
-
 trace("    u8: " + sizeof (u8));
 trace("    i8: " + sizeof (i8));
 trace("   u16: " + sizeof (u16));
@@ -98,8 +96,6 @@ trace("Floating point literals are typed as double: " + 1.1 / 2);
 </p>
 
 <pre class="example">
-extern trace;
-
 let int x = 42;      // Declare 'x' as int and assign 42 to it.
 let int *y = &x;     /* Declare 'y' as a pointer to int and assign it
                         the address of x. Since JavaScript doesn't
@@ -111,14 +107,13 @@ trace(x);
 trace(x);
 **z = 12;
 trace(x);
-**z = ***(&z);       // You can get as fancy as you want.</pre>
+**z = ***(&z);       // You can get as fancy as you want.
+</pre>
 <p>
   Structs are defined using the <tt>struct</tt> keyword.
 </p>
 
 <pre class="example">
-extern trace;
-
 struct Point {
   int x, y, z;
 };
@@ -143,7 +138,6 @@ trace(b.top.start.x);</pre>
 </p>
 
 <pre class="example">
-extern trace;
 union Box {
   int i;
   float f;
@@ -193,8 +187,6 @@ unsafeQuux("123", 2, 123.456);</pre>
 </p>
 
 <pre class="example">
-extern trace;
-
 function void swap(int *a, int *b) {
   let int t = *a;
   *a = *b;
@@ -238,8 +230,6 @@ trace("x = " + x + ", y = " + y);</pre>
 </p>
 
 <pre class="example">
-extern trace;
-
 struct Node {
   Node *next;
   int value;
@@ -274,8 +264,6 @@ function void traceList(Node *p) {
 </p>
 
 <pre class="example">
-extern trace;
-
 // Import malloc. The casting is annoying -- we don't have a good
 // story for typed imports yet.
 typedef byte *malloc_ty(uint);
@@ -347,7 +335,6 @@ function ObjNode() {
   this.pad1 = this.pad2 = this.pad3 = this.pad4 = 0;
 }
 
-extern trace;
 extern Date;
 
 const int n = 250000;
@@ -429,6 +416,7 @@ trace("Objects: " + dt / 10 + " ms");
 <script src="lljs/escodegen.js"></script>
 <script src="lljs/estransform.js"></script>
 <script src="lljs/compiler.js"></script>
+<script src="lljs/memcheck.js"></script>
 <script src="lljs/memory.js"></script>
 <script src="lljs/ljc.js"></script>
 
@@ -437,10 +425,13 @@ var id = 0;
 $('.example').replaceWith(function() {
   var src = this.innerHTML;
   var lineCount = src.split("\n").length;
-  return '<table class="example"><tr><td><textarea id="ex:' + id + ':source" class="jcCode" rows="' + lineCount + '" spellcheck="false">' + src + '</textarea></td><td valign="top"><pre id="ex:' + id++ + ':result" class="jcResult"></pre></td></tr></table>'
+  var res = '<table class="example"><tr><td><textarea id="ex:' + id + ':source" class="jcCode" rows="' + lineCount + '" spellcheck="false">' + src + '</textarea></td><td valign="top"><pre id="ex:' + id + ':result" class="jcResult"></pre></td></tr></table><table class="toolbar"><tr><td><div id="ex:' + id + '" class="minibutton run" title="Ctrl-Enter">Run</div><div id="ex:' + id + '" style="margin-left: 10px" class="minibutton runMemCheck" title="Ctrl-Enter">Run with MemCheck</div></td></tr></table>';
+  id ++;
+  return res;
 });
 
 var lastMarker;
+
 function compileExample(ex) {
   if (lastMarker) {
     this.clearMarker(lastMarker);
@@ -454,7 +445,9 @@ function compileExample(ex) {
     } else {
       name = "ex" + number;
     }
-    result.innerHTML = LJC.compile(name, name, this.getValue(), { bare: true });
+    var source = this.getValue();
+    source = 'extern trace;\n' + source;
+    result.innerHTML = LJC.compile(name, name, source, { bare: true, memcheck: false });
   } catch (x) {
     result.innerHTML = x.message;
     if (x.lineNumber) {
@@ -494,11 +487,15 @@ function require(name) {
   return null;
 }
 
-function executeExample(id) {
+function executeExample(id, enableMemCheck) {
   var number = id.split(":")[1];
   var result = document.getElementById("ex:" + number + ":result");
   try {
-    memory.reset();
+    if (enableMemCheck) {
+      memory.set_memcheck(true);
+    } else {
+      memory.reset();
+    }
 
     timer = new Timer();
 
@@ -509,7 +506,14 @@ function executeExample(id) {
     };
 
     start = new Date();
-    var code = LJC.compile("ex" + number, "ex" + number, this.getValue(), {});
+    var source = this.getValue();
+    if (enableMemCheck) {
+      source = 'extern trace;\nlet $$$M = require("memory");\n' +
+               source + '\ntrace($$$M.memcheck.report());';
+    } else {
+      source = 'extern trace;\n' + source;
+    }
+    var code = LJC.compile("ex" + number, "ex" + number, source, { memcheck: !!enableMemCheck });
     result.innerHTML += "Compiled in: " + (new Date() - start) + " ms\n";
     result.innerHTML += "-----------------------------------------------------\n";
 
@@ -525,9 +529,11 @@ function executeExample(id) {
   }
 }
 
+var codeMirrors = {};
+
 $('.jcCode').each(function() {
   var id = this.id;
-  var cm = CodeMirror.fromTextArea(this, {
+  var cm = codeMirrors[id] = CodeMirror.fromTextArea(this, {
     tabSize: 2,
     lineNumbers: true,
     gutter: true,
@@ -544,6 +550,16 @@ $('.jcCode').each(function() {
     }
   });
   compileExample.call(cm, id);
+});
+
+$('.run').click(function() {
+  var number = this.id.split(":")[1];
+  executeExample.call(codeMirrors["ex:" + number + ":source"], this.id);
+});
+
+$('.runMemCheck').click(function() {
+  var number = this.id.split(":")[1];
+  executeExample.call(codeMirrors["ex:" + number + ":source"], this.id, true);
 });
 
 </script>
