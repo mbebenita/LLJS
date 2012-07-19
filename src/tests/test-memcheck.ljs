@@ -358,7 +358,7 @@ function test_callstack() {
     
     let errors = checker.getBadAccesses();
     assert(1, errors.length, "only had one bad access");
-    assertTrue(errors[0].trace.pop().indexOf("test_callstack") !== -1,
+    assertTrue(errors[0].trace[0].indexOf("test_callstack") !== -1,
               "this function should be on the top of the callstack")
     print("passed")
   }
