@@ -227,7 +227,7 @@
   const spTy = new PointerType(u32ty);
 
   const mallocTy = new ArrowType([u32ty], bytePointerTy);
-  const freeTy = new ArrowType([bytePointerTy], voidTy);
+  const freeTy = new ArrowType([undefined], voidTy);
 
   function createMemcpyType(pointerTy) {
     return new ArrowType([pointerTy, pointerTy, u32ty], pointerTy);
