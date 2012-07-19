@@ -227,7 +227,7 @@
   const spTy = new PointerType(u32ty);
 
   const mallocTy = new ArrowType([u32ty], bytePointerTy);
-  const freeTy = new ArrowType([undefined], voidTy);
+  const freeTy = new ArrowType([bytePointerTy], voidTy);
 
   function createMemcpyType(pointerTy) {
     return new ArrowType([pointerTy, pointerTy, u32ty], pointerTy);
@@ -1191,7 +1191,7 @@
 
     if (op === "delete" && ty) {
       check(ty instanceof PointerType, "cannot free non-pointer type");
-      return (new CallExpression(o.scope.FREE(), [this.argument], this.loc)).transform(o);
+      return (new CallExpression(o.scope.FREE(), [cast(this.argument, bytePointerTy)], this.loc)).transform(o);
     }
 
     if (op === "*") {
