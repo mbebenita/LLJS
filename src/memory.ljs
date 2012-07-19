@@ -275,7 +275,8 @@ function byte *malloc(int nBytes) {
 }
 
 
-function void free(byte *ap) {
+function void free(dyn a) {
+  let byte* ap = (byte*)(a);
   let Header *bp = (Header *)(ap) - 1, *p;
   if(enable_memcheck) {
     setInMemory(true);

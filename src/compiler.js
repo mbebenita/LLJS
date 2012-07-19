@@ -227,7 +227,7 @@
   const spTy = new PointerType(u32ty);
 
   const mallocTy = new ArrowType([u32ty], bytePointerTy);
-  const freeTy = new ArrowType([bytePointerTy], voidTy);
+  const freeTy = new ArrowType([undefined], voidTy);
 
   function createMemcpyType(pointerTy) {
     return new ArrowType([pointerTy, pointerTy, u32ty], pointerTy);
@@ -1838,6 +1838,7 @@
       body.push(new VariableDeclaration("const", [mdecl]));
       // todo: broken just like above
       if(name !== "memory") {
+        assert (memcheck !== undefined);
         body.push(new ExpressionStatement(
           new CallExpression(new MemberExpression(cachedMEMORY, new Identifier("set_memcheck")), 
                              [new Literal(memcheck)])));
