@@ -179,8 +179,8 @@ function getLeaks() {
 
 let callstack = [];
 
-function call_push(name, line, col) {
-  callstack.push(name + ":" + line + ":" + col)
+function call_push(name, fname, line, col) {
+  callstack.push(name + " (" + fname + ".ljs:" + line + ":" + col + ")")
 }
 function call_pop() {
   callstack.pop()
@@ -210,18 +210,18 @@ function report(limit) {
     return errors.map(function(val, idx) {
       let stack;
       if(val.trace.length === 0) {
-        stack = "<empty stack>";
+        stack = "at <empty stack>";
       } else {
-        stack = val.trace.reverse().join("\n\t");
+        stack = val.trace.reverse().join("\n\tat ");
       }
-      return val.membyte + " at:\n\t" + stack;
+      return "address " + val.membyte + "\n\t" + stack;
     }).join("\n")
   }
   
-  let leaks = "Leaks:\n" + fmtErrors(getLeaks());
-  let access = "Unallocated:\n" + fmtErrors(getBadAccesses());
-  let undef = "Undefined:\n" + fmtErrors(getBadUndefined());
-  let frees = "Bad frees:\n" + fmtErrors(getBadFrees());
+  let leaks = "== Memory Leaks ==\n" + fmtErrors(getLeaks());
+  let access = "== Access of unallocated memory ==\n" + fmtErrors(getBadAccesses());
+  let undef = "== Access of uninitialized memory ==\n" + fmtErrors(getBadUndefined());
+  let frees = "== Free of unallocated memory ==\n" + fmtErrors(getBadFrees());
   return [access, undef, frees, leaks].join("\n\n");
 }
 
