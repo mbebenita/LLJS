@@ -23,7 +23,7 @@
   }
   const MB = 1024 * 1024 | 0;
   const WORD_SIZE = 4;
-  const SIZE = 32 * MB / WORD_SIZE;
+  const SIZE = 256 * MB / WORD_SIZE;
   const STACK_SIZE = 2 * MB / WORD_SIZE;
   const HEAP_SIZE = SIZE - STACK_SIZE;
   // debug
@@ -228,8 +228,9 @@
     setInMemory(false);
     return 0;
   }
-  function free(ap) {
+  function free(a) {
     const $U4 = $M.U4;
+    var ap = a;
     var bp = (ap >> 2) - 1 * 2, p = 0;
     if (enable_memcheck) {
       setInMemory(true);

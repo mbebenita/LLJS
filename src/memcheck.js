@@ -147,8 +147,8 @@
     });
   }
   var callstack = [];
-  function call_push(name, line, col) {
-    callstack.push(name + ':' + line + ':' + col);
+  function call_push(name, fname, line, col) {
+    callstack.push(name + ' (' + fname + '.ljs:' + line + ':' + col + ')');
   }
   function call_pop() {
     callstack.pop();
@@ -175,17 +175,17 @@
       return errors.map(function (val, idx) {
         var stack;
         if (val.trace.length === 0) {
-          stack = '<empty stack>';
+          stack = 'at <empty stack>';
         } else {
-          stack = val.trace.reverse().join('\n\t');
+          stack = val.trace.reverse().join('\n\tat ');
         }
-        return val.membyte + ' at:\n\t' + stack;
+        return 'address ' + val.membyte + '\n\t' + stack;
       }).join('\n');
     }
-    var leaks = 'Leaks:\n' + fmtErrors(getLeaks());
-    var access = 'Unallocated:\n' + fmtErrors(getBadAccesses());
-    var undef = 'Undefined:\n' + fmtErrors(getBadUndefined());
-    var frees = 'Bad frees:\n' + fmtErrors(getBadFrees());
+    var leaks = '== Memory Leaks ==\n' + fmtErrors(getLeaks());
+    var access = '== Access of unallocated memory ==\n' + fmtErrors(getBadAccesses());
+    var undef = '== Access of uninitialized memory ==\n' + fmtErrors(getBadUndefined());
+    var frees = '== Free of unallocated memory ==\n' + fmtErrors(getBadFrees());
     return [
       access,
       undef,
