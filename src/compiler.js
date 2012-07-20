@@ -1,31 +1,14 @@
 (function (exports) {
   if (typeof process !== "undefined") {
     var util = require("./util.js");
-  } else {
-    var util = this.util;
-  }
-
-  if (typeof process !== "undefined") {
     var T = require("./estransform.js");
-  } else {
-    var T = estransform;
-  }
-
-  if (typeof process !== "undefined") {
-    var jsFrontend = require("./js_frontend.js");
-  } else {
-    load("./js_frontend.js");
-  }
-
-  if (typeof process !== "undefined") {
     var S = require("./scope.js");
-  } else {
-    load("./scope.js");
-  }
-
-  if (typeof process !== "undefined") {
     var Types = require("./types.js");
   } else {
+    var util = this.util;
+    var T = estransform;
+    load("./scope.js");
+    var S = scope;
     load("./types.js");
   }
 
