@@ -2,20 +2,49 @@
 
   if (typeof process !== "undefined") {
     var util = require("./util.js");
-  } else {
-    var util = this.util;
-  }
-
-  if (typeof process !== "undefined") {
+    var T = require("./estransform.js");
     var Types = require("./types.js");
   } else {
-    load("./types.js");
+    var util = this.util;
+    var T = this.T;
+    var Types = this.Types;
   }
+
+  /**
+   * Import nodes.
+   */
+  const Node = T.Node;
+  const Literal = T.Literal;
+  const Identifier = T.Identifier;
+  const VariableDeclaration = T.VariableDeclaration;
+  const VariableDeclarator = T.VariableDeclarator;
+  const MemberExpression = T.MemberExpression;
+  const BinaryExpression = T.BinaryExpression;
+  const SequenceExpression = T.SequenceExpression;
+  const CallExpression = T.CallExpression;
+  const AssignmentExpression = T.AssignmentExpression;
+  const ExpressionStatement = T.ExpressionStatement;
+  const ReturnStatement = T.ReturnStatement;
+  const Program = T.Program;
+  const FunctionDeclaration = T.FunctionDeclaration;
+  const FunctionExpression = T.FunctionExpression;
+  const ConditionalExpression = T.ConditionalExpression;
+  const ObjectExpression = T.ObjectExpression;
+  const UnaryExpression = T.UnaryExpression;
+  const NewExpression = T.NewExpression;
+  const UpdateExpression = T.UpdateExpression;
+  const ForStatement = T.ForStatement;
+  const BlockStatement = T.BlockStatement;
+  const CatchClause = T.CatchClause;
+  const ThisExpression = T.ThisExpression;
+  const TypeAliasDirective = T.TypeAliasDirective;
+  const CastExpression = T.CastExpression;
 
   /**
    * Import utilities.
    */
   const assert = util.assert;
+  const cast = util.cast;
 
   /**
    * Import types.
