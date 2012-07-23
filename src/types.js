@@ -193,6 +193,7 @@
 
   exports.wordTy = wordTy;
   exports.voidTy = voidTy;
+  exports.nullTy = nullTy;
   exports.bytePointerTy = bytePointerTy;
   exports.spTy = spTy;
 
