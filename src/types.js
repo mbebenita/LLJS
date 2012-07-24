@@ -175,6 +175,7 @@
   exports.TypeAlias = TypeAlias;
   exports.PrimitiveType = PrimitiveType;
   exports.StructType = StructType;
+  exports.UnionType = UnionType;
   exports.PointerType = PointerType;
   exports.ArrowType = ArrowType;
   exports.builtinTypes = builtinTypes;
