@@ -3078,8 +3078,12 @@
       if (match('}')) {
         break;
       }
-      list.push.apply(list, parseVariableDeclarationList("field", true,
-                                                         parseTypeIdentifier()));
+      if (matchKeyword("function")) {
+        list.push(parseFunctionDeclaration());
+      } else {
+        list.push.apply(list, parseVariableDeclarationList("field", true,
+                                                           parseTypeIdentifier()));
+      }
       consumeSemicolon();
     }
     expect('}');
