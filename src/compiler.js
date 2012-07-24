@@ -300,14 +300,14 @@
 
   UnionType.prototype.lint = function () {
     var maxAlignSize = 1;
-    var maxAlignSizeType = u8ty;
+    var maxAlignSizeType = Types.u8ty;
     var fields = this.fields
     var field, type;
     for (var i = 0, j = fields.length; i < j; i++) {
       field = fields[i];
       type = field.type;
       check(type, "cannot have untyped field");
-      check(type.size, "cannot have fields of size 0 type " + quote(tystr(type, 0)));
+      check(type.size, "cannot have fields of size 0 type " + quote(Types.tystr(type, 0)));
 
       if (type.align.size > maxAlignSize) {
         maxAlignSize = type.align.size;
@@ -518,7 +518,7 @@
   };
 
   PointerType.prototype.assignableFrom = function (other) {
-    if (other === nullTy
+    if (other === Types.nullTy
         || (other instanceof PointerType && this.base.assignableFrom(other.base))
         || (other instanceof PrimitiveType && other.integral)) {
       return true;
@@ -789,7 +789,7 @@
 
     if (op === "delete" && ty) {
       check(ty instanceof PointerType, "cannot free non-pointer type");
-      return (new CallExpression(o.scope.FREE(), [cast(this.argument, bytePointerTy)], this.loc)).transform(o);
+      return (new CallExpression(o.scope.FREE(), [cast(this.argument, Types.bytePointerTy)], this.loc)).transform(o);
     }
 
     if (op === "*") {
@@ -830,7 +830,7 @@
                this.callee.computed &&
                (ty = o.types[this.callee.object.name])) {
       var size = new BinaryExpression("*", new Literal(ty.size), this.callee.property, this.loc);
-      var alloc = new CallExpression(o.scope.MALLOC(), [cast(size, u32ty)], this.loc);
+      var alloc = new CallExpression(o.scope.MALLOC(), [cast(size, Types.u32ty)], this.loc);
       return cast(alloc.transform(o), new PointerType(ty));
     }
     return Node.prototype.transform.call(this, o);
