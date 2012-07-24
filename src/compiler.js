@@ -370,7 +370,7 @@
   Scope.prototype.addVariable = function addVariable(variable, external) {
     assert(variable);
     assert(!variable.frame);
-    assert(!this.variables[variable.name]);
+    assert(!this.variables[variable.name], "Scope already has a variable named " + variable.name);
     variable.frame = this.frame;
 
     var variables = this.variables;
@@ -814,12 +814,17 @@
   };
 
   TypeAliasDirective.prototype.scan = function (o) {
+    var scope;
     var thisTy = new PointerType(o.types[this.original.id.name]);
     if (this.original instanceof T.StructType) {
       var fields = this.original.fields;
       for (var i = 0; i < fields.length; i++) {
         if (fields[i] instanceof FunctionDeclaration) {
+          if (!scope) {
+            scope = new Frame(o.scope, "Struct " + this.original.id.name);
+          }
           o = extend(o, { thisTy: thisTy });
+          o.scope = scope;
           fields[i].scan(o);
         }
       }
@@ -1273,13 +1278,15 @@
       var pty = new PointerType(ty)
       var alloc = new CallExpression(o.scope.MALLOC(), [cast(new Literal(ty.size), u32ty)], this.loc);
       alloc = cast(alloc.transform(o), pty);
-      var hasConstructor = ty.getField(ty.name);
-      if (hasConstructor) {
+      var field = ty.getField(ty.name);
+      if (field) {
+        logger.push(this);
         var tmp = o.scope.freshTemp(pty, this.loc);
         var assignment = new AssignmentExpression(tmp, "=", alloc, this.loc);
-        var constructor = new MemberExpression(new Identifier(ty.name + "$" + ty.name), new Identifier("call"));
-        var callConstructor = new CallExpression(constructor, [assignment].concat(this.arguments), this.loc);
+        var constructor = cast(new MemberExpression(new Identifier(ty.name + "$" + ty.name), new Identifier("call"), false), field.type, true);
+        var callConstructor = new CallExpression(constructor, [assignment].concat(this.arguments), this.loc).transform(o);
         var val = new SequenceExpression([callConstructor, tmp], this.loc);
+        logger.pop();
         return cast(val, pty, true);
       }
       return alloc;
