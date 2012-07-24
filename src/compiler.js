@@ -407,15 +407,15 @@
   Scope.prototype.MEMSET = function MEMSET(size) {
     return this.frame.MEMSET(size);
   };
-  
+
   Scope.prototype.MEMCHECK_CALL_PUSH = function MEMCHECK_CALL_PUSH() {
     return this.frame.MEMCHECK_CALL_PUSH();
   };
-  
+
   Scope.prototype.MEMCHECK_CALL_RESET = function MEMCHECK_CALL_RESET() {
     return this.frame.MEMCHECK_CALL_RESET();
   };
-  
+
   Scope.prototype.MEMCHECK_CALL_POP = function MEMCHECK_CALL_POP() {
     return this.frame.MEMCHECK_CALL_POP();
   };
@@ -484,15 +484,15 @@
     }
     return getCachedLocal(this, name, ty);
   };
-  
+
   Frame.prototype.MEMCHECK_CALL_PUSH = function MEMCHECK_CALL_PUSH() {
     return getCachedLocal(this, "memcheck_call_push", "dyn");
   };
-  
+
   Frame.prototype.MEMCHECK_CALL_RESET = function MEMCHECK_CALL_RESET() {
     return getCachedLocal(this, "memcheck_call_reset", "dyn");
   };
-  
+
   Frame.prototype.MEMCHECK_CALL_POP = function MEMCHECK_CALL_POP() {
     return getCachedLocal(this, "memcheck_call_pop", "dyn");
   };
@@ -1011,7 +1011,7 @@
     node.ty = ty;
     return node;
   }
-  
+
   Node.prototype.transform = T.makePass("transform", "transformNode");
 
   function compileList(list, o) {
@@ -1054,7 +1054,7 @@
     o = extend(o);
     o.scope = this.frame;
 
-    
+
     assert(this.body instanceof BlockStatement);
     this.body.body = compileList(this.body.body, o);
 
@@ -1671,8 +1671,8 @@
         variables.push(v);
       }
     }
-    
-      
+
+
 
     // Do this after the SP calculation since it might bring in U4. Since this
     // is after, we need to unshift.
@@ -1720,7 +1720,7 @@
     }
     return translist;
   }
-  
+
 
   Node.prototype.lower = T.makePass("lower", "lowerNode");
 
@@ -1780,7 +1780,7 @@
     this.body = lowerList(this.body, o);
     return this;
   };
-  
+
   function findParentFun(scope) {
     var name;
     while(scope.parent) {
@@ -1900,9 +1900,9 @@
     lowered.ty = this.ty;
     return lowered;
   };
-  
 
-  
+
+
   /**
    * Driver
    */
@@ -1916,7 +1916,7 @@
     var cachedMEMORY = program.frame.cachedMEMORY;
     if (cachedMEMORY) {
       var mdecl;
-      // todo: causes all files named "memory.ljs" to be compiled with the memory 
+      // todo: causes all files named "memory.ljs" to be compiled with the memory
       // var pointing at exports, probably want a better way of doing that...
       if (name === "memory") {
         mdecl = new VariableDeclarator(cachedMEMORY, new Identifier("exports"));

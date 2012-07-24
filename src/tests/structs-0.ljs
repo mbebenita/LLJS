@@ -1,0 +1,46 @@
+extern Math;
+extern console;
+
+struct Point {
+  int x, y;
+  function Point (int x, int y) {
+    this->x = x;
+    this->y = y;
+  }
+  function toString() {
+    return "{x: " + this->x + ", y: " + this->y + "}";
+  }
+}
+
+struct Line {
+  Point a, b;
+  function Line (int x1, int y1, int x2, int y2) {
+    this->a.x = x1;
+    this->a.y = y1;
+    this->b.x = x2;
+    this->b.y = y2;
+  }
+  function float getLength() {
+    let float dx = this->a.x - this->b.x;
+    let float dy = this->a.y - this->b.y;
+    return float(Math.sqrt(dx * dx + dy * dy));
+  }
+  function toString() {
+    return "{" + this->a.toString() + " -> " + this->b.toString() + "}";
+  }
+}
+
+let Point * p = new Point(1, 2);
+
+console.info(p->toString());
+
+let Line * l = new Line(1, 2, 3, 4);
+
+console.info(l->toString());
+
+let Line l1; // We need a syntax to call the ctor here.
+
+console.info(l1.toString());
+
+console.info(l1.a.toString());
+console.info(l1.b.toString());
