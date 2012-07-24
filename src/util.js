@@ -1,4 +1,11 @@
 (function (exports) {
+  if (typeof process !== "undefined") {
+    var T = require("./estransform.js");
+  } else {
+    var T = estransform;
+  }
+
+  const CastExpression = T.CastExpression;
 
   function assert(condition, message) {
     if (!condition) {
@@ -37,6 +44,15 @@
       return s.substring(1, s.length - 1);
     }
     return s;
+  }
+
+  function cast(node, ty, force) {
+    if ((node.ty || force) && node.ty !== ty) {
+      node = new CastExpression(undefined, node, node.loc);
+      node.force = force;
+    }
+    node.ty = ty;
+    return node;
   }
 
   var OptParser = (function () {
@@ -421,5 +437,6 @@
   exports.quote = quote;
   exports.clone = clone;
   exports.extend = extend;
+  exports.cast = cast;
 
 }(typeof exports === 'undefined' ? (util = {}) : exports));

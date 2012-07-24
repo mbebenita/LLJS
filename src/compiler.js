@@ -66,6 +66,7 @@
   const quote = util.quote;
   const clone = util.clone;
   const extend = util.extend;
+  const cast = util.cast;
 
   /**
    * Import scopes.
@@ -569,15 +570,6 @@
     return this.returnType.assignableFrom(other.returnType);
   };
 
-  function cast(node, ty, force) {
-    if ((node.ty || force) && node.ty !== ty) {
-      node = new CastExpression(undefined, node, node.loc);
-      node.force = force;
-    }
-    node.ty = ty;
-    return node;
-  }
-  
   Node.prototype.transform = T.makePass("transform", "transformNode");
 
   function compileList(list, o) {
