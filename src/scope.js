@@ -158,7 +158,7 @@
       variable.name = this.freshName(name, variable);
     }
 
-    logger.info("added variable " + variable + " to scope " + this);
+    //logger.info("added variable " + variable + " to scope " + this);
   };
 
   Scope.prototype.MEMORY = function MEMORY() {
