@@ -37,8 +37,9 @@ console.info(p->toString());
 let Line * l = new Line(1, 2, 3, 4);
 
 console.info(l->toString());
+console.info(l->getLength());
 
-let Line l1; // We need a syntax to call the ctor here.
+let Line l1 (1, 2, 3, 4), l2 (2, 3, 4, 5), *l3;
 
 console.info(l1.toString());
 

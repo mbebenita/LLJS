@@ -2203,6 +2203,12 @@
         id = parseVariableIdentifier(),
         init = null;
 
+    var args = undefined;
+
+    if (match('(')) {
+      args = parseArguments();
+    }
+
     // 12.2.1
     if (strict && isRestrictedWord(id.name)) {
       throwError({}, Messages.StrictVarName);
@@ -2219,6 +2225,7 @@
     return {
       type: kind === 'field' ? Syntax.FieldDeclarator : Syntax.VariableDeclarator,
       decltype: declaredType,
+      arguments: args,
       id: id,
       init: init
     };

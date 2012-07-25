@@ -118,7 +118,7 @@
 
     VariableDeclarator: {
       extends: "Node",
-      fields:  ["@id", "@init", "@decltype"]
+      fields:  ["@id", "@init", "@decltype", "@arguments"]
     },
 
     Expression: {

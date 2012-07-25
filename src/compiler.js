@@ -701,9 +701,19 @@
 
     if (!this.init && ty && typeof ty.defaultValue !== "undefined") {
       this.init = new Literal(ty.defaultValue);
-   }
+    }
 
-    if (this.init) {
+    if (this.arguments) {
+      var field = ty.getField(ty.name);
+      if (field) {
+        var constructor = new MemberExpression(new Identifier(ty.name + "$" + ty.name), new Identifier("call"), false);
+        constructor = cast(constructor, field.type, true);
+        var obj = new UnaryExpression("&", this.id, this.loc).transform(o);
+        var callConstructor = new CallExpression(constructor, [obj].concat(this.arguments), this.loc).transform(o);
+        // TODO: This is kind of retarded.
+        this.init = new SequenceExpression([callConstructor, this.id]);
+      }
+    } else if (this.init) {
       var a = (new AssignmentExpression(this.id, "=", this.init, this.init.loc)).transform(o);
       this.id = a.left;
       this.init = a.right;
@@ -836,29 +846,31 @@
 
   NewExpression.prototype.transform = function (o) {
     var ty;
-
     if (this.callee instanceof Identifier && (ty = o.types[this.callee.name])) {
       var pty = new PointerType(ty)
-      var alloc = new CallExpression(o.scope.MALLOC(), [cast(new Literal(ty.size), u32ty)], this.loc);
-      alloc = cast(alloc.transform(o), pty);
+      var allocation = new CallExpression(o.scope.MALLOC(), [cast(new Literal(ty.size), Types.u32ty)], this.loc);
+      allocation = cast(allocation.transform(o), pty);
+      // Check if we have a constructor ArrowType.
       var field = ty.getField(ty.name);
       if (field) {
+        assert (field.type instanceof ArrowType);
         logger.push(this);
         var tmp = o.scope.freshTemp(pty, this.loc);
-        var assignment = new AssignmentExpression(tmp, "=", alloc, this.loc);
-        var constructor = cast(new MemberExpression(new Identifier(ty.name + "$" + ty.name), new Identifier("call"), false), field.type, true);
+        var assignment = new AssignmentExpression(tmp, "=", allocation, this.loc);
+        var constructor = new MemberExpression(new Identifier(ty.name + "$" + ty.name), new Identifier("call"), false);
+        constructor = cast(constructor, field.type, true);
         var callConstructor = new CallExpression(constructor, [assignment].concat(this.arguments), this.loc).transform(o);
-        var val = new SequenceExpression([callConstructor, tmp], this.loc);
+        allocation = new SequenceExpression([callConstructor, tmp], this.loc);
         logger.pop();
-        return cast(val, pty, true);
+        return cast(allocation, pty, true);
       }
-      return alloc;
+      return allocation;
     } else if (this.callee instanceof MemberExpression &&
                this.callee.computed &&
                (ty = o.types[this.callee.object.name])) {
       var size = new BinaryExpression("*", new Literal(ty.size), this.callee.property, this.loc);
-      var alloc = new CallExpression(o.scope.MALLOC(), [cast(size, Types.u32ty)], this.loc);
-      return cast(alloc.transform(o), new PointerType(ty));
+      var allocation = new CallExpression(o.scope.MALLOC(), [cast(size, Types.u32ty)], this.loc);
+      return cast(allocation.transform(o), new PointerType(ty));
     }
     return Node.prototype.transform.call(this, o);
   };
@@ -963,23 +975,27 @@
 
     check(prop instanceof Identifier, "invalid property name.");
     var field = this.structField = oty.getField(prop.name);
-    check(field, "Unknown field " + quote(prop.name) + " of type " + quote(tystr(oty, 0)));
+    check(field, "Unknown field " + quote(prop.name) + " of type " + quote(Types.tystr(oty, 0)));
 
+
+    // Expressions of the form |o->f(x, y)| need to be translated into |f(o, x, y)|. Here we
+    // see the |o->f| part so we mark it as a |MemberFunctionCall| and take care of it when we
+    // transform the CallExpression.
     if (field.type instanceof ArrowType) {
+      // Normalize the form |o.f| into |&o->f| to simplify things.
       if (!(obj.ty instanceof PointerType)) {
         obj = new UnaryExpression("&", obj, this.loc).transform(o);
       }
       return new MemberFunctionCall(obj, field);
     }
-
     return cast(this, field.type);
   };
 
   CallExpression.prototype.transformNode = function (o) {
+
     if (this.callee instanceof MemberFunctionCall) {
-      var callee = this.callee;
-      var obj = callee.object;
-      var field = callee.field;
+      var obj = this.callee.object;
+      var field = this.callee.field;
       var name = obj.ty.base.name + "$" + field.name;
       var fn = cast(new MemberExpression (
         new Identifier(name),
