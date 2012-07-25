@@ -50,7 +50,12 @@
   function dereference(address, byteOffset, ty, scope, loc) {
     assert(scope);
     address = alignAddress(address, byteOffset, ty);
-    var expr = new MemberExpression(scope.getView(ty), address, true, loc);
+    var expr;
+    if (ty.arraySize) {
+      expr = address;
+    } else {
+      expr = new MemberExpression(scope.getView(ty), address, true, loc);
+    }
     // Remember (coerce) the type so we can realign, but *do not* cast.
     expr.ty = ty;
     return expr;

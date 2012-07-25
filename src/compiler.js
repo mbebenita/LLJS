@@ -429,6 +429,10 @@
     var name = this.id.name;
     var ty = this.decltype ? this.decltype.reflect(o) : undefined;
 
+    if (this.arraySize) {
+      ty.arraySize = this.arraySize;
+    }
+
     check(!scope.getVariable(name, true),
           "Variable " + quote(name) + " is already declared in local scope.");
     scope.addVariable(new Variable(name, ty), o.declkind === "extern");
@@ -658,7 +662,7 @@
     var variable = this.id.variable;
     var ty = this.id.ty;
 
-    if (!this.init && ty && typeof ty.defaultValue !== "undefined") {
+    if (!this.init && ty && typeof ty.defaultValue !== "undefined" && !ty.arraySize) {
       this.init = new Literal(ty.defaultValue);
     }
 
@@ -1311,6 +1315,10 @@
   };
 
   VariableDeclarator.prototype.lowerNode = function (o) {
+    if (this.id.ty && this.id.ty.arraySize) {
+      return null;
+    }
+
     if (!(this.id instanceof Identifier)) {
       if (this.init) {
         this.init = new AssignmentExpression(this.id, "=", this.init, this.init.loc);
@@ -1486,6 +1494,7 @@
     // Pass 3.
     logger.info("Pass 3");
     node = node.transform(o);
+
     // Pass 4.
     logger.info("Pass 4");
     node = node.lower(o);

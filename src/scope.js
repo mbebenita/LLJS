@@ -64,7 +64,8 @@
   function Variable(name, type) {
     this.name = name;
     this.type = type;
-    this.isStackAllocated = type instanceof StructType;
+    this.isStackAllocated = (type instanceof StructType ||
+                             (type && type.arraySize !== undefined));
   }
 
   Variable.prototype.toString = function () {
@@ -306,8 +307,12 @@
     for (var name in mangles) {
       var variable = mangles[name];
       if (mangles[name].isStackAllocated) {
+        var size = variable.type.size;
+        if (variable.type.arraySize) {
+          size = variable.type.base.size*variable.type.arraySize;
+        }
         variable.wordOffset = wordOffset;
-        wordOffset += alignTo(variable.type.size, wordSize * 2) / wordSize;
+        wordOffset += alignTo(size, wordSize * 2) / wordSize;
       }
     }
 

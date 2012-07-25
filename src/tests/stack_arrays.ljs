@@ -1,0 +1,49 @@
+extern print;
+
+let passed = true;
+function assert(test, testStr) {
+  if (test !== true) {
+    print("ASSERTION FAILED: " + testStr);
+    passed = false;
+  }
+}
+
+struct ST {
+  int x;
+};
+
+(function frame0() {
+  let int arr[100];
+  arr[0] = 5;
+  arr[1] = 10;
+  assert(*arr === 5, "dereferencing array");
+  assert(arr[0] === 5, "access first element");
+  assert(arr[1] === 10, "access second element");
+
+  let ST s;
+  assert(&s-arr === 100, "s is 100 offsets after arr");
+})();
+
+(function other_types() {
+  let u8 arr[100];
+  arr[0] = 5;
+  arr[1] = 10;
+  assert(*arr === 5, "dereferencing array");
+  assert(arr[0] === 5, "access first element");
+  assert(arr[1] === 10, "access second element");
+
+  let float arr2[100];
+  arr2[0] = 5;
+  arr2[1] = 10;
+  assert(*arr2 === 5, "dereferencing array");
+  assert(arr2[0] === 5, "access first element");
+  assert(arr2[1] === 10, "access second element");
+
+  let ST s;
+  assert(&s-arr === 126, "s is 126 offsets after arr");
+})();
+
+if (passed)
+  print("SUCCESS");
+else
+  print("FAILURE");

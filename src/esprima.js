@@ -2203,8 +2203,30 @@
         init = null;
 
     var args = undefined;
+    var arraySize = undefined;
 
-    if (match('(')) {
+    if (match('[')) {
+      if (kind === 'const') {
+        throwError({}, Messages.ArrayConstant);
+      }
+
+      lex();
+
+      declaredType = {
+        type: Syntax.PointerType,
+        base: declaredType
+      };
+
+      var token = lex();
+
+      if (token.type !== Token.NumericLiteral || Math.round(token.value) !== token.value) {
+        throwError(token, Messages.ArraySizeIntegral);
+      }
+
+      arraySize = token.value;
+
+      expect(']');
+    } else if (match('(')) {
       args = parseArguments();
     }
 
@@ -2225,6 +2247,7 @@
       type: kind === 'field' ? Syntax.FieldDeclarator : Syntax.VariableDeclarator,
       decltype: declaredType,
       arguments: args,
+      arraySize: arraySize,
       id: id,
       init: init
     };
