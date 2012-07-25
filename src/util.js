@@ -1,11 +1,87 @@
 (function (exports) {
+  var T, Types;
   if (typeof process !== "undefined") {
-    var T = require("./estransform.js");
+    T = require("./estransform.js");
+    Types = require("./types.js");
   } else {
-    var T = estransform;
+    T = estransform;
+    Types = this.Types;
   }
 
   const CastExpression = T.CastExpression;
+  const BinaryExpression = T.BinaryExpression;
+  const Literal = T.Literal;
+  const MemberExpression = T.MemberExpression;
+
+
+  function realign(expr, lalign) {
+    assert(expr.ty instanceof Types.PointerType);
+    var ralign = expr.ty.base.align.size;
+
+    if (lalign === ralign) {
+      return expr;
+    }
+
+    var ratio, op;
+    if (lalign < ralign) {
+      ratio = ralign / lalign;
+      op = "<<";
+    } else {
+      ratio = lalign / ralign;
+      op = ">>";
+    }
+
+    return new BinaryExpression(op, expr, new Literal(log2(ratio)), expr.loc);
+  }
+
+  function alignAddress(base, byteOffset, ty) {
+    var address = realign(base, ty.align.size);
+    if (byteOffset !== 0) {
+      assert(isAlignedTo(byteOffset, ty.align.size), "unaligned byte offset " + byteOffset +
+             " for type " + quote(ty) + " with alignment " + ty.align.size);
+      var offset = byteOffset / ty.align.size;
+      address = new BinaryExpression("+", address, new Literal(offset), address.loc);
+    }
+    // Remember (coerce) the type of the address for realign, but *do not* cast.
+    address.ty = new Types.PointerType(ty);
+    return address;
+  }
+
+  function dereference(address, byteOffset, ty, scope, loc) {
+    assert(scope);
+    address = alignAddress(address, byteOffset, ty);
+    var expr = new MemberExpression(scope.getView(ty), address, true, loc);
+    // Remember (coerce) the type so we can realign, but *do not* cast.
+    expr.ty = ty;
+    return expr;
+  }
+
+
+  function isInteger(x) {
+    return (parseInt(x) | 0) === Number(x);
+  }
+
+  function isPowerOfTwo(x) {
+    return x && ((x & (x - 1)) === 0);
+  }
+
+  function log2(x) {
+    assert (isPowerOfTwo(x), "Value " + x + " is not a power of two.");
+    return Math.log(x) / Math.LN2;
+  }
+
+  function div4(x) {
+    assert (x % 4 === 0, "Value " + x + " is not divisible by four.");
+    return x / 4;
+  }
+
+  function isAlignedTo(offset, alignment) {
+    return offset & ~(alignment - 1);
+  }
+
+  function alignTo(offset, alignment) {
+    return (offset + (alignment - 1)) & ~(alignment - 1);
+  }
 
   function assert(condition, message) {
     if (!condition) {
@@ -438,5 +514,13 @@
   exports.clone = clone;
   exports.extend = extend;
   exports.cast = cast;
+  exports.isInteger = isInteger;
+  exports.isPowerOfTwo = isPowerOfTwo;
+  exports.log2 = log2;
+  exports.div4 = div4;
+  exports.isAlignedTo = isAlignedTo;
+  exports.alignTo = alignTo;
+  exports.dereference = dereference;
+  exports.realign = realign;
 
 }(typeof exports === 'undefined' ? (util = {}) : exports));

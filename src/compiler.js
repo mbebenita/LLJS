@@ -1,16 +1,23 @@
 (function (exports) {
+  var util, T, S, Types;
   if (typeof process !== "undefined") {
-    var util = require("./util.js");
-    var T = require("./estransform.js");
-    var S = require("./scope.js");
-    var Types = require("./types.js");
-  } else {
-    var util = this.util;
-    var T = estransform;
+    util = require("./util.js");
+    T = require("./estransform.js");
+    S = require("./scope.js");
+    Types = require("./types.js");
+  } else if (typeof snarf !== "undefined") {
+    util = this.util;
+    T = estransform;
     load("./scope.js");
-    var S = scope;
+    S = scope;
     load("./types.js");
+  } else {
+    util = this.util;
+    T = estransform;
+    S = scope;
+    Types = this.Types;
   }
+
 
   /**
    * Import nodes.
@@ -50,6 +57,14 @@
   const clone = util.clone;
   const extend = util.extend;
   const cast = util.cast;
+  const isInteger = util.isInteger;
+  const isPowerOfTwo = util.isPowerOfTwo;
+  const log2 = util.log2;
+  const div4 = util.div4;
+  const isAlignedTo = util.isAlignedTo;
+  const alignTo = util.alignTo;
+  const dereference = util.dereference;
+  const realign = util.realign;
 
   /**
    * Import scopes.
@@ -72,32 +87,6 @@
   /**
    * Misc utility functions.
    */
-
-  function isInteger(x) {
-    return (parseInt(x) | 0) === Number(x);
-  }
-
-  function isPowerOfTwo(x) {
-    return x && ((x & (x - 1)) === 0);
-  }
-
-  function log2(x) {
-    assert (isPowerOfTwo(x), "Value " + x + " is not a power of two.");
-    return Math.log(x) / Math.LN2;
-  }
-
-  function div4(x) {
-    assert (x % 4 === 0, "Value " + x + " is not divisible by four.");
-    return x / 4;
-  }
-
-  function isAlignedTo(offset, alignment) {
-    return offset & ~(alignment - 1);
-  }
-
-  function alignTo(offset, alignment) {
-    return (offset + (alignment - 1)) & ~(alignment - 1);
-  }
 
   function check(condition, message, warn) {
     if (!condition) {
@@ -1083,48 +1072,6 @@
   ArrowType.prototype.convert = function (expr) {
     return expr;
   };
-
-  function realign(expr, lalign) {
-    assert(expr.ty instanceof PointerType);
-    var ralign = expr.ty.base.align.size;
-
-    if (lalign === ralign) {
-      return expr;
-    }
-
-    var ratio, op;
-    if (lalign < ralign) {
-      ratio = ralign / lalign;
-      op = "<<";
-    } else {
-      ratio = lalign / ralign;
-      op = ">>";
-    }
-
-    return new BinaryExpression(op, expr, new Literal(log2(ratio)), expr.loc);
-  }
-
-  function alignAddress(base, byteOffset, ty) {
-    var address = realign(base, ty.align.size);
-    if (byteOffset !== 0) {
-      assert(isAlignedTo(byteOffset, ty.align.size), "unaligned byte offset " + byteOffset +
-             " for type " + quote(ty) + " with alignment " + ty.align.size);
-      var offset = byteOffset / ty.align.size;
-      address = new BinaryExpression("+", address, new Literal(offset), address.loc);
-    }
-    // Remember (coerce) the type of the address for realign, but *do not* cast.
-    address.ty = new PointerType(ty);
-    return address;
-  }
-
-  function dereference(address, byteOffset, ty, scope, loc) {
-    assert(scope);
-    address = alignAddress(address, byteOffset, ty);
-    var expr = new MemberExpression(scope.getView(ty), address, true, loc);
-    // Remember (coerce) the type so we can realign, but *do not* cast.
-    expr.ty = ty;
-    return expr;
-  }
 
   function createPrologue(node, o) {
     assert(node.frame);

@@ -1,13 +1,13 @@
 (function (exports) {
-
+  var util, T, Types;
   if (typeof process !== "undefined") {
-    var util = require("./util.js");
-    var T = require("./estransform.js");
-    var Types = require("./types.js");
+    util = require("./util.js");
+    T = require("./estransform.js");
+    Types = require("./types.js");
   } else {
-    var util = this.util;
-    var T = this.T;
-    var Types = this.Types;
+    util = this.util;
+    T = estransform;
+    Types = this.Types;
   }
 
   /**
@@ -45,6 +45,8 @@
    */
   const assert = util.assert;
   const cast = util.cast;
+  const alignTo = util.alignTo;
+  const dereference = util.dereference;
 
   /**
    * Import types.
