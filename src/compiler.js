@@ -184,6 +184,9 @@
 
     startResolving(this);
     this.base = this.base.resolve(types, true);
+    if (this.arraySize) {
+      this.size = this.base.size*this.arraySize;
+    }
     finishResolving(this);
     return this;
   };
@@ -228,9 +231,6 @@
   PointerType.prototype.lint = function () {
     check(this.base, "pointer without base type");
     check(this.base.size, "cannot take pointer of size 0 type " + quote(Types.tystr(this.base, 0)));
-    if (this.arraySize) {
-      this.size = this.base.size*this.arraySize;
-    }
   };
 
   StructType.prototype.lint = function () {
