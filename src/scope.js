@@ -308,9 +308,6 @@
       var variable = mangles[name];
       if (mangles[name].isStackAllocated) {
         var size = variable.type.size;
-        if (variable.type.arraySize) {
-          size = variable.type.base.size*variable.type.arraySize;
-        }
         variable.wordOffset = wordOffset;
         wordOffset += alignTo(size, wordSize * 2) / wordSize;
       }

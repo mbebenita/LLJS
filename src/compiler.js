@@ -128,6 +128,10 @@
   T.PointerType.prototype.construct = function () {
     var ty = new PointerType(this.base.construct());
     ty.node = this;
+
+    if (this.arraySize) {
+      ty.arraySize = this.arraySize;
+    }
     return ty;
   };
 
@@ -224,6 +228,9 @@
   PointerType.prototype.lint = function () {
     check(this.base, "pointer without base type");
     check(this.base.size, "cannot take pointer of size 0 type " + quote(Types.tystr(this.base, 0)));
+    if (this.arraySize) {
+      this.size = this.base.size*this.arraySize;
+    }
   };
 
   StructType.prototype.lint = function () {
@@ -428,10 +435,6 @@
 
     var name = this.id.name;
     var ty = this.decltype ? this.decltype.reflect(o) : undefined;
-
-    if (this.arraySize) {
-      ty.arraySize = this.arraySize;
-    }
 
     check(!scope.getVariable(name, true),
           "Variable " + quote(name) + " is already declared in local scope.");

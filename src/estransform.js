@@ -118,7 +118,7 @@
 
     VariableDeclarator: {
       extends: "Node",
-      fields:  ["@id", "@init", "@decltype", "@arguments", "arraySize"]
+      fields:  ["@id", "@init", "@decltype", "@arguments"]
     },
 
     Expression: {
@@ -259,7 +259,7 @@
 
     PointerType: {
       extends: "Type",
-      fields: ["@base"]
+      fields: ["@base", "arraySize"]
     },
 
     StructType: {

@@ -2203,7 +2203,6 @@
         init = null;
 
     var args = undefined;
-    var arraySize = undefined;
 
     if (match('[')) {
       if (kind === 'const') {
@@ -2223,7 +2222,7 @@
         throwError(token, Messages.ArraySizeIntegral);
       }
 
-      arraySize = token.value;
+      declaredType.arraySize = token.value;
 
       expect(']');
     } else if (match('(')) {
@@ -2247,7 +2246,6 @@
       type: kind === 'field' ? Syntax.FieldDeclarator : Syntax.VariableDeclarator,
       decltype: declaredType,
       arguments: args,
-      arraySize: arraySize,
       id: id,
       init: init
     };
