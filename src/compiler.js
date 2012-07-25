@@ -343,9 +343,9 @@
   };
 
   TypeAliasDirective.prototype.scan = function (o) {
-    var scope = new Frame(o.scope, "Struct " + this.original.id.name);;
-    var thisTy = new PointerType(o.types[this.original.id.name]);
     if (this.original instanceof T.StructType) {
+      var thisTy = new PointerType(o.types[this.original.id.name]);
+      var scope = new Frame(o.scope, "Struct " + this.original.id.name);;
       var fields = this.original.fields;
       for (var i = 0; i < fields.length; i++) {
         if (fields[i] instanceof FunctionDeclaration) {
@@ -551,7 +551,10 @@
         }
       }
     }
-    return new BlockStatement(functions);
+    if (functions.length) {
+      return new BlockStatement(functions);
+    }
+    return null;
   };
 
   Program.prototype.transform = function (o) {
