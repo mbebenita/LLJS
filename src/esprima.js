@@ -3090,6 +3090,9 @@
       }
       if (matchKeyword("function")) {
         list.push(parseFunctionDeclaration());
+      } else if (matchKeyword("struct") || matchKeyword("union")) {
+        list.push.apply(list, parseVariableDeclarationList("field", true,
+                                                           parseStructType()));
       } else {
         list.push.apply(list, parseVariableDeclarationList("field", true,
                                                            parseTypeIdentifier()));

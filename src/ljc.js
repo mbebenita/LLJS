@@ -202,6 +202,7 @@
       if (mode === BROWSER) {
         throw e;
       }
+      throw e;
 
       if (e.index) {
         // Esprima error, make a loc out of it.
