@@ -29,6 +29,7 @@
     this.name = name;
     this.fields = [];
     this.offset = 0;
+    this.isUnion = false;
   }
 
   StructType.prototype.toString = function (lvl) {
@@ -44,34 +45,6 @@
   };
 
   StructType.prototype.getField = function getField(name) {
-    var fields = this.fields;
-    for (var i = 0; i < fields.length; i++) {
-      if (fields[i].name === name) {
-        return fields[i];
-      }
-    }
-    return null;
-  };
-
-  function UnionType(name) {
-    this.name = name;
-    this.fields = [];
-    this.offset = 0;
-  }
-
-  UnionType.prototype.toString = function (lvl) {
-    lvl = lvl || 0;
-    if (lvl > 0) {
-      return this.name || "<anon union>";
-    }
-    var s = "union" + (this.name ? (" " + this.name) : " ") + " { ";
-    s += this.fields.map(function (f) {
-      return tystr(f.type, lvl + 1) + " " + f.name;
-    }).join("; ");
-    return s + " }";
-  };
-
-  UnionType.prototype.getField = function getField(name) {
     var fields = this.fields;
     for (var i = 0; i < fields.length; i++) {
       if (fields[i].name === name) {
@@ -175,7 +148,6 @@
   exports.TypeAlias = TypeAlias;
   exports.PrimitiveType = PrimitiveType;
   exports.StructType = StructType;
-  exports.UnionType = UnionType;
   exports.PointerType = PointerType;
   exports.ArrowType = ArrowType;
   exports.builtinTypes = builtinTypes;

@@ -54,7 +54,6 @@
   const TypeAlias = Types.TypeAlias;
   const PrimitiveType = Types.PrimitiveType;
   const StructType = Types.StructType;
-  const UnionType = Types.UnionType;
   const PointerType = Types.PointerType;
   const ArrowType = Types.ArrowType;
 
@@ -65,7 +64,7 @@
   function Variable(name, type) {
     this.name = name;
     this.type = type;
-    this.isStackAllocated = type instanceof StructType || type instanceof UnionType;
+    this.isStackAllocated = type instanceof StructType;
   }
 
   Variable.prototype.toString = function () {

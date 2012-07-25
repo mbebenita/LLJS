@@ -264,12 +264,7 @@
 
     StructType: {
       extends: "Type",
-      fields: ["@id", "@fields"]
-    },
-
-    UnionType: {
-      extends: "Type",
-      fields: ["@id", "@fields"]
+      fields: ["@id", "@fields", "isUnion"]
     },
 
     FieldDeclarator: {
