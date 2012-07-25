@@ -386,15 +386,12 @@
   };
 
   TypeAliasDirective.prototype.scan = function (o) {
-    var scope;
+    var scope = new Frame(o.scope, "Struct " + this.original.id.name);;
     var thisTy = new PointerType(o.types[this.original.id.name]);
     if (this.original instanceof T.StructType) {
       var fields = this.original.fields;
       for (var i = 0; i < fields.length; i++) {
         if (fields[i] instanceof FunctionDeclaration) {
-          if (!scope) {
-            scope = new Frame(o.scope, "Struct " + this.original.id.name);
-          }
           o = extend(o, { thisTy: thisTy });
           o.scope = scope;
           fields[i].scan(o);
@@ -620,6 +617,7 @@
 
     assert(this.body instanceof BlockStatement);
     this.body.body = compileList(this.body.body, o);
+    this.frame.close();
 
     return cast(this, this.decltype.reflect(o));
   };
@@ -1263,7 +1261,7 @@
 
   Program.prototype.lower = function (o) {
     o = extend(o);
-    o.scope = this.frame;
+    o.scope = o.frame = this.frame;
 
     this.body = lowerList(this.body, o);
     var prologue = createPrologue(this, o);
@@ -1277,7 +1275,8 @@
   FunctionDeclaration.prototype.lower = function (o) {
     var memcheckName;
     o = extend(o);
-    o.scope = this.frame;
+    o.scope = o.frame = this.frame;
+
 
     if (o.memcheck) {
       if (this.id && this.id.name) {
@@ -1300,7 +1299,6 @@
     var prologue = createPrologue(this, o);
     var epilogue = createEpilogue(this, o);
     this.body.body = prologue.concat(this.body.body).concat(epilogue);
-    this.frame.close();
 
     return this;
   };
@@ -1343,7 +1341,7 @@
   Identifier.prototype.lowerNode = function (o) {
     var variable = this.variable;
     if (variable && variable.isStackAllocated) {
-      return variable.getStackAccess(o.scope, this.loc);
+      return variable.getStackAccess(o.frame, this.loc);
     }
   };
 

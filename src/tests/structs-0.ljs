@@ -10,6 +10,11 @@ struct Point {
   function toString() {
     return "{x: " + this->x + ", y: " + this->y + "}";
   }
+  function distanceTo(Point * other) {
+    let Line l (this->x, this->y, other->x, other->y);
+    console.info(l.toString());
+    return l.getLength();
+  }
 }
 
 struct Line {
@@ -45,3 +50,16 @@ console.info(l1.toString());
 
 console.info(l1.a.toString());
 console.info(l1.b.toString());
+
+for (let int i = 0; i < 10; i++) {
+  let Point * k = new Point(1, 2);
+  console.info(k->toString());
+  console.info(k);
+}
+
+for (let int i = 0; i < 10; i++) {
+  let Point a (i, 1), b (1, i);
+  console.info(a.toString() + " @" + &a);
+  console.info(b.toString() + " @" + &b);
+  console.info(a.distanceTo(&b));
+}
