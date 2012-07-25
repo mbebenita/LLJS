@@ -233,13 +233,18 @@
     var field, type;
     var prev = { offset: 0, type: { size: 0 } };
     for (var i = 0, j = fields.length; i < j; i++) {
-      if (fields[i].type instanceof ArrowType) {
+      field = fields[i];
+      type = field.type;
+
+      if (type instanceof ArrowType) {
         // Ignore member functions.
         continue;
       }
 
-      field = fields[i];
-      type = field.type;
+      if (type instanceof StructType) {
+        // Recursively lint inline structs
+        type.lint();
+      }
 
       check(type, "cannot have untyped field");
       check(type.size, "cannot have fields of size 0 type " + quote(Types.tystr(type, 0)));
