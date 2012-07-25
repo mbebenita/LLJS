@@ -28,10 +28,10 @@
     print = console.log;
     quit = process.exit;
   } else if (mode === JS_SHELL) {
+    load("./estransform.js");
     load("./util.js");
     load("./esprima.js");
     load("./escodegen.js");
-    load("./estransform.js");
     load("./compiler.js");
 
     argv = this.arguments;
