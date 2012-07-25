@@ -43,6 +43,31 @@ struct ST {
   assert(&s-arr === 126, "s is 126 offsets after arr");
 })();
 
+struct InlineArrayST {
+  int arr[100];
+};
+
+(function structInlineTest() {
+  let InlineArrayST s;
+  s.arr[5] = 10;
+
+  let ST s2;
+  assert(&s2-&s === 100, "s2 is 100 offsets after s");
+})();
+
+struct InlineStructArrayST {
+  InlineArrayST arr[100];
+};
+
+(function structInlineTestMeta() {
+  let InlineStructArrayST s;
+  s.arr[5].arr[5] = 5;
+
+  let ST s2;
+  assert(&s2-&s === 100*100, "s2 is 100*100 offsets after s");
+})();
+
+
 if (passed)
   print("SUCCESS");
 else
