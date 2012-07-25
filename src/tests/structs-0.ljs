@@ -35,6 +35,21 @@ struct Line {
   }
 }
 
+union Box {
+  int x;
+  int y;
+  function Box(int x, int y) {
+    this->x = x;
+    this->y = y;
+  }
+  function sum () {
+    return this->x + this->y;
+  }
+}
+
+let Box b (1, 2);
+console.info(b.sum());
+
 let Point * p = new Point(1, 2);
 
 console.info(p->toString());
