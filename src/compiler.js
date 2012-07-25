@@ -805,18 +805,20 @@
       var allocation = new CallExpression(o.scope.MALLOC(), [cast(new Literal(ty.size), Types.u32ty)], this.loc);
       allocation = cast(allocation.transform(o), pty);
       // Check if we have a constructor ArrowType.
-      var field = ty.getField(ty.name);
-      if (field) {
-        assert (field.type instanceof ArrowType);
-        logger.push(this);
-        var tmp = o.scope.freshTemp(pty, this.loc);
-        var assignment = new AssignmentExpression(tmp, "=", allocation, this.loc);
-        var constructor = new MemberExpression(new Identifier(ty.name + "$" + ty.name), new Identifier("call"), false);
-        constructor = cast(constructor, field.type, true);
-        var callConstructor = new CallExpression(constructor, [assignment].concat(this.arguments), this.loc).transform(o);
-        allocation = new SequenceExpression([callConstructor, tmp], this.loc);
-        logger.pop();
-        return cast(allocation, pty, true);
+      if (ty instanceof StructType) {
+        var field = ty.getField(ty.name);
+        if (field) {
+          assert (field.type instanceof ArrowType);
+          logger.push(this);
+          var tmp = o.scope.freshTemp(pty, this.loc);
+          var assignment = new AssignmentExpression(tmp, "=", allocation, this.loc);
+          var constructor = new MemberExpression(new Identifier(ty.name + "$" + ty.name), new Identifier("call"), false);
+          constructor = cast(constructor, field.type, true);
+          var callConstructor = new CallExpression(constructor, [assignment].concat(this.arguments), this.loc).transform(o);
+          allocation = new SequenceExpression([callConstructor, tmp], this.loc);
+          logger.pop();
+          return cast(allocation, pty, true);
+        }
       }
       return allocation;
     } else if (this.callee instanceof MemberExpression &&
