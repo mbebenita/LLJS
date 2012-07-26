@@ -1,0 +1,24 @@
+extern print;
+
+struct S {
+  union {
+    int x;
+    float y;
+  } u;
+  struct {
+    int x;
+    float y;
+  } s;
+  int x;
+};
+
+let S s;
+s.u.x = 5;
+s.s.x = 5;
+s.s.y = 3.14;
+s.x = 10;
+print(s.u.x);
+print(s.u.y);
+print(s.s.x);
+print(s.s.y);
+print(s.x);

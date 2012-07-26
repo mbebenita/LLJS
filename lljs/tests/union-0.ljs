@@ -1,0 +1,25 @@
+extern print;
+
+union foo {
+  int x;
+  float y;
+};
+
+let foo u;
+u.x = 5;
+print(u.x);
+print(u.y);
+
+let foo *uStar = new foo;
+uStar->x = 5;
+print(uStar->x);
+print(uStar->y);
+
+struct bar {
+  foo u;
+};
+
+let bar b;
+b.u.x = 5;
+print(b.u.x);
+print(b.u.y);

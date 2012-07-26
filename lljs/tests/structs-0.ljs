@@ -1,0 +1,80 @@
+extern Math;
+extern console;
+
+struct Point {
+  int x, y;
+  function Point (int x, int y) {
+    this->x = x;
+    this->y = y;
+  }
+  function toString() {
+    return "{x: " + this->x + ", y: " + this->y + "}";
+  }
+  function distanceTo(Point * other) {
+    let Line l (this->x, this->y, other->x, other->y);
+    console.info(l.toString());
+    return l.getLength();
+  }
+}
+
+struct Line {
+  Point a, b;
+  function Line (int x1, int y1, int x2, int y2) {
+    this->a.x = x1;
+    this->a.y = y1;
+    this->b.x = x2;
+    this->b.y = y2;
+  }
+  function float getLength() {
+    let float dx = this->a.x - this->b.x;
+    let float dy = this->a.y - this->b.y;
+    return float(Math.sqrt(dx * dx + dy * dy));
+  }
+  function toString() {
+    return "{" + this->a.toString() + " -> " + this->b.toString() + "}";
+  }
+}
+
+union Box {
+  int x;
+  int y;
+  function Box(int x, int y) {
+    this->x = x;
+    this->y = y;
+  }
+  function sum () {
+    return this->x + this->y;
+  }
+}
+
+let Box b (1, 2);
+console.info(b.sum());
+
+let Point * p = new Point(1, 2);
+
+console.info(p->toString());
+
+let Line * l = new Line(1, 2, 3, 4);
+
+console.info(l->toString());
+console.info(l->getLength());
+
+let Line l1 (1, 2, 3, 4), l2 (2, 3, 4, 5), *l3;
+
+console.info(l1.toString());
+
+console.info(l1.a.toString());
+console.info(l1.b.toString());
+
+for (let int i = 0; i < 10; i++) {
+  let Point * k = new Point(1, 2);
+  console.info(k->toString());
+  console.info(k);
+}
+
+for (let int i = 0; i < 10; i++) {
+  let Point a (i, 1), b (1, i);
+  console.info(a.toString() + " @" + &a);
+  console.info(b.toString() + " @" + &b);
+  console.info(a.distanceTo(&b));
+}

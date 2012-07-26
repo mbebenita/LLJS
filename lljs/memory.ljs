@@ -1,0 +1,389 @@
+extern ArrayBuffer;
+extern Uint8Array;
+extern Int8Array;
+extern Uint16Array;
+extern Int16Array;
+extern Uint32Array;
+extern Int32Array;
+extern Float32Array;
+extern Float64Array;
+extern memcheck;
+extern Proxy;
+extern Object;
+extern undefined;
+extern console;
+extern parseInt;
+extern process;
+extern snarf;
+extern Error;
+extern print;
+
+extern throwError;
+
+let NODE_JS = 1;
+let JS_SHELL = 2;
+let BROWSER = 3;
+
+let enable_memcheck = false;
+
+let mode;
+if (typeof process !== "undefined") {
+  mode = NODE_JS;
+} else if (typeof snarf !== "undefined") {
+  mode = JS_SHELL;
+} else {
+  mode = BROWSER;
+}
+
+let ck;
+if (mode === NODE_JS) {
+  print = console.log;
+  ck = require('memcheck');
+} else if (mode === JS_SHELL) {
+  ck = (load('memcheck.js'), memcheck);
+} else {
+  ck = memcheck;
+}
+
+
+const MB = 1024 * 1024;
+const WORD_SIZE = sizeof(word);
+const SIZE = (256 * MB) / WORD_SIZE;
+const STACK_SIZE = (2 * MB) / WORD_SIZE;
+const HEAP_SIZE = SIZE - STACK_SIZE;
+
+// debug
+let log = function() { };
+
+// let I4, U4;
+
+/*
+   +---------------+ -
+ 0 | Heap  Pointer |
+ 1 | Stack Pointer |
+   +---------------+ <- Heap Pointer (HP)
+   |               |
+   |               | |
+   |     HEAP      | | Malloc Region
+   |               | v
+   |               |
+   +---------------+
+   |               |
+   |               | ^
+   |     STACK     | |
+   |               | |
+   |               |
+   +---------------+ <- Stack Pointer (SP)
+*/
+
+function byte *memcpy(byte *dst, byte *src, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *dst++ = *src++;
+  }
+  return dst;
+}
+
+function u16 *memcpy2(u16 *dst, u16 *src, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *dst++ = *src++;
+  }
+  return dst;
+}
+
+function u32 *memcpy4(u32 *dst, u32 *src, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *dst++ = *src++;
+  }
+  return dst;
+}
+
+function void memset(byte *s, byte b, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *s = b;
+  }
+}
+
+function void memset2(u16 *s, u16 b, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *s = b;
+  }
+}
+
+function void memset4(u32 *s, u32 b, uint length) {
+  for (let int i = 0; i < length; ++i) {
+    *s = b;
+  }
+}
+
+/* K&R Malloc */
+
+struct Header {
+  Header *next;
+  uint size;
+};
+
+let Header *base = null;
+let Header *freep = null;
+
+let inMemory = false;
+function setInMemory(val) {
+  if(enable_memcheck) { inMemory = val;}
+}
+
+function shadowMemory(mem, uint memsize, uint shift) {
+  let handler = makeIdHandler(mem);
+  // override the identity get/set handlers
+  handler.get = function(receiver, name) {
+    let byte *loc = (byte *) ((parseInt(name, 10)) << shift) ;
+    // malloc/free can get/set unallocated memory
+    if(!inMemory) {
+      if(!ck.isAddressable(loc)) {
+        ck.addBadAccessError(loc);
+      }
+      if(!ck.isDefined(loc)) {
+        ck.addUndefinedError(loc);
+      }
+    }
+    return mem[name];
+  };
+  handler.set = function(receiver, name, val) {
+    let byte *loc = (byte *) ((parseInt(name, 10)) << shift) ;
+    // memory functions should be able to set unallocated addresses
+    if(!inMemory) {
+      if(!ck.isAddressable(loc)) {
+        ck.addBadAccessError(loc);
+      }
+      ck.setDefined(loc, memsize, true);
+    }
+    mem[name] = val;
+    return true;
+  };
+  return Proxy.create(handler);
+}
+
+function reset() {
+  setInMemory(true);
+  let M = exports.M = new ArrayBuffer(SIZE * WORD_SIZE);
+  if(enable_memcheck) {
+    ck.reset(SIZE * WORD_SIZE);
+    exports.U1 = shadowMemory(new Uint8Array(M), sizeof(u8), 0);
+    exports.I1 = shadowMemory(new Int8Array(M), sizeof(i8), 0);
+    exports.U2 = shadowMemory(new Uint16Array(M), sizeof(u16), 1);
+    exports.I2 = shadowMemory(new Int16Array(M), sizeof(i16), 1);
+    exports.U4 = shadowMemory(new Uint32Array(M), sizeof(u32), 2);
+    exports.I4 = shadowMemory(new Int32Array(M), sizeof(i32), 2);
+    exports.F4 = shadowMemory(new Float32Array(M), sizeof(f32), 2);
+    exports.F8 = shadowMemory(new Float64Array(M), sizeof(f64), 3);
+  } else {
+    exports.U1 = new Uint8Array(M);
+    exports.I1 = new Int8Array(M);
+    exports.U2 = new Uint16Array(M);
+    exports.I2 = new Int16Array(M);
+    exports.U4 = new Uint32Array(M);
+    exports.I4 = new Int32Array(M);
+    exports.F4 = new Float32Array(M);
+    exports.F8 = new Float64Array(M);
+  }
+  
+  exports.U4[0] = 4;
+  exports.U4[1] = SIZE;
+
+  base = (Header *)(2);
+  freep = null;
+  
+  setInMemory(false);
+}
+
+reset();
+
+function word *sbrk(int nBytes) {
+  let U4 = exports.U4;
+  let int nWords = nBytes / sizeof(word);
+  if (U4[0] + nWords > HEAP_SIZE) {
+    return null;
+  }
+  let word *address = (word *)(U4[0]);
+  U4[0] += nWords;
+  return address;
+}
+
+let uint nUnitsMin = 1024;
+
+function Header *morecore(uint nUnits) {
+  if (nUnits < nUnitsMin) {
+    nUnits = nUnitsMin;
+  }
+  let word *buffer = sbrk(nUnits * sizeof(Header));
+
+  if (buffer === null) {
+    return null;
+  }
+  
+  let Header *header = (Header *)(buffer);
+  header->size = nUnits;
+  
+  if(enable_memcheck) {
+    // prevent double free recording on morecore
+    ck.setAlloc((byte *) (header + 1), true) 
+    // setting all the user addressable bytes as addressable in the
+    // shadow memory
+    ck.setAddressable((byte *) (header + 1), nUnits, true);
+  }
+  free((byte*)(header + 1));
+  setInMemory(true);
+  return freep;
+}
+
+function byte *malloc(int nBytes) {
+  let Header *p, *prevp;
+  let uint nUnits = ((nBytes + sizeof(Header) - 1) / sizeof(Header)) + 1;
+
+  setInMemory(true);
+  if ((prevp = freep) === null) {
+    base->next = freep = prevp = base;
+    base->size = 0;
+  }
+
+  for (p = prevp->next; true; prevp = p, p = p->next) {
+    if (p->size >= nUnits) {
+      if (p->size === nUnits) {
+        prevp->next = p->next;
+      } else {
+        p->size -= nUnits;
+        p += p->size;
+        p->size = nUnits;
+      }
+      freep = prevp;
+      if(enable_memcheck) {
+        // record that this chunck of memory can be addressed
+        ck.setAddressable((byte *) (p+1), nBytes, true);
+        ck.setAlloc((byte *) (p+1), true);
+      }
+      setInMemory(false);
+      return (byte*)(p + 1);
+    }
+    if (p === freep) {
+      
+      if ((p = morecore(nUnits)) === null) {
+        setInMemory(false);
+        return null;
+      }
+    }
+  }
+  setInMemory(false);
+  return null;
+}
+
+
+function void free(byte* ap) {
+  let Header *bp = (Header *)(ap) - 1, *p;
+  if(enable_memcheck) {
+    setInMemory(true);
+    if(ck.isAlloc(ap)) {
+      // this byte actually was malloced before, reset it
+      ck.setAlloc(ap, false);
+      // this memory chunk is no longer addressable
+      ck.setAddressable(ap, bp->size, false);
+      // this memory chunk is no longer defined
+      ck.setDefined(ap, bp->size, false);
+    } else {
+      // this byte was never allocated, trying to free the wrong thing
+      ck.addDoubleFreeError(ap);
+    }
+  }
+  for (p = freep; !(bp > p && bp < p->next); p = p->next) {
+    if (p >= p->next && (bp > p || bp < p->next)) {
+      break;
+    }
+  }
+  if (bp + bp->size === p->next) {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+  } else {
+    bp->next = p->next;
+  }
+  if (p + p->size == bp) {
+    p->size += bp->size;
+    p->next = bp->next;
+  } else {
+    p->next = bp;
+  }
+  freep = p;
+  setInMemory(false);
+}
+
+
+
+function makeIdHandler(obj) {  
+  return {  
+    // Fundamental traps  
+    getOwnPropertyDescriptor: function(name) {  
+      let desc = Object.getOwnPropertyDescriptor(obj, name);  
+      // a trapping proxy's properties must always be configurable  
+      if (desc !== undefined) { desc.configurable = true; }  
+      return desc;  
+    },  
+    getPropertyDescriptor:  function(name) {  
+      let desc = Object.getPropertyDescriptor(obj, name); // not in ES5  
+      // a trapping proxy's properties must always be configurable  
+      if (desc !== undefined) { desc.configurable = true; }  
+      return desc;  
+    },  
+    getOwnPropertyNames: function() {  
+      return Object.getOwnPropertyNames(obj);  
+    },  
+    getPropertyNames: function() {  
+      return Object.getPropertyNames(obj);                // not in ES5  
+    },  
+    defineProperty: function(name, desc) {  
+      Object.defineProperty(obj, name, desc);  
+    },  
+    delete:       function(name) { return delete obj[name]; },     
+    fix:          function() {  
+      if (Object.isFrozen(obj)) {  
+        return Object.getOwnPropertyNames(obj).map(function(name) {  
+          return Object.getOwnPropertyDescriptor(obj, name);  
+        });  
+      }  
+      // As long as obj is not frozen, the proxy won't allow itself to be fixed  
+      return undefined; // will cause a TypeError to be thrown  
+    },  
+     
+    // derived traps  
+    has:          function(name) { return name in obj; },  
+    hasOwn:       function(name) { return Object.prototype.hasOwnProperty.call(obj, name); },  
+    get:          function(receiver, name) {
+      return obj[name];
+    },  
+    set:          function(receiver, name, val) {
+      obj[name] = val; return true;
+    }, // bad behavior when set fails in non-strict mode  
+    enumerate:    function() {  
+      let result = [];  
+      for (let name in obj) { result.push(name); };  
+      return result;  
+    },  
+    keys: function() { return Object.keys(obj) }  
+  };  
+}  
+
+exports.reset = reset;
+
+exports.memcpy = memcpy;
+exports.memcpy2 = memcpy2;
+exports.memcpy4 = memcpy4;
+exports.memset = memset;
+exports.memset2 = memset2;
+exports.memset4 = memset4;
+
+exports.malloc = malloc;
+exports.free = free;
+
+exports.set_memcheck = function(val) {
+  enable_memcheck = val;
+  reset();
+};
+exports.memcheck = ck;
+exports.memcheck_call_pop = ck.memcheck_call_pop;
+exports.memcheck_call_push = ck.memcheck_call_push;
+exports.memcheck_call_reset = ck.memcheck_call_reset;
