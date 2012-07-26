@@ -240,13 +240,13 @@
     var field, type;
     var prev = { offset: 0, type: { size: 0 } };
     for (var i = 0, j = fields.length; i < j; i++) {
-      field = fields[i];
-      type = field.type;
-
-      if (type instanceof ArrowType) {
+      if (fields[i].type instanceof ArrowType) {
         // Ignore member functions.
         continue;
       }
+
+      field = fields[i];
+      type = field.type;
 
       if (type instanceof StructType) {
         // Recursively lint inline structs
@@ -260,6 +260,7 @@
         maxAlignSize = type.align.size;
         maxAlignSizeType = type.align;
       }
+
       if (this.isUnion) {
         field.offset = 0;
       } else {

@@ -1,0 +1,73 @@
+extern describe, it, Math;
+
+struct Point {
+  int x, y;
+  function Point (int x, int y) {
+    this->x = x;
+    this->y = y;
+  }
+  function toString() {
+    return "{x: " + this->x + ", y: " + this->y + "}";
+  }
+  function distanceTo(Point * other) {
+    let Line l (this->x, this->y, other->x, other->y);
+    return l.getLength();
+  }
+}
+
+struct Line {
+  Point a, b;
+  function Line (int x1, int y1, int x2, int y2) {
+    this->a.x = x1;
+    this->a.y = y1;
+    this->b.x = x2;
+    this->b.y = y2;
+  }
+  function float getLength() {
+    let float dx = this->a.x - this->b.x;
+    let float dy = this->a.y - this->b.y;
+    return float(Math.sqrt(dx * dx + dy * dy));
+  }
+  function toString() {
+    return "{" + this->a.toString() + " -> " + this->b.toString() + "}";
+  }
+}
+
+function floatIsEqual(a, b) {
+  let d = a - b;
+  if (d < 0) {
+    d *= -1;
+  }
+  return d < 0.001;
+}
+
+describe('Structs with Member Functions', function() {
+  it('allocates structs on the heap and call methods', function () {
+    let Point * p = new Point(1, 2);
+    p->toString().should.equal("{x: 1, y: 2}");
+
+    let Line * l = new Line(1, 2, 3, 4);
+    l->toString().should.equal("{{x: 1, y: 2} -> {x: 3, y: 4}}");
+    floatIsEqual(l->getLength(), 2.8284271247461903).should.be.true;
+  });
+
+  it('allocates structs on the stack and call methods', function () {
+    let Line l1 (1, 2, 3, 4), l2 (2, 3, 4, 5), *l3;
+    l1.toString().should.equal("{{x: 1, y: 2} -> {x: 3, y: 4}}");
+    l1.a.toString().should.equal("{x: 1, y: 2}");
+    l1.b.toString().should.equal("{x: 3, y: 4}");
+  });
+
+  it('allocates structs on the stack and call methods', function () {
+    for (let int i = 0; i < 10; i++) {
+      let Point * k = new Point(1, 2);
+      k->toString().should.equal("{x: 1, y: 2}");
+    }
+
+    for (let int i = 0; i < 10; i++) {
+      let Point a (i, 1), b (i, 2);
+      (a.distanceTo(&b)).should.equal(1);
+    }
+  });
+
+});
