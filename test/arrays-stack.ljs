@@ -1,0 +1,63 @@
+extern describe, it;
+
+struct ST {
+  int x;
+};
+
+struct InlineArrayST {
+  int arr[100];
+};
+
+struct InlineStructArrayST {
+  InlineArrayST arr[100];
+};
+
+describe('Arrays-Stack', function () {
+  it('allocates an int array on the stack', function () {
+    let int arr[100];
+    arr[0] = 5;
+    arr[1] = 10;
+
+    (*arr).should.equal(5);
+    (arr[0]).should.equal(5);
+    (arr[1]).should.equal(10);
+
+    let ST s;
+    (&s-arr).should.equal(100);
+  });
+
+  it('allocates an u8 array on the stack', function () {
+    let u8 arr[100];
+    arr[0] = 5;
+    arr[1] = 10;
+    (*arr).should.equal(5, "dereferencing array");
+    (arr[0]).should.equal(5, "access first element");
+    (arr[1]).should.equal(10, "access second element");
+
+    let float arr2[100];
+    arr2[0] = 5;
+    arr2[1] = 10;
+    (*arr2).should.equal(5);
+    (arr2[0]).should.equal(5);
+    (arr2[1]).should.equal(10);
+
+    let ST s;
+    (&s-arr).should.equal(126);
+  });
+
+  it('allocates a struct with an inline array', function () {
+    let InlineArrayST s;
+    s.arr[5] = 10;
+
+    let ST s2;
+    (&s2-&s).should.equal(100);
+  });
+
+  it('allocates a struct with an inline array of structs with arrays', function () {
+    let InlineStructArrayST s;
+    s.arr[5].arr[5] = 5;
+
+    let ST s2;
+    (&s2-&s).should.equal(100*100);
+  });
+});

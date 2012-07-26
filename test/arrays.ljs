@@ -1,9 +1,6 @@
 extern describe, it;
-extern Number;
 
-let assert = require("assert");
-
-describe('Array 0', function() {
+describe('Arrays', function() {
   function testElements(int * a, int length) {
     for (let int i = 0; i < length; i++) {
         a[i] = i;

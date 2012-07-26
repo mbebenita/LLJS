@@ -1,0 +1,60 @@
+extern describe, it;
+
+struct S {
+  union {
+    int x;
+    float y;
+  } u;
+  struct {
+    int x;
+    float y;
+  } s;
+  int x;
+};
+
+function floatIsEqual(a, b) {
+  let d = a - b;
+  if (d < 0) {
+    d *= -1;
+  }
+  return d < 0.001;
+}
+
+describe('Structs', function() {
+  it('allocates a struct with unions', function () {
+    let S s;
+    s.u.x = 5;
+    s.s.x = 5;
+    s.s.y = 3.14;
+    s.x = 10;
+
+    (s.u.x).should.equal(5);
+    (s.u.y).should.equal(7.006492321624085e-45);
+    (s.s.x).should.equal(5);
+    floatIsEqual(s.s.y, 3.14).should.be.true;
+    (s.x).should.equal(10);
+  });
+});
+
+union foo {
+  int x;
+  float y;
+};
+
+struct bar {
+  foo u;
+};
+
+describe('Structs', function() {
+  it('allocates an union', function () {
+    let foo u;
+    u.x = 5;
+    (u.x).should.equal(5);
+    (floatIsEqual(u.y, 7.006492321624085e-45)).should.be.true
+
+    let foo *uStar = new foo;
+    uStar->x = 5;
+    (uStar->x).should.equal(5);
+    (floatIsEqual(uStar->y, 7.006492321624085e-45)).should.be.true
+  });
+});

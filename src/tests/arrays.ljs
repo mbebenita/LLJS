@@ -1,6 +1,0 @@
-struct Point {
-  int x, y;
-}
-
-let int * a = new int [1024];
-let Point * b = new Point [1024];
