@@ -427,7 +427,7 @@ var id = 0;
 $('.example').replaceWith(function() {
   var src = this.innerHTML;
   var lineCount = src.split("\n").length;
-  var res = '<table class="example"><tr><td><textarea id="ex:' + id + ':source" class="jcCode" rows="' + lineCount + '" spellcheck="false">' + src + '</textarea></td><td valign="top"><pre id="ex:' + id + ':result" class="jcResult"></pre></td></tr></table><table class="toolbar"><tr><td><div id="ex:' + id + '" class="minibutton run" title="Ctrl-Enter">Run</div><div id="ex:' + id + '" style="margin-left: 10px" class="minibutton runMemCheck" title="Ctrl-Enter">Run with MemCheck</div></td></tr></table>';
+  var res = '<table class="example"><tr><td><textarea id="ex:' + id + ':source" class="jcCode" rows="' + lineCount + '" spellcheck="false">' + src + '</textarea></td><td valign="top"><pre id="ex:' + id + ':result" class="jcResult"></pre></td></tr></table><table class="toolbar"><tr><td><div id="ex:' + id + '" class="minibutton run" title="Ctrl-Enter">Run</div><!--<div id="ex:' + id + '" style="margin-left: 10px" class="minibutton runMemCheck" title="Ctrl-Enter">Run with MemCheck</div>--></td></tr></table>';
   id ++;
   return res;
 });
