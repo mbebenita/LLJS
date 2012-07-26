@@ -84,7 +84,7 @@ trace("i32: " + (i32)(-1));
 let int x = 3;
 let int y = 2;
 
-/* Arithmetic follows C semantics. Arithmetic on integers begets 
+/* Arithmetic follows C semantics. Arithmetic on integers begets
    integers, truncated with | 0. */
 trace("Result is an integer: " + x / y);
 trace("Integral literals are typed as integers: " + 1 / 2);
@@ -482,7 +482,7 @@ function compileExample(ex) {
     }
     var source = this.getValue();
     source = 'extern trace;\n' + source;
-    result.innerHTML = LJC.compile(name, name, source, { bare: true, memcheck: false });
+    result.innerHTML = LJC.compile(source, { bare: true, memcheck: false, filename: name });
   } catch (x) {
     result.innerHTML = x.message;
     if (x.lineNumber) {
@@ -548,7 +548,7 @@ function executeExample(id, enableMemCheck) {
     } else {
       source = 'extern trace;\n' + source;
     }
-    var code = LJC.compile("ex" + number, "ex" + number, source, { memcheck: !!enableMemCheck });
+    var code = LJC.compile(source, { memcheck: !!enableMemCheck, filename: "ex" + number});
     result.innerHTML += "Compiled in: " + (new Date() - start) + " ms\n";
     result.innerHTML += "-----------------------------------------------------\n";
 

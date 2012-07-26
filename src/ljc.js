@@ -7,6 +7,13 @@
   var mode;
   if (typeof process !== "undefined") {
     mode = NODE_JS;
+    // Install compiler as an extension for '.ljs' files that are loaded using the
+    // |require| function. This is how mocha tests are executed.
+    var fs = require('fs');
+    require.extensions['.ljs'] = function(module, filename) {
+      var source = fs.readFileSync(filename, 'utf8');
+      return module._compile(compile(source, {filename: filename, memcheck: false}), filename);
+    };
   } else if (typeof snarf !== "undefined") {
     mode = JS_SHELL;
   } else {
@@ -143,7 +150,9 @@
     basename = basename.substr(0, basename.lastIndexOf(".")) || basename;
 
     var source = snarf(filename);
-    var code = compile(basename, filename, source, options);
+    options.filename = filename;
+    options.basename = basename;
+    var code = compile(source, options);
 
     if (options["pretty-print"]) {
       print(pretty(code));
@@ -167,7 +176,7 @@
     }
   }
 
-  function compile(name, logName, source, options) {
+  function compile(source, options) {
     // -W anything infers -W.
     for (var p in options) {
       if (p.charAt(0) === "W") {
@@ -180,7 +189,7 @@
       options.warn = false;
     }
 
-    var logger = new util.Logger("ljc", logName, source, options);
+    var logger = new util.Logger("ljc", options.filename, source, options);
     var code;
 
     try {
@@ -191,7 +200,7 @@
       if (options["only-parse"]) {
         code = node;
       } else {
-        node = compiler.compile(node, name, logger, options);
+        node = compiler.compile(node, options.filename, logger, options);
         if (options["emit-ast"]) {
           code = node;
         } else {
