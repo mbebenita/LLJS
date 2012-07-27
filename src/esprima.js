@@ -170,7 +170,8 @@
     StrictLHSPostfix:  'Postfix increment/decrement may not have eval or arguments operand in strict mode',
     StrictLHSPrefix:  'Prefix increment/decrement may not have eval or arguments operand in strict mode',
     StrictReservedWord:  'Use of future reserved word in strict mode',
-    CastingNothing:  'Body of cast expression empty'
+    CastingNothing:  'Body of cast expression empty',
+    ArraySizeIntegral: 'Stack allocated array size must be an integer literal'
   };
 
   // See also tools/generate-unicode-regex.py.
