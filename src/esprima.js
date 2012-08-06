@@ -282,7 +282,7 @@
   }
 
   function toType(expr) {
-    if (expr.type === Syntax.Identifier && expr.name in Types) {
+    if (expr.type === Syntax.Identifier && Types.hasOwnProperty(expr.name)) {
       return {
         type: Syntax.TypeIdentifier,
         name: expr.name
