@@ -1984,14 +1984,14 @@
     return expr;
   }
 
-  function parseBitwiseORExpression() {
+  function parseBitwiseXORExpression() {
     var expr = parseBitwiseANDExpression();
 
-    while (match('|')) {
+    while (match('^')) {
       lex();
       expr = {
         type: Syntax.BinaryExpression,
-        operator: '|',
+        operator: '^',
         left: expr,
         right: parseBitwiseANDExpression()
       };
@@ -2000,16 +2000,16 @@
     return expr;
   }
 
-  function parseBitwiseXORExpression() {
-    var expr = parseBitwiseORExpression();
+  function parseBitwiseORExpression() {
+    var expr = parseBitwiseXORExpression();
 
-    while (match('^')) {
+    while (match('|')) {
       lex();
       expr = {
         type: Syntax.BinaryExpression,
-        operator: '^',
+        operator: '|',
         left: expr,
-        right: parseBitwiseORExpression()
+        right: parseBitwiseXORExpression()
       };
     }
 
