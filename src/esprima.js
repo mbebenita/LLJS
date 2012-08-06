@@ -2019,7 +2019,7 @@
   // 11.11 Binary Logical Operators
 
   function parseLogicalANDExpression() {
-    var expr = parseBitwiseXORExpression();
+    var expr = parseBitwiseORExpression();
 
     while (match('&&')) {
       lex();
@@ -2027,7 +2027,7 @@
         type: Syntax.LogicalExpression,
         operator: '&&',
         left: expr,
-        right: parseBitwiseXORExpression()
+        right: parseBitwiseORExpression()
       };
     }
 
