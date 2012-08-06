@@ -108,7 +108,7 @@
 
     FunctionDeclaration: {
       extends: "Declaration",
-      fields:  ["@id", "@params", "@body", "@decltype", "generator", "expression"]
+      fields:  ["@id", "@modifiers", "@params", "@body", "@decltype", "generator", "expression"]
     },
 
     VariableDeclaration: {
@@ -264,12 +264,12 @@
 
     StructType: {
       extends: "Type",
-      fields: ["@id", "@fields", "isUnion"]
+      fields: ["@id", "@members", "isUnion"]
     },
 
-    FieldDeclarator: {
+    MemberDeclarator: {
       extends: "Node",
-      fields: ["@id", "@decltype"]
+      fields: ["modifiers", "@declarator"]
     },
 
     ArrowType: {

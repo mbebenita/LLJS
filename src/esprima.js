@@ -125,7 +125,7 @@
     StructType: 'StructType',
     ArrowType: 'ArrowType',
     TypeIdentifier: 'TypeIdentifier',
-    FieldDeclarator: 'FieldDeclarator',
+    MemberDeclarator: 'MemberDeclarator',
     TypeAliasDirective: 'TypeAliasDirective',
     CastExpression: 'CastExpression'
   };
@@ -189,6 +189,7 @@
     u32: true,
     int: true,
     uint: true,
+    bool: true,
     void: true,
     num: true,
     float: true,
@@ -322,6 +323,7 @@
 
   // 7.6.1.1 Keywords
 
+
   function isKeyword(id) {
     var keyword = false;
     switch (id.length) {
@@ -335,13 +337,15 @@
       keyword = (id === 'this') || (id === 'else') || (id === 'case') || (id === 'void') || (id === 'with');
       break;
     case 5:
-      keyword = (id === 'while') || (id === 'break') || (id === 'catch') || (id === 'throw') || (id === 'union');
+      keyword = (id === 'while') || (id === 'break') || (id === 'catch') || (id === 'throw') || (id === 'union') ||
+                (id === 'const');
       break;
     case 6:
-      keyword = (id === 'return') || (id === 'typeof') || (id === 'delete') || (id === 'switch') || (id === 'struct') || (id === 'sizeof') || (id === 'extern');
+      keyword = (id === 'return') || (id === 'typeof') || (id === 'delete') || (id === 'switch') ||
+                (id === 'struct') || (id === 'sizeof') || (id === 'extern') || (id === 'public') || (id === 'static');
       break;
     case 7:
-      keyword = (id === 'default') || (id === 'finally') || (id === 'typedef');
+      keyword = (id === 'default') || (id === 'finally') || (id === 'typedef') || (id === 'private');
       break;
     case 8:
       keyword = (id === 'function') || (id === 'continue') || (id === 'debugger');
@@ -2246,7 +2250,7 @@
     }
 
     return {
-      type: kind === 'field' ? Syntax.FieldDeclarator : Syntax.VariableDeclarator,
+      type: Syntax.VariableDeclarator,
       decltype: declaredType,
       arguments: args,
       id: id,
@@ -3094,6 +3098,16 @@
     return parseStatement();
   }
 
+  function parseModifiers() {
+    var modifiers = [];
+    while (matchKeyword('public') || matchKeyword('static') ||
+           matchKeyword('private') || matchKeyword('const')) {
+      modifiers.push(lookahead().value);
+      lex();
+    }
+    return modifiers;
+  }
+
   function parseStructType() {
     var isUnion = false;
     if (matchKeyword('union')) {
@@ -3108,30 +3122,38 @@
       Types[id.name] = true;
     }
     var statement;
-    var list = [];
+    var members = [];
 
     expect('{');
     while (index < length) {
       if (match('}')) {
         break;
       }
+      var modifiers = parseModifiers();
+      var list = [];
       if (matchKeyword("function")) {
         list.push(parseFunctionDeclaration());
       } else if (matchKeyword("struct") || matchKeyword("union")) {
-        list.push.apply(list, parseVariableDeclarationList("field", true,
+        list.push.apply(list, parseVariableDeclarationList(undefined, true,
                                                            parseStructType()));
       } else {
-        list.push.apply(list, parseVariableDeclarationList("field", true,
+        list.push.apply(list, parseVariableDeclarationList(undefined, true,
                                                            parseTypeIdentifier()));
       }
+      members.push.apply(members, list.map(function (x) {
+        return {
+          type: Syntax.MemberDeclarator,
+          declarator: x,
+          modifiers: modifiers
+        };
+      }));
       consumeSemicolon();
     }
     expect('}');
-
     return {
       type: Syntax.StructType,
       id: id,
-      fields: list,
+      members: members,
       isUnion: isUnion
     };
   }

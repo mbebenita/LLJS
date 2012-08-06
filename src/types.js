@@ -27,9 +27,12 @@
 
   function StructType(name) {
     this.name = name;
+    this.members = [];
     this.fields = [];
     this.offset = 0;
     this.isUnion = false;
+    this.staticType = this instanceof StructStaticType ?
+                      this : new StructStaticType(this);
   }
 
   StructType.prototype.toString = function (lvl) {
@@ -44,15 +47,22 @@
     return s + " }";
   };
 
-  StructType.prototype.getField = function getField(name) {
-    var fields = this.fields;
-    for (var i = 0; i < fields.length; i++) {
-      if (fields[i].name === name) {
-        return fields[i];
+  StructType.prototype.getMember = function getMember(name) {
+    var members = this.members;
+    for (var i = 0; i < members.length; i++) {
+      if (members[i].name === name) {
+        return members[i];
       }
     }
     return null;
   };
+
+  function StructStaticType(type) {
+    this.instanceType = type;
+    StructType.call(this, type.name + "_Static");
+  }
+
+  StructStaticType.prototype = Object.create(StructType.prototype);
 
   function PointerType(base) {
     this.base = base;
@@ -132,6 +142,7 @@
     num:    f64ty,
     int:    i32ty,
     uint:   u32ty,
+    bool:   i32ty,
     float:  f32ty,
     double: f64ty,
 
@@ -148,6 +159,7 @@
   exports.TypeAlias = TypeAlias;
   exports.PrimitiveType = PrimitiveType;
   exports.StructType = StructType;
+  exports.StructStaticType = StructStaticType;
   exports.PointerType = PointerType;
   exports.ArrowType = ArrowType;
   exports.builtinTypes = builtinTypes;
