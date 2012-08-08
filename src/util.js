@@ -274,7 +274,11 @@
           var s = spec[i];
           str += indent;
           if (s.name) {
-            str += flushLeft("-" + s.short, 4) + flushLeft("--" + s.name, 18);
+            if (s.short) {
+              str += flushLeft("-" + s.short, 4) + flushLeft("--" + s.name, 18);
+            } else {
+              str += flushLeft("", 4) + flushLeft("--" + s.name, 18);
+            }
           } else {
             str += flushLeft("-" + s.short, 22);
           }
