@@ -1571,7 +1571,14 @@
         VariableDeclaration: ['declarations'],
         VariableDeclarator: ['id', 'init'],
         WhileStatement: ['test', 'body'],
-        WithStatement: ['object', 'body']
+        WithStatement: ['object', 'body'],
+        PointerType: ['base'],
+        StructType: ['id', 'fields'],
+        FieldDeclarator: ['id', 'decltype'],
+        ArrowType: ['params', 'return'],
+        TypeIdentifier: [],
+        TypeAliasDirective: ['original', 'alias'],
+        CastExpression: ['as', 'argument']
     };
 
     VisitorOption = {

@@ -285,7 +285,8 @@
     if (expr.type === Syntax.Identifier && Types.hasOwnProperty(expr.name)) {
       return {
         type: Syntax.TypeIdentifier,
-        name: expr.name
+        name: expr.name,
+        range: expr.range
       };
     }
 
@@ -2188,7 +2189,8 @@
       lex();
       ty = {
         type: Syntax.PointerType,
-        base: ty
+        base: ty,
+        range: ty.range
       };
     }
     return ty;
@@ -2277,7 +2279,8 @@
     if (force || next.type === Token.Identifier || next.value === '*') {
       return {
         type: Syntax.TypeIdentifier,
-        name: token.value
+        name: token.value,
+        range: token.range
       };
     }
 
@@ -2314,7 +2317,8 @@
         original = {
           type: Syntax.ArrowType,
           params: paramTypes,
-          return: original
+          return: original,
+          range: original.range
         };
       }
     }
@@ -3081,7 +3085,8 @@
         original: type,
         alias: {
           type: Syntax.TypeIdentifier,
-          name: type.id.name
+          name: type.id.name,
+          range: type.range
         }
       };
     }
@@ -3134,6 +3139,7 @@
   function parseFunctionDeclaration() {
     var id, param, paramType, params = [], body, token, firstRestricted, message, previousStrict, paramSet, paramTypes, returnType;
 
+    var start = index;
     expectKeyword('function');
     returnType = parseInlineableType();
     token = lookahead();
@@ -3202,14 +3208,16 @@
       if (!paramTypes[i]) {
         paramTypes[i] = {
           type: Syntax.TypeIdentifier,
-          name: "dyn"
+          name: "dyn",
+          range: params[i].range
         };
       }
     }
     if (!returnType) {
       returnType = {
         type: Syntax.TypeIdentifier,
-        name: "dyn"
+        name: "dyn",
+        range: [start, start]
       }
     }
 
@@ -3219,7 +3227,8 @@
       decltype: {
         type: Syntax.ArrowType,
         params: paramTypes,
-        return: returnType
+        return: returnType,
+        range: returnType.range
       },
       params: params,
       body: body
@@ -3229,6 +3238,7 @@
   function parseFunctionExpression() {
     var token, id = null, firstRestricted, message, param, paramType, params = [], body, previousStrict, paramSet, paramTypes, returnType;
 
+    var start = index;
     expectKeyword('function');
     if (!match('(')) {
       returnType = parseInlineableType();
@@ -3299,14 +3309,16 @@
       if (!paramTypes[i]) {
         paramTypes[i] = {
           type: Syntax.TypeIdentifier,
-          name: "dyn"
+          name: "dyn",
+          range: params[i].range
         };
       }
     }
     if (!returnType) {
       returnType = {
         type: Syntax.TypeIdentifier,
-        name: "dyn"
+        name: "dyn",
+        range: [start, start]
       }
     }
 
@@ -3316,7 +3328,8 @@
       decltype: {
         type: Syntax.ArrowType,
         params: paramTypes,
-        return: returnType
+        return: returnType,
+        range: returnType.range
       },
       params: params,
       body: body
