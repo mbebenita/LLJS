@@ -122,6 +122,7 @@
     WithStatement: 'WithStatement',
 
     PointerType: 'PointerType',
+    ArrayType: 'ArrayType',
     StructType: 'StructType',
     ArrowType: 'ArrowType',
     TypeIdentifier: 'TypeIdentifier',
@@ -2216,22 +2217,26 @@
         throwError({}, Messages.ArrayConstant);
       }
 
-      lex();
-
-      declaredType = {
-        type: Syntax.PointerType,
-        base: declaredType
-      };
-
-      var token = lex();
-
-      if (token.type !== Token.NumericLiteral || Math.round(token.value) !== token.value) {
-        throwError(token, Messages.ArraySizeIntegral);
+      var lengths = [];
+      while(match('[')) {
+        lex();
+        if (!match(']')) {
+          var token = lex();
+          if (token.type !== Token.NumericLiteral || Math.round(token.value) !== token.value) {
+            throwError(token, Messages.ArraySizeIntegral);
+          }
+          lengths.unshift(token.value);
+        }
+        expect(']');
       }
+      lengths.forEach(function (x) {
+        declaredType = {
+          type: Syntax.ArrayType,
+          base: declaredType,
+          length: x
+        };
+      });
 
-      declaredType.arraySize = token.value;
-
-      expect(']');
     } else if (match('(')) {
       args = parseArguments();
     }
@@ -2240,6 +2245,7 @@
     if (strict && isRestrictedWord(id.name)) {
       throwError({}, Messages.StrictVarName);
     }
+
 
     if (kind === 'const') {
       expect('=');

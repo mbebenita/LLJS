@@ -26,6 +26,7 @@
   const Node = T.Node;
   const Literal = T.Literal;
   const Identifier = T.Identifier;
+  const ArrayExpression = T.ArrayExpression;
   const VariableDeclaration = T.VariableDeclaration;
   const VariableDeclarator = T.VariableDeclarator;
   const MemberDeclarator = T.MemberDeclarator;
@@ -84,6 +85,7 @@
   const StructType = Types.StructType;
   const StructStaticType = Types.StructStaticType;
   const PointerType = Types.PointerType;
+  const ArrayType = Types.ArrayType;
   const ArrowType = Types.ArrowType;
 
   /**
@@ -133,6 +135,15 @@
 
     if (this.arraySize) {
       ty.arraySize = this.arraySize;
+    }
+    return ty;
+  };
+
+  T.ArrayType.prototype.construct = function () {
+    var ty = new ArrayType(this.base.construct());
+    ty.node = this;
+    if (this.length) {
+      ty.length = this.length;
     }
     return ty;
   };
@@ -194,11 +205,23 @@
     if (this._resolved) {
       return this;
     }
-
     startResolving(this);
     this.base = this.base.resolve(types, true);
     if (this.arraySize) {
       this.size = this.base.size * this.arraySize;
+    }
+    finishResolving(this);
+    return this;
+  };
+
+  ArrayType.prototype.resolve = function (types) {
+    if (this._resolved) {
+      return this;
+    }
+    startResolving(this);
+    this.base = this.base.resolve(types, true);
+    if (this.length) {
+      this.size = this.base.size * this.length;
     }
     finishResolving(this);
     return this;
@@ -246,6 +269,10 @@
   PointerType.prototype.lint = function () {
     check(this.base, "pointer without base type");
     check(this.base.size, "cannot take pointer of size 0 type " + quote(Types.tystr(this.base, 0)));
+  };
+
+  ArrayType.prototype.lint = function () {
+    check(this.base, "array without element type");
   };
 
   StructType.prototype.lint = function () {
@@ -705,16 +732,22 @@
 
   VariableDeclarator.prototype.transformNode = function (o) {
     var variable = this.id.variable;
-    var ty = this.id.ty;
+    var type = variable.type;
 
-    if (!this.init && ty && typeof ty.defaultValue !== "undefined" && !ty.arraySize) {
-      this.init = new Literal(ty.defaultValue);
+    if (!type) {
+      return;
+    }
+
+    if (!this.init && type.defaultValue !== undefined) {
+      // Make sure we have an initializer if the type has a default value.
+      this.init = new Literal(type.defaultValue);
     }
 
     if (this.arguments) {
-      var member = ty.getMember(ty.name);
+      // Does the variable declaration call the constructor?
+      var member = type.getMember(type.name);
       if (member) {
-        var constructor = new MemberExpression(new Identifier(ty.name + "$" + ty.name), new Identifier("call"), false);
+        var constructor = new MemberExpression(new Identifier(type.name + "$" + type.name), new Identifier("call"), false);
         constructor = cast(constructor, member.type, true);
         var obj = new UnaryExpression("&", this.id, this.loc).transform(o);
         var callConstructor = new CallExpression(constructor, [obj].concat(this.arguments), this.loc).transform(o);
@@ -722,9 +755,41 @@
         this.init = new SequenceExpression([callConstructor, this.id]);
       }
     } else if (this.init) {
-      var a = (new AssignmentExpression(this.id, "=", this.init, this.init.loc)).transform(o);
-      this.id = a.left;
-      this.init = a.right;
+      if (this.init instanceof ArrayExpression) {
+        var rootPointer = cast(this.id, new PointerType(type.getRoot()), true);
+        this.id = o.scope.freshTemp(type, this.loc);
+        var elementInitializers = new SequenceExpression([]);
+        var generated = 0;
+        function generateInitializers(type, elements) {
+          check(type.length === elements.length, "Incompatible array initializer.");
+          for (var i = 0; i < elements.length; i++) {
+            var element = elements[i];
+            if (element instanceof ArrayExpression) {
+              generateInitializers(type.base, element.elements);
+            } else {
+              elementInitializers.expressions.push (
+                new AssignmentExpression (
+                  new UnaryExpression("*",
+                    new BinaryExpression("+",
+                      rootPointer,
+                      new Literal(generated++)
+                    )
+                  ),
+                  "=", element, element.loc
+                )
+              );
+            }
+          }
+        }
+        generateInitializers(type, this.init.elements);
+        this.init = elementInitializers.transform(o);
+      } else {
+        var a = (new AssignmentExpression(this.id, "=", this.init, this.init.loc)).transform(o);
+        this.id = a.left;
+        this.init = a.right;
+      }
+    } else if (variable.isStackAllocated) {
+      this.id = o.scope.freshTemp(type, this.loc);
     }
   };
 
@@ -1217,8 +1282,6 @@
       }
     }
 
-
-
     // Do this after the SP calculation since it might bring in U4. Since this
     // is after, we need to unshift.
     if (variables.length) {
@@ -1529,7 +1592,6 @@
     node = T.lift(node);
 
     // Pass 1.
-
     logger.info("Pass 1");
     var types = resolveAndLintTypes(node, clone(Types.builtinTypes));
     var o = { types: types, name: name, logger: _logger, warn: warningOptions(options), memcheck: options.memcheck };

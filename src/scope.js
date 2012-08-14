@@ -55,6 +55,7 @@
   const PrimitiveType = Types.PrimitiveType;
   const StructType = Types.StructType;
   const PointerType = Types.PointerType;
+  const ArrayType = Types.ArrayType;
   const ArrowType = Types.ArrowType;
 
   /**
@@ -64,8 +65,7 @@
   function Variable(name, type) {
     this.name = name;
     this.type = type;
-    this.isStackAllocated = (type instanceof StructType ||
-                             (type && type.arraySize !== undefined));
+    this.isStackAllocated = (type instanceof StructType || type instanceof ArrayType);
   }
 
   Variable.prototype.toString = function () {

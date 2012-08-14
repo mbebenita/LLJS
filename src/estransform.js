@@ -131,7 +131,7 @@
 
     ArrayExpression: {
       extends: "Expression",
-      fields:  ["elements"]
+      fields:  ["@elements"]
     },
 
     ObjectExpression: {
@@ -259,7 +259,12 @@
 
     PointerType: {
       extends: "Type",
-      fields: ["@base", "arraySize"]
+      fields: ["@base"]
+    },
+
+    ArrayType: {
+      extends: "PointerType",
+      fields: ["length"]
     },
 
     StructType: {

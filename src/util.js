@@ -51,7 +51,7 @@
     assert(scope);
     address = alignAddress(address, byteOffset, ty);
     var expr;
-    if (ty.arraySize) {
+    if (ty instanceof Types.ArrayType) {
       expr = address;
     } else {
       expr = new MemberExpression(scope.getView(ty), address, true, loc);

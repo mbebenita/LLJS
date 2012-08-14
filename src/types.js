@@ -66,7 +66,7 @@
 
   function PointerType(base) {
     this.base = base;
-  };
+  }
 
   PointerType.prototype.defaultValue = 0;
   PointerType.prototype.size = 4;
@@ -75,6 +75,34 @@
     lvl = lvl || 0;
     return tystr(this.base, lvl + 1) + "*";
   };
+
+  function ArrayType(base, length) {
+    PointerType.call(this, base);
+    this.length = length;
+  }
+
+  ArrayType.prototype = Object.create(PointerType.prototype);
+  ArrayType.prototype.toString = function (lvl) {
+    lvl = lvl || 0;
+    var lengths = "";
+    var base = this;
+    while (base instanceof ArrayType) {
+      lengths += '[' + (base.length !== undefined ? base.length : "*") + ']';
+      base = base.base;
+    }
+    return tystr(base, lvl + 1) + lengths;
+  };
+  /**
+   * Gets the root element type.
+   */
+  ArrayType.prototype.getRoot = function () {
+    var base = this;
+    while (base instanceof ArrayType) {
+      base = base.base;
+    }
+    return base;
+  };
+  ArrayType.prototype.defaultValue = undefined;
 
   function ArrowType(paramTypes, returnType) {
     this.paramTypes = paramTypes;
@@ -155,12 +183,14 @@
   };
 
   PointerType.prototype.align = u32ty;
+  ArrayType.prototype.align = u32ty;
 
   exports.TypeAlias = TypeAlias;
   exports.PrimitiveType = PrimitiveType;
   exports.StructType = StructType;
   exports.StructStaticType = StructStaticType;
   exports.PointerType = PointerType;
+  exports.ArrayType = ArrayType;
   exports.ArrowType = ArrowType;
   exports.builtinTypes = builtinTypes;
 
