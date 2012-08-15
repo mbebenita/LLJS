@@ -1,3 +1,5 @@
+let assert = require("assert");
+
 extern describe, it;
 
 struct ST {
@@ -18,31 +20,36 @@ describe('Arrays-Stack', function () {
     arr[0] = 5;
     arr[1] = 10;
 
-    (*arr).should.equal(5);
-    (arr[0]).should.equal(5);
-    (arr[1]).should.equal(10);
-
+    assert (*arr === 5);
+    assert (arr[0] === 5);
+    assert (arr[1] === 10);
     let ST s;
-    (&s-arr).should.equal(100);
+    assert (&s - arr === 100);
+  });
+
+  it('allocates an u8 array on the stack', function () {
+    let u8 arr[100];
+    arr[2] = 5;
+    assert (arr[2] === 5);
   });
 
   it('allocates an u8 array on the stack', function () {
     let u8 arr[100];
     arr[0] = 5;
     arr[1] = 10;
-    (*arr).should.equal(5, "dereferencing array");
-    (arr[0]).should.equal(5, "access first element");
-    (arr[1]).should.equal(10, "access second element");
+    assert (*arr === 5);
+    assert (arr[0] === 5);
+    assert (arr[1] === 10);
 
     let float arr2[100];
     arr2[0] = 5;
     arr2[1] = 10;
-    (*arr2).should.equal(5);
-    (arr2[0]).should.equal(5);
-    (arr2[1]).should.equal(10);
+    assert (*arr2 === 5);
+    assert (arr2[0] === 5);
+    assert (arr2[1] === 10);
 
     let ST s;
-    (&s-arr).should.equal(126);
+    assert (&s - arr === 126);
   });
 
   it('allocates a struct with an inline array', function () {
@@ -50,7 +57,7 @@ describe('Arrays-Stack', function () {
     s.arr[5] = 10;
 
     let ST s2;
-    (&s2-&s).should.equal(100);
+    assert (&s2 - &s === 100);
   });
 
   it('allocates a struct with an inline array of structs with arrays', function () {
@@ -58,6 +65,6 @@ describe('Arrays-Stack', function () {
     s.arr[5].arr[5] = 5;
 
     let ST s2;
-    (&s2-&s).should.equal(100*100);
+    assert (&s2 - &s === 100 * 100);
   });
 });

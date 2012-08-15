@@ -1,3 +1,5 @@
+let assert = require("assert");
+
 extern describe, it, Math;
 
 struct A {
@@ -16,17 +18,17 @@ describe('Structs with Member Functions', function() {
   it('calls static member functions', function () {
     for (let int i = 0; i < 10; i++) {
       B.setY(i);
-      (B.y).should.equal(i);
+      assert (B.y === i);
       let int * x = &B.y;
       *x = i + 1;
-      (B.y).should.equal(i + 1);
+      assert (B.y === i + 1);
     }
   });
   it('updates static member fields', function () {
     for (let int i = 0; i < 10; i++) {
       let int * x = &B.y;
       *x = i + 1;
-      (B.y).should.equal(i + 1);
+      assert (B.y === i + 1);
     }
   });
 });

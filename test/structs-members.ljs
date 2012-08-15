@@ -1,3 +1,5 @@
+let assert = require("assert");
+
 extern describe, it, Math;
 
 struct Point {
@@ -41,33 +43,32 @@ function floatIsEqual(a, b) {
   return d < 0.001;
 }
 
-describe('Structs with Member Functions', function() {
+describe('Member Functions', function() {
   it('allocates structs on the heap and call methods', function () {
     let Point * p = new Point(1, 2);
-    p->toString().should.equal("{x: 1, y: 2}");
+    assert (p->toString() === "{x: 1, y: 2}");
 
     let Line * l = new Line(1, 2, 3, 4);
-    l->toString().should.equal("{{x: 1, y: 2} -> {x: 3, y: 4}}");
-    floatIsEqual(l->getLength(), 2.8284271247461903).should.be.true;
+    assert (l->toString() === "{{x: 1, y: 2} -> {x: 3, y: 4}}");
+    assert (floatIsEqual(l->getLength(), 2.8284271247461903));
   });
 
   it('allocates structs on the stack and call methods', function () {
     let Line l1 (1, 2, 3, 4), l2 (2, 3, 4, 5), *l3;
-    l1.toString().should.equal("{{x: 1, y: 2} -> {x: 3, y: 4}}");
-    l1.a.toString().should.equal("{x: 1, y: 2}");
-    l1.b.toString().should.equal("{x: 3, y: 4}");
+    assert (l1.toString() === "{{x: 1, y: 2} -> {x: 3, y: 4}}");
+    assert (l1.a.toString() === "{x: 1, y: 2}");
+    assert (l1.b.toString() === "{x: 3, y: 4}");
   });
 
   it('allocates structs on the stack and call methods', function () {
     for (let int i = 0; i < 10; i++) {
       let Point * k = new Point(1, 2);
-      k->toString().should.equal("{x: 1, y: 2}");
+      assert (k->toString() === "{x: 1, y: 2}");
     }
 
     for (let int i = 0; i < 10; i++) {
       let Point a (i, 1), b (i, 2);
-      (a.distanceTo(&b)).should.equal(1);
+      assert (a.distanceTo(&b) === 1);
     }
   });
-
 });

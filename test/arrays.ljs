@@ -1,3 +1,5 @@
+let assert = require("assert");
+
 extern describe, it;
 
 describe('Arrays', function() {
@@ -9,7 +11,7 @@ describe('Arrays', function() {
     for (let int i = 0; i < length; i++) {
       sum += a[i];
     }
-    sum.should.equal((length * (length - 1)) / 2);
+    assert (sum === ((length * (length - 1)) / 2));
   }
 
   it('allocates an array on the heap', function () {
