@@ -48,8 +48,9 @@ enable it with:
 Testing
 =======
 
-To run the tests install [Mocha](http://visionmedia.github.com/mocha/) and [Should.js](https://github.com/visionmedia/should.js) Node modules. Then run:
+To run the tests install the [Mocha](http://visionmedia.github.com/mocha/) module then run:
 
-    mocha --compilers ljs:ljc --require should
+    export NODE_PATH=src/
+    mocha --compilers ljs:ljc
 
 from the root LLJS directory.

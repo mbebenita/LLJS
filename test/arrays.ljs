@@ -1,6 +1,6 @@
 let assert = require("assert");
 
-extern describe, it;
+extern describe, it, console;
 
 describe('Arrays', function() {
   function testElements(int * a, int length) {
@@ -22,6 +22,32 @@ describe('Arrays', function() {
     let int a [1024];
     testElements(a, 1024);
   });
+
+  it('int', function () {
+    let int a [1024];
+    testElements(a, 1024);
+   });
 });
 
-
+describe('Stack Arrays', function() {
+  it('u8', function () {
+    let u8 a [1024];
+    a[42] = 42;
+    assert (a[42] === 42);
+    assert (*(a + 42) === 42);
+    a[42] = 0xFFAD;
+    assert (*(a + 42) === 0xAD);
+    a[12] = -1;
+    assert (a[12] === 255);
+  });
+  it('i8', function () {
+    let i8 a [1024];
+    a[42] = -42;
+    assert (a[42] === -42);
+    assert (*(a + 42) === -42);
+    *(a + 42) = 0xFFAE;
+    assert (*(a + 42) === -82);
+    a[12] = -1;
+    assert (a[12] === -1);
+  });
+});
