@@ -14,19 +14,14 @@ describe('Arrays', function() {
     assert (sum === ((length * (length - 1)) / 2));
   }
 
-  it('allocates an array on the heap', function () {
+  it('Read / Write from i32 Heap Array', function () {
     testElements(new int [1024], 1024);
   });
 
-  it('allocates an array on the stack', function () {
+  it('Read / Write from i32 Stack Array', function () {
     let int a [1024];
     testElements(a, 1024);
   });
-
-  it('int', function () {
-    let int a [1024];
-    testElements(a, 1024);
-   });
 });
 
 describe('Stack Arrays', function() {
@@ -40,6 +35,7 @@ describe('Stack Arrays', function() {
     a[12] = -1;
     assert (a[12] === 255);
   });
+
   it('i8', function () {
     let i8 a [1024];
     a[42] = -42;
@@ -49,5 +45,49 @@ describe('Stack Arrays', function() {
     assert (*(a + 42) === -82);
     a[12] = -1;
     assert (a[12] === -1);
+  });
+
+  it('1D Array with Initializer', function () {
+    let int a [4] = [1, 2, 3, 4];
+    assert (a[0] === 1);
+    assert (a[1] === 2);
+    assert (a[2] === 3);
+    assert (a[3] === 4);
+  });
+
+  it('2D Array with Initializer', function () {
+    let int a [2][2] = [[1, 2], [3, 4]];
+    assert (a[0][0] === 1);
+    assert (a[0][1] === 2);
+    assert (a[1][0] === 3);
+    assert (a[1][1] === 4);
+  });
+
+  it('5D Array', function () {
+    let int a [5][5][5][5][5];
+    let int x = 0;
+    for (let int i = 0; i < 5; i++) {
+      for (let int j = 0; j < 5; j++) {
+        for (let int k = 0; k < 5; k++) {
+          for (let int l = 0; l < 5; l++) {
+            for (let int m = 0; m < 5; m++) {
+              a[i][j][k][l][m] = x++;
+            }
+          }
+        }
+      }
+    }
+    x = 0;
+    for (let int i = 0; i < 5; i++) {
+      for (let int j = 0; j < 5; j++) {
+        for (let int k = 0; k < 5; k++) {
+          for (let int l = 0; l < 5; l++) {
+            for (let int m = 0; m < 5; m++) {
+              assert (a[i][j][k][l][m] === x++);
+            }
+          }
+        }
+      }
+    }
   });
 });
