@@ -52,6 +52,10 @@
   const TypeAliasDirective = T.TypeAliasDirective;
   const CastExpression = T.CastExpression;
 
+  function literal(x) {
+    return new Literal(x);
+  }
+  
   /**
    * Import utilities.
    */
@@ -740,7 +744,7 @@
 
     if (!this.init && type.defaultValue !== undefined) {
       // Make sure we have an initializer if the type has a default value.
-      this.init = new Literal(type.defaultValue);
+      this.init = literal(type.defaultValue);
     }
 
     if (this.arguments) {
@@ -772,7 +776,7 @@
                   new UnaryExpression("*",
                     new BinaryExpression("+",
                       rootPointer,
-                      new Literal(generated++)
+                      literal(generated++)
                     )
                   ),
                   "=", element, element.loc
@@ -879,7 +883,7 @@
 
     if (op === "sizeof") {
       ty = this.argument.reflect(o);
-      return cast(new Literal(ty.size, this.argument.loc), Types.i32ty);
+      return cast(literal(ty.size, this.argument.loc), Types.i32ty);
     }
 
     var arg = this.argument = this.argument.transform(o);
@@ -921,7 +925,7 @@
     var ty;
     if (this.callee instanceof Identifier && (ty = o.types[this.callee.name])) {
       var pty = new PointerType(ty)
-      var allocation = new CallExpression(o.scope.MALLOC(), [cast(new Literal(ty.size), Types.u32ty)], this.loc);
+      var allocation = new CallExpression(o.scope.MALLOC(), [cast(literal(ty.size), Types.u32ty)], this.loc);
       allocation = cast(allocation.transform(o), pty);
       // Check if we have a constructor ArrowType.
       if (ty instanceof StructType) {
@@ -943,7 +947,7 @@
     } else if (this.callee instanceof MemberExpression &&
                this.callee.computed &&
                (ty = o.types[this.callee.object.name])) {
-      var size = new BinaryExpression("*", new Literal(ty.size), this.callee.property, this.loc);
+      var size = new BinaryExpression("*", literal(ty.size), this.callee.property, this.loc);
       var allocation = new CallExpression(o.scope.MALLOC(), [cast(size, Types.u32ty)], this.loc);
       return cast(allocation.transform(o), new PointerType(ty));
     }
@@ -963,7 +967,7 @@
       var scope = o.scope;
       var op = this.operator === "++" ? "+" : "-";
       var ref = scope.cacheReference(arg);
-      var right = new BinaryExpression(op, ref.use, new Literal(1), this.loc);
+      var right = new BinaryExpression(op, ref.use, literal(1), this.loc);
       if (this.prefix) {
         return (new AssignmentExpression(ref.def, "=", right, this.loc)).transform(o);
       }
@@ -1010,9 +1014,11 @@
       }
       var left = new UnaryExpression("&", this.left, this.left.loc);
       var right = new UnaryExpression("&", this.right, this.right.loc);
-      return cast(new CallExpression(mc, [left, right, new Literal(size)]), lty, this.loc).transform(o);
+      return cast(new CallExpression(mc, [left, right, literal(size)]), lty, this.loc).transform(o);
     } else {
+
       this.right = cast(this.right, lty);
+
       return cast(this, lty);
     }
   };
@@ -1206,16 +1212,15 @@
     // truncation.
     var loc = expr.loc;
     if (lwidth !== 32 && lwidth < rwidth) {
-      conversion = new BinaryExpression("&", expr, new Literal(mask), loc);
+      conversion = new BinaryExpression("&", expr, literal(mask), loc);
       // Do we need to sign extend?
       if (lsigned) {
-        var shiftLit = new Literal(shift);
-        conversion = new BinaryExpression("<<", conversion, shift, loc);
-        conversion = new BinaryExpression(">>", conversion, shift, loc);
+        conversion = new BinaryExpression("<<", conversion, literal(shift), loc);
+        conversion = new BinaryExpression(">>", conversion, literal(shift), loc);
       }
     } else {
       conversion = new BinaryExpression((lsigned ? "|" : ">>>"), expr,
-                                        new Literal(0), loc);
+                                        literal(0), loc);
     }
 
     return conversion;
@@ -1267,7 +1272,7 @@
 
     var frameSize = frame.frameSizeInWords;
     if (frameSize) {
-      var allocStack = new AssignmentExpression(frame.realSP(), "-=", new Literal(frameSize));
+      var allocStack = new AssignmentExpression(frame.realSP(), "-=", literal(frameSize));
       var spDecl = new VariableDeclarator(frame.SP(), allocStack);
       code.push(new VariableDeclaration("const", [spDecl]));
     }
@@ -1312,7 +1317,7 @@
     var frame = node.frame;
     var frameSize = frame.frameSizeInWords;
     if (frameSize) {
-      return [new ExpressionStatement(new AssignmentExpression(frame.realSP(), "+=", new Literal(frameSize)))];
+      return [new ExpressionStatement(new AssignmentExpression(frame.realSP(), "+=", literal(frameSize)))];
     }
     return [];
   }
@@ -1359,10 +1364,10 @@
       }
       this.frame.memcheckFnLoc = {name: memcheckName, line: this.loc.start.line, column: this.loc.start.column};
       this.body.body.unshift(new ExpressionStatement(new CallExpression(this.frame.MEMCHECK_CALL_PUSH(),
-                                                                        [new Literal(memcheckName),
-                                                                         new Literal(o.name),
-                                                                         new Literal(this.loc.start.line),
-                                                                         new Literal(this.loc.start.column)])));
+                                                                        [literal(memcheckName),
+                                                                         literal(o.name),
+                                                                         literal(this.loc.start.line),
+                                                                         literal(this.loc.start.column)])));
 
       if (this.body.body[this.body.body.length-1].type !== 'ReturnStatement') {
          this.body.body.push(new ExpressionStatement(new CallExpression(this.frame.MEMCHECK_CALL_POP(), [])));
@@ -1403,9 +1408,9 @@
     if(o.memcheck) {
       var fnLoc = o.scope.frame.memcheckFnLoc;
       this.body.body.unshift(new ExpressionStatement(new CallExpression(o.scope.frame.MEMCHECK_CALL_RESET(),
-                                                                        [new Literal(fnLoc.name),
-                                                                         new Literal(fnLoc.line),
-                                                                         new Literal(fnLoc.column)])));
+                                                                        [literal(fnLoc.name),
+                                                                         literal(fnLoc.line),
+                                                                         literal(fnLoc.column)])));
     }
     return Node.prototype.lower.call(this, o);
   };
@@ -1448,7 +1453,7 @@
       var assn = new AssignmentExpression(t, "=", arg, arg.loc);
       var exprList = [assn];
       if(frameSize) {
-        var restoreStack = new AssignmentExpression(scope.frame.realSP(), "+=", new Literal(frameSize));
+        var restoreStack = new AssignmentExpression(scope.frame.realSP(), "+=", literal(frameSize));
         exprList.push(restoreStack);
       }
       if(o.memcheck) {
@@ -1470,7 +1475,7 @@
       if (rty instanceof PrimitiveType && rty.integral) {
         var scale = lty.base.size / lty.base.align.size;
         if (scale > 1) {
-          this.right = new BinaryExpression("*", this.right, new Literal(scale), this.right.loc);
+          this.right = new BinaryExpression("*", this.right, literal(scale), this.right.loc);
         }
       }
     }
@@ -1520,7 +1525,7 @@
    */
 
   function createRequire(name) {
-    return new CallExpression(new Identifier("require"), [new Literal(name)]);
+    return new CallExpression(new Identifier("require"), [literal(name)]);
   }
 
   function createModule(program, name, bare, loadInstead, memcheck) {
@@ -1534,7 +1539,7 @@
         mdecl = new VariableDeclarator(cachedMEMORY, new Identifier("exports"));
       } else if (loadInstead) {
         mdecl = new VariableDeclarator(cachedMEMORY, new SequenceExpression([
-          new CallExpression(new Identifier("load"), [new Literal("memory.js")]),
+          new CallExpression(new Identifier("load"), [literal("memory.js")]),
           new Identifier("memory")]));
       } else {
         mdecl = new VariableDeclarator(cachedMEMORY, createRequire("memory"));
@@ -1545,7 +1550,7 @@
         assert (memcheck !== undefined);
         body.push(new ExpressionStatement(
           new CallExpression(new MemberExpression(cachedMEMORY, new Identifier("set_memcheck")),
-                             [new Literal(memcheck)])));
+                             [literal(memcheck)])));
       }
 
     }
@@ -1565,7 +1570,7 @@
     var moduleArgs = [
       new ThisExpression(),
       new ConditionalExpression(
-        new BinaryExpression("===", new UnaryExpression("typeof", exports), new Literal("undefined")),
+        new BinaryExpression("===", new UnaryExpression("typeof", exports), literal("undefined")),
         new AssignmentExpression(new Identifier(mname), "=", new ObjectExpression([])),
         exports)
     ];
