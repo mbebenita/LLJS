@@ -1,0 +1,60 @@
+let assert = require("assert");
+
+extern describe, it, console;
+
+
+struct Matrix {
+  float elements[2][2];
+
+  static function mul(Matrix * a, Matrix * b, Matrix * c) {
+    for (let int j = 0; j < 2; j++) {
+      for (let int k = 0; k < 2; k++) {
+        for (let int i = 0; i < 2; i++) {
+          c->elements[i][j] += a->elements[i][k] * b->elements[k][j];
+        }
+      }
+    }
+  }
+}
+
+describe('Matrix', function() {
+  it('Multiply', function () {
+    let Matrix a, b, c, d;
+    a.elements[0][0] = 1;
+    a.elements[0][1] = 2;
+    a.elements[1][0] = 3;
+    a.elements[1][1] = 4;
+
+    b.elements[0][0] = 0;
+    b.elements[0][1] = 0;
+    b.elements[1][0] = 0;
+    b.elements[1][1] = 0;
+
+    c.elements[0][0] = 0;
+    c.elements[0][1] = 0;
+    c.elements[1][0] = 0;
+    c.elements[1][1] = 0;
+
+    Matrix.mul(&a, &a, &b);
+
+    assert (b.elements[0][0] === 7);
+    assert (b.elements[0][1] === 10);
+    assert (b.elements[1][0] === 15);
+    assert (b.elements[1][1] === 22);
+
+    Matrix.mul(&a, &b, &c);
+
+    assert (c.elements[0][0] === 37);
+    assert (c.elements[0][1] === 54);
+    assert (c.elements[1][0] === 81);
+    assert (c.elements[1][1] === 118);
+
+  });
+});
+
+
+describe('Structs', function() {
+  it('allocates an union', function () {
+
+  });
+});
