@@ -183,7 +183,6 @@
   };
 
   PointerType.prototype.align = u32ty;
-  ArrayType.prototype.align = u32ty;
 
   exports.TypeAlias = TypeAlias;
   exports.PrimitiveType = PrimitiveType;

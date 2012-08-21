@@ -277,6 +277,8 @@
 
   ArrayType.prototype.lint = function () {
     check(this.base, "array without element type");
+    this.base.lint();
+    this.align = this.base.align;
   };
 
   StructType.prototype.lint = function () {
@@ -294,8 +296,8 @@
       this.fields.push(field = members[i]);
       type = field.type;
 
-      // Recursively lint inline structs.
-      if (type instanceof StructType) {
+      // Recursively lint field types.
+      if (type) {
         type.lint();
       }
 
@@ -843,9 +845,10 @@
       if (rty instanceof PrimitiveType && rty.integral) {
         ty = lty;
       } else if (rty instanceof PointerType && op === "-") {
-        if (lty.assignableFrom(rty)) {
-          ty = Types.i32ty;
-        }
+        check(lty.base.size === rty.base.size,
+              "subtraction with incompatible pointer types " +
+              quote(lty) + " and " + quote(rty));
+        ty = Types.i32ty;
       }
     } else if (BINOP_COMPARISON.indexOf(op) >= 0) {
       if (lty instanceof PointerType && isNull(this.right)) {
@@ -1139,6 +1142,10 @@
     }
 
     if (!this.numeric) {
+      return expr;
+    }
+
+    if (rty && rty.numeric) {
       return expr;
     }
 
