@@ -372,7 +372,9 @@
         if (child instanceof Array) {
           arr = this[children[i]] = [];
           for (var k = 0, l = child.length; k < l; k++) {
-            if (typeof child[k][name] === "function") {
+            if (!child[k]) {
+              arr.push(child[k]);
+            } else if (typeof child[k][name] === "function") {
               trans = child[k][name](o);
               if (trans !== null) {
                 arr.push(trans);
@@ -408,6 +410,10 @@
   };
 
   exports.lift = function lift(raw) {
+    if (!raw) {
+      return raw;
+    }
+    
     if (raw instanceof Array) {
       return raw.map(function (r) {
         return lift(r);
@@ -440,6 +446,9 @@
   };
 
   exports.flatten = function flatten(node) {
+    if (!node) {
+      return node;
+    }
     if (node instanceof Array) {
       return node.map(function (n) {
         return flatten(n);

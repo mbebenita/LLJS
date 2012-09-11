@@ -383,7 +383,9 @@
 
   function scanList(list, o) {
     for (var i = 0, j = list.length; i < j; i++) {
-      list[i].scan(o);
+      if (list[i]) {
+        list[i].scan(o);
+      }
     }
   }
 
@@ -435,7 +437,7 @@
       }
     }
     return this;
-  }
+  };
 
   FunctionExpression.prototype.scan =
   FunctionDeclaration.prototype.scan = function (o) {
