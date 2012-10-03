@@ -213,4 +213,12 @@
   exports.mallocTy = mallocTy;
   exports.freeTy = freeTy;
 
+  exports.memsetTy = memsetTy;
+  exports.memset2Ty = memset2Ty;
+  exports.memset4Ty = memset4Ty;
+
+  exports.memcpyTy = memcpyTy;
+  exports.memcpy2Ty = memcpy2Ty;
+  exports.memcpy4Ty = memcpy4Ty;
+
 }).call(this, typeof exports === "undefined" ? (Types = {}) : exports);

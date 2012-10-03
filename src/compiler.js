@@ -272,7 +272,7 @@
 
   PointerType.prototype.lint = function () {
     check(this.base, "pointer without base type");
-    check(this.base.size, "cannot take pointer of size 0 type " + quote(Types.tystr(this.base, 0)));
+    // check(this.base.size, "cannot take pointer of size 0 type " + quote(Types.tystr(this.base, 0)));
   };
 
   ArrayType.prototype.lint = function () {
@@ -1017,9 +1017,10 @@
         mc = scope.MEMCPY(Types.u8ty.size);
         size = lty.size;
       }
-      var left = new UnaryExpression("&", this.left, this.left.loc);
-      var right = new UnaryExpression("&", this.right, this.right.loc);
-      return cast(new CallExpression(mc, [left, right, literal(size)]), lty, this.loc).transform(o);
+      var memcpyTy = mc.ty.paramTypes[0];
+      var left = cast(new UnaryExpression("&", this.left, this.left.loc), memcpyTy, true);
+      var right = cast(new UnaryExpression("&", this.right, this.right.loc), memcpyTy, true);
+      return cast(new CallExpression(mc, [left, right, literal(size)]), lty).transform(o);
     } else {
       this.right = cast(this.right, lty);
 
