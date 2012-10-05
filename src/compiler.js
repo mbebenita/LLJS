@@ -1021,7 +1021,6 @@
       var right = new UnaryExpression("&", this.right, this.right.loc);
       return cast(new CallExpression(mc, [left, right, literal(size)]), lty, this.loc).transform(o);
     } else {
-
       this.right = cast(this.right, lty);
 
       return cast(this, lty);
@@ -1147,11 +1146,10 @@
       return expr;
     }
 
-    if (rty && rty.numeric) {
-      return expr;
-    }
-
     if (!this.integral) {
+      if (rty && rty.numeric) {
+        return expr;
+      }
       return new CallExpression(new Identifier("Number"), [expr], expr.loc);
     }
 
