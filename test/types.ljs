@@ -1,0 +1,61 @@
+let assert = require("assert");
+
+extern describe, it;
+
+describe('Machine Types', function() {
+  it('u8', function () {
+    let u8 x;         assert (x === 0);
+    x = 1;            assert (x === 1);
+    x = -1;           assert (x === 0xff);
+    x = 0xff;         assert (x === 0xff);
+    x += 1;           assert (x === 0);
+                      assert (sizeof(u8) === 1);
+  });
+
+  it('i8', function () {
+    let i8 x;         assert (x === 0);
+    x = 1;            assert (x === 1);
+    x = -1;           assert (x === -1);
+    x = 0xff;         assert (x === -1);
+    x += 1;           assert (x === 0);
+                      assert (sizeof(i8) === 1);
+  });
+
+
+  it('u16', function () {
+    let u16 x;        assert (x === 0);
+    x = 1;            assert (x === 1);
+    x = -1;           assert (x === 0xffff);
+    x = 0xffff;       assert (x === 0xffff);
+    x += 1;           assert (x === 0);
+                      assert (sizeof(u16) === 2);
+  });
+
+  it('i16', function () {
+    let i16 x;        assert (x === 0);
+    x = 1;            assert (x === 1);
+    x = -1;           assert (x === -1);
+    x = 0xffff;       assert (x === -1);
+    x += 1;           assert (x === 0);
+                      assert (sizeof(i16) === 2);
+  });
+
+  it('u32', function () {
+    let u32 x;        assert (x === 0);
+    x = 1;            assert (x === 1);
+    x = -1;           assert (x === 0xffffffff);
+    x = 0xffffffff;   assert (x === 0xffffffff);
+    x += 1;           assert (x === 0);
+                      assert (sizeof(u32) === 4);
+  });
+
+  it('i32', function () {
+    let i32 x;        assert (x === 0);
+    x = 1;            assert (x === 1);
+    x = -1;           assert (x === -1);
+    x = 0xffffffff;   assert (x === -1);
+    x += 1;           assert (x === 0);
+                      assert (sizeof(i32) === 4);
+  });
+
+});
