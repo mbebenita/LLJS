@@ -349,7 +349,7 @@ let int z = *x + *y;</pre>
 list nodes with the slow K&R malloc versus using native JavaScript objects. We
 allocate and free 250,000 structs of 40 bytes each and compare it against
 allocating 250,000 objects with 4 extra properties. The struct version is much
-more space efficient, and as we will see, performs at leat as well, if
+more space efficient, and as we will see, performs at least as well, if
 not better, than allocating objects.</p>
 
 <p>At the time of this writing, allocating structs is about as fast as
