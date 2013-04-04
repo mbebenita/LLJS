@@ -57,5 +57,23 @@ describe('Machine Types', function() {
     x += 1;           assert (x === 0);
                       assert (sizeof(i32) === 4);
   });
+  
+  it('float', function () {
+    let float x;      assert (x === 0);
+    x = 1;            assert (x === 1);
+    x = -1;           assert (x === -1);
+    x = 0xffffffff;   assert (x === 4294967295);
+    x += 1;           assert (x === 4294967296);
+                      assert (sizeof(float) === 4);
+  });
+
+  it('double', function () {
+    let double x;     assert (x === 0);
+    x = 1;            assert (x === 1);
+    x = -1;           assert (x === -1);
+    x = 0xffffffff;   assert (x === 4294967295);
+    x += 1;           assert (x === 4294967296);
+                      assert (sizeof(double) === 8);
+  });
 
 });
