@@ -85,7 +85,7 @@ describe('Machine Types', function() {
   });
 
   it('num', function () {
-    let num x;     assert (x === 0);
+    let num x;        assert (x === 0);
     x = 1;            assert (x === 1);
     x = -1;           assert (x === -1);
     x = 0xffffffff;   assert (x === 4294967295);
