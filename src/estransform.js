@@ -108,7 +108,7 @@
 
     FunctionDeclaration: {
       extends: "Declaration",
-      fields:  ["@id", "@modifiers", "@params", "@body", "@decltype", "generator", "expression"]
+      fields:  ["@id", "@params", "@body", "@decltype", "generator", "expression", "@modifiers"]
     },
 
     VariableDeclaration: {
