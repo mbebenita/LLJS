@@ -216,10 +216,12 @@ arr[5] = 42;
 trace(arr[5]);
 
 // Heap allocated, dynamic size
+let int *heapArr = new int[10];
 for (let int i=1; i <= 10; i++) {
-  let int *heapArr = new int[i];
-  arr[i-1] = i;
-  trace(i + ": " + arr[i-1]);
+  heapArr[i-1] = i;
+}
+for (let int i=1; i <= 10; i++) {
+  trace(i + ": " + heapArr[i-1]);
 }
 
 // Stack allocated array inside a struct
