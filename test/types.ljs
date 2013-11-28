@@ -9,6 +9,7 @@ describe('Machine Types', function() {
     x = -1;           assert (x === 0xff);
     x = 0xff;         assert (x === 0xff);
     x += 1;           assert (x === 0);
+    x = 1.1;          assert (x/2 === 0);
                       assert (sizeof(u8) === 1);
   });
 
@@ -18,6 +19,7 @@ describe('Machine Types', function() {
     x = -1;           assert (x === -1);
     x = 0xff;         assert (x === -1);
     x += 1;           assert (x === 0);
+    x = 1.1;          assert (x/2 === 0);
                       assert (sizeof(i8) === 1);
   });
 
@@ -28,6 +30,7 @@ describe('Machine Types', function() {
     x = -1;           assert (x === 0xffff);
     x = 0xffff;       assert (x === 0xffff);
     x += 1;           assert (x === 0);
+    x = 1.1;          assert (x/2 === 0);
                       assert (sizeof(u16) === 2);
   });
 
@@ -37,6 +40,7 @@ describe('Machine Types', function() {
     x = -1;           assert (x === -1);
     x = 0xffff;       assert (x === -1);
     x += 1;           assert (x === 0);
+    x = 1.1;          assert (x/2 === 0);
                       assert (sizeof(i16) === 2);
   });
 
@@ -46,6 +50,7 @@ describe('Machine Types', function() {
     x = -1;           assert (x === 0xffffffff);
     x = 0xffffffff;   assert (x === 0xffffffff);
     x += 1;           assert (x === 0);
+    x = 1.1;          assert (x/2 === 0);
                       assert (sizeof(u32) === 4);
   });
 
@@ -55,7 +60,38 @@ describe('Machine Types', function() {
     x = -1;           assert (x === -1);
     x = 0xffffffff;   assert (x === -1);
     x += 1;           assert (x === 0);
+    x = 1.1;          assert (x/2 === 0);
                       assert (sizeof(i32) === 4);
+  });
+
+  it('float', function () {
+    let float x;      assert (x === 0);
+    x = 1;            assert (x === 1);
+    x = -1;           assert (x === -1);
+    x = 0xffffffff;   assert (x === 4294967295);
+    x += 1;           assert (x === 4294967296);
+    x = 1.1;          assert (x/2 === 0.55);
+                      assert (sizeof(float) === 4);
+  });
+
+  it('double', function () {
+    let double x;     assert (x === 0);
+    x = 1;            assert (x === 1);
+    x = -1;           assert (x === -1);
+    x = 0xffffffff;   assert (x === 4294967295);
+    x += 1;           assert (x === 4294967296);
+    x = 1.1;          assert (x/2 === 0.55);
+                      assert (sizeof(double) === 8);
+  });
+
+  it('num', function () {
+    let num x;        assert (x === 0);
+    x = 1;            assert (x === 1);
+    x = -1;           assert (x === -1);
+    x = 0xffffffff;   assert (x === 4294967295);
+    x += 1;           assert (x === 4294967296);
+    x = 1.1;          assert (x/2 === 0.55);
+                      assert (sizeof(num) === 8);
   });
 
 });
