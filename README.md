@@ -10,8 +10,6 @@ goal here is to explore low-level statically typed features in a high-level
 dynamically typed language. Think of it as inline assembly in C, or the
 unsafe keyword in C#. It's not pretty, but it gets the job done.
 
-[Try It Online](http://lljs.org)
-
 Usage
 =====
 
