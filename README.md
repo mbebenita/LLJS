@@ -46,7 +46,7 @@ enable it with:
 Testing
 =======
 
-To run the tests install the [Mocha](http://visionmedia.github.com/mocha/) module then run:
+To run the tests install the [Mocha](http://mochajs.org/) module then run:
 
     export NODE_PATH=src/
     mocha --compilers ljs:ljc
